@@ -1,0 +1,277 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+ 
+:root {
+  --pulse-forest: #1E6B4E;
+  --pulse-leaf: #3FA96B;
+  --pulse-mint: #EAF7EF;
+  --pulse-mist: #F6FBF8;
+  --pulse-white: #FFFFFF;
+  --pulse-ink: #1B2A22;
+  --pulse-muted: #6C8479;
+  --pulse-border: #DCEEE3;
+}
+ 
+.admin-root * { box-sizing: border-box; }
+ 
+.admin-root {
+  font-family: 'Inter', sans-serif;
+  color: var(--pulse-ink);
+  background: var(--pulse-mist);
+  min-height: 100vh;
+  display: flex;
+  width: 100%;
+}
+ 
+/* ---------- Sidebar ---------- */
+.admin-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--pulse-white);
+  border-right: 1px solid var(--pulse-border);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 16px;
+  min-height: 100vh;
+}
+ 
+.admin-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px 4px 4px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+.admin-logo:hover { background: var(--pulse-mint); }
+ 
+.admin-logo-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--pulse-forest), var(--pulse-leaf));
+  flex-shrink: 0;
+}
+ 
+.admin-logo-text {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--pulse-ink);
+  letter-spacing: -0.01em;
+}
+.admin-logo-accent { color: var(--pulse-leaf); }
+ 
+.admin-sidebar-role {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pulse-muted);
+  margin: 18px 10px 10px;
+}
+ 
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+ 
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pulse-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+ 
+.admin-nav-item:hover {
+  background: var(--pulse-mint);
+  border-color: var(--pulse-border);
+}
+ 
+.admin-nav-item.active {
+  background: var(--pulse-mint);
+  border-color: var(--pulse-leaf);
+  color: var(--pulse-forest);
+  font-weight: 600;
+}
+ 
+.admin-sidebar-spacer { flex: 1; }
+ 
+.admin-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: none;
+  border: 1px solid transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #B3453D;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.admin-logout:hover { background: #FCEEEC; }
+ 
+/* ---------- Main ---------- */
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  padding: 22px 32px 40px;
+}
+ 
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+ 
+.admin-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--pulse-white);
+  border: 1px solid var(--pulse-border);
+  color: var(--pulse-forest);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.admin-back-btn:hover:not(:disabled) {
+  background: var(--pulse-mint);
+  transform: translateX(-2px);
+}
+.admin-back-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+ 
+.admin-date-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pulse-white);
+  border: 1px solid var(--pulse-border);
+  color: var(--pulse-forest);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 999px;
+}
+ 
+.admin-pulse-divider {
+  width: 100%;
+  height: 22px;
+  margin: 10px 0 22px;
+  opacity: 0.55;
+}
+ 
+.admin-page-heading {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 2px;
+  color: var(--pulse-ink);
+}
+.admin-page-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  color: var(--pulse-muted);
+  margin: 0 0 22px;
+}
+ 
+/* ---------- Cards ---------- */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.admin-grid.admin-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 900px;
+}
+ 
+.admin-card {
+  background: var(--pulse-white);
+  border: 1px solid var(--pulse-border);
+  border-radius: 16px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+ 
+.admin-card:hover, .admin-card:focus-visible {
+  transform: translateY(-6px);
+  background: var(--pulse-mint);
+  border-color: var(--pulse-leaf);
+  box-shadow: 0 14px 24px -12px rgba(30, 107, 78, 0.28);
+  outline: none;
+}
+ 
+.admin-card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--pulse-mint);
+  color: var(--pulse-forest);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.22s ease, color 0.22s ease;
+}
+.admin-card:hover .admin-card-icon {
+  background: var(--pulse-white);
+}
+ 
+.admin-card-text h3 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--pulse-ink);
+}
+.admin-card-text p {
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  color: var(--pulse-muted);
+  margin: 0;
+}
+ 
+@media (max-width: 980px) {
+  .admin-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .admin-sidebar { width: 76px; }
+  .admin-logo-text, .admin-sidebar-role, .admin-nav-item span, .admin-logout span { display: none; }
+  .admin-grid, .admin-grid.admin-grid-3 { grid-template-columns: 1fr; }
+  .admin-main { padding: 18px 16px 32px; }
+}
+ 

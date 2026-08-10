@@ -1,0 +1,262 @@
+.ewf-page {
+  --ink: #18b989;
+  --leaf-700: #0de189;
+  --leaf-600: #24d988;
+  --leaf-500: #0c9e5d;
+  --leaf-300: #95D5B2;
+  --leaf-100: #D8F3DC;
+  --paper: #FFFFFF;
+  --mist: #F4FBF6;
+  --danger: #C0392B;
+  --font-display: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(circle at 12% 8%, var(--leaf-100) 0%, var(--mist) 45%, #eaf6ee 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+.ewf-page *, .ewf-page *::before, .ewf-page *::after { box-sizing: border-box; }
+
+.ewf-card {
+  width: 100%;
+  max-width: 960px;
+  background: var(--paper);
+  border-radius: 22px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  box-shadow: 0 30px 60px -25px rgba(11, 61, 46, 0.35);
+  border: 1px solid var(--leaf-100);
+}
+@media (max-width: 800px) {
+  .ewf-card { grid-template-columns: 1fr; }
+}
+
+/* -------- illustration panel -------- */
+.ewf-hero {
+  position: relative;
+  background: linear-gradient(160deg, var(--leaf-700) 0%, var(--leaf-600) 55%, var(--leaf-500) 100%);
+  color: var(--leaf-100);
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.ewf-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  background: rgba(255,255,255,0.12);
+  padding: 8px 14px;
+  border-radius: 999px;
+  width: fit-content;
+}
+.ewf-hero h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 22px 0 10px;
+  font-weight: 600;
+}
+.ewf-hero p {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--leaf-100);
+  opacity: 0.9;
+  max-width: 34ch;
+}
+.ewf-hero-illustration { margin: 8px 0; }
+.ewf-hero-foot {
+  font-size: 12.5px;
+  opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ewf-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 90%, rgba(255,255,255,0.12), transparent 55%);
+  pointer-events: none;
+}
+
+/* -------- form panel -------- */
+.ewf-form-panel {
+  padding: 40px 36px 32px;
+  display: flex;
+  flex-direction: column;
+}
+.ewf-form-header h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--leaf-700);
+}
+.ewf-form-header p {
+  font-size: 13.5px;
+  color: #557A6B;
+  margin: 0 0 22px;
+}
+
+.ewf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 14px;
+}
+.ewf-grid .ewf-span-2 { grid-column: 1 / -1; }
+@media (max-width: 520px) {
+  .ewf-grid { grid-template-columns: 1fr; }
+  .ewf-grid .ewf-span-2 { grid-column: auto; }
+}
+
+.ewf-field { display: flex; flex-direction: column; gap: 6px; }
+.ewf-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--leaf-700);
+  letter-spacing: 0.01em;
+}
+.ewf-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid #DCEEE2;
+  background: var(--mist);
+  border-radius: 10px;
+  padding: 0 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ewf-input-wrap:focus-within {
+  border-color: var(--leaf-500);
+  box-shadow: 0 0 0 3px rgba(64, 145, 108, 0.15);
+  background: var(--paper);
+}
+.ewf-input-wrap--error {
+  border-color: var(--danger);
+  background: #FDF3F2;
+}
+.ewf-input-icon { color: var(--leaf-500); flex-shrink: 0; }
+.ewf-input-wrap--error .ewf-input-icon { color: var(--danger); }
+.ewf-status-icon--ok { color: var(--leaf-500); flex-shrink: 0; }
+.ewf-status-icon--error { color: var(--danger); flex-shrink: 0; }
+
+.ewf-input-wrap input,
+.ewf-input-wrap select,
+.ewf-input-wrap textarea {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--ink);
+  width: 100%;
+  padding: 11px 0;
+}
+.ewf-input-wrap textarea { resize: none; padding: 11px 0; }
+.ewf-input-wrap select { appearance: none; cursor: pointer; }
+.ewf-input-wrap input::placeholder,
+.ewf-input-wrap textarea::placeholder { color: #9BB5AA; }
+
+
+.ewf-eye-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--leaf-500);
+  display: flex;
+  flex-shrink: 0;
+}
+
+.ewf-error {
+  font-size: 12px;
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ewf-submit {
+  margin-top: 24px;
+  width: 100%;
+  background: linear-gradient(135deg, var(--leaf-600), var(--leaf-500));
+  color: white;
+  border: none;
+  padding: 13px 20px;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 12px 24px -12px rgba(45, 106, 79, 0.6);
+}
+.ewf-submit:hover { transform: translateY(-1px); }
+.ewf-submit:active { transform: translateY(0); }
+
+.ewf-footnote {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #6A8B7B;
+  text-align: center;
+}
+
+/* success state */
+.ewf-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 30px 10px;
+  flex: 1;
+}
+.ewf-success-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--leaf-100);
+  color: var(--leaf-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ewf-success h2 { font-family: var(--font-display); color: var(--leaf-700); margin: 0; }
+.ewf-success p { color: #557A6B; font-size: 13.5px; max-width: 32ch; margin: 0; }
+.ewf-success-btn {
+  margin-top: 6px;
+  background: var(--leaf-100);
+  color: var(--leaf-700);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.ewf-success-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}

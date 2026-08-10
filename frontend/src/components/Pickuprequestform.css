@@ -1,0 +1,293 @@
+/* PickupRequestForm.css
+   Light-green + white palette for the waste pickup request form. */
+
+:root {
+  --pf-page-bg: #ffffff;
+  --pf-card-bg: #e8f5e9;
+  --pf-card-border: #c8e6c9;
+  --pf-border: #bee0c0;
+  --pf-field-bg: #ffffff;
+  --pf-dashed-border: #a5d6a7;
+  --pf-green: #4caf50;
+  --pf-green-hover: #43a047;
+  --pf-green-dark: #1b5e20;
+  --pf-green-darker: #14401a;
+  --pf-green-mid: #2e7d32;
+  --pf-green-soft: #66bb6a;
+  --pf-green-muted: #7cb87f;
+  --pf-disabled: #cfe9cf;
+  --pf-submit-bg: #81c784;
+  --pf-submit-bg-hover: #6fbf73;
+  --pf-success-bg: #dff3e1;
+  --pf-white: #ffffff;
+}
+
+.pf-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  background: var(--pf-page-bg);
+  padding: 24px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.pf-wrap {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Top bar */
+.pf-topbar {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.pf-topbar-row {
+  display: flex;
+  align-items: center;
+}
+
+.pf-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: var(--pf-white);
+  border: 1px solid var(--pf-green-dark);
+  color: var(--pf-green-darker);
+  cursor: pointer;
+}
+
+.pf-title {
+  margin-left: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--pf-green-darker);
+}
+
+.pf-underline {
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--pf-green-dark);
+  margin-top: 10px;
+  margin-left: 52px;
+}
+
+/* Form card */
+.pf-card {
+  background: var(--pf-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pf-card-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+.pf-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pf-green-mid);
+  margin-bottom: 8px;
+}
+
+/* Waste image dropzone */
+.pf-dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  border-radius: 12px;
+  border: 2px dashed var(--pf-dashed-border);
+  background: var(--pf-field-bg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pf-dropzone-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf-green-mid);
+  cursor: pointer;
+}
+
+.pf-dropzone-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--pf-green);
+  pointer-events: none;
+}
+
+.pf-dropzone-title {
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.pf-dropzone-sub {
+  font-size: 12px;
+  color: var(--pf-green-muted);
+  margin-top: 2px;
+}
+
+.pf-file-input {
+  display: none;
+}
+
+/* Location field */
+.pf-loc-wrap {
+  position: relative;
+}
+
+.pf-loc-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pf-green-soft);
+}
+
+.pf-loc-input {
+  width: 100%;
+  height: 48px;
+  padding-left: 40px;
+  padding-right: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--pf-border);
+  background: var(--pf-field-bg);
+  color: var(--pf-green-dark);
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Submit button */
+.pf-submit-btn {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  font-weight: 500;
+  color: var(--pf-green-darker);
+  background: var(--pf-submit-bg);
+  border: 1px solid var(--pf-dashed-border);
+  cursor: pointer;
+  font-size: 15px;
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+
+.pf-submit-btn:hover:not(:disabled) {
+  background: var(--pf-submit-bg-hover);
+}
+
+.pf-submit-btn:disabled {
+  background: var(--pf-disabled);
+  cursor: not-allowed;
+}
+
+/* Success state */
+.pf-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.pf-success-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pf-green-mid);
+  font-weight: 500;
+}
+
+.pf-success-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: var(--pf-success-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-reset-btn {
+  font-size: 14px;
+  color: var(--pf-green);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Truck-to-bin animation (inside submit button) */
+.pf-anim-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+}
+
+.pf-anim-road {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  height: 2px;
+  background: rgba(20, 64, 26, 0.25);
+}
+
+.pf-anim-bin {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pf-anim-truck {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: pf-truck-drive 1.7s ease-in-out forwards;
+}
+
+@keyframes pf-truck-drive {
+  0% {
+    transform: translate(0, -50%);
+  }
+  90% {
+    transform: translate(calc(100% + 220px), -50%);
+  }
+  100% {
+    transform: translate(calc(100% + 220px), -50%);
+    opacity: 0;
+  }
+}

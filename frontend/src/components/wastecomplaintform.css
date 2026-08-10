@@ -1,0 +1,295 @@
+/* WasteComplaintForm.css
+   Light-green + white palette, matching PickupRequestForm's design system. */
+
+:root {
+  --wc-page-bg: #ffffff;
+  --wc-card-bg: #e8f5e9;
+  --wc-card-border: #c8e6c9;
+  --wc-border: #bee0c0;
+  --wc-field-bg: #ffffff;
+  --wc-dashed-border: #a5d6a7;
+  --wc-green: #4caf50;
+  --wc-green-hover: #43a047;
+  --wc-green-dark: #1b5e20;
+  --wc-green-darker: #14401a;
+  --wc-green-mid: #2e7d32;
+  --wc-green-soft: #66bb6a;
+  --wc-green-muted: #7cb87f;
+  --wc-disabled: #cfe9cf;
+  --wc-submit-bg: #81c784;
+  --wc-submit-bg-hover: #6fbf73;
+  --wc-success-bg: #dff3e1;
+  --wc-white: #ffffff;
+}
+
+.wc-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  background: var(--wc-page-bg);
+  padding: 24px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.wc-wrap {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Top bar */
+.wc-topbar {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.wc-topbar-row {
+  display: flex;
+  align-items: center;
+}
+
+.wc-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: var(--wc-white);
+  border: 1px solid var(--wc-green-dark);
+  color: var(--wc-green-darker);
+  cursor: pointer;
+}
+
+.wc-title {
+  margin-left: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--wc-green-darker);
+}
+
+.wc-underline {
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--wc-green-dark);
+  margin-top: 10px;
+  margin-left: 52px;
+}
+
+/* Form card */
+.wc-card {
+  background: var(--wc-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--wc-card-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+.wc-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wc-green-mid);
+  margin-bottom: 8px;
+}
+
+/* Image dropzone */
+.wc-dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  border-radius: 12px;
+  border: 2px dashed var(--wc-dashed-border);
+  background: var(--wc-field-bg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.wc-dropzone-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wc-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wc-green-mid);
+  cursor: pointer;
+}
+
+.wc-dropzone-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--wc-green);
+  pointer-events: none;
+}
+
+.wc-dropzone-title {
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.wc-dropzone-sub {
+  font-size: 12px;
+  color: var(--wc-green-muted);
+  margin-top: 2px;
+}
+
+.wc-file-input {
+  display: none;
+}
+
+/* Location field */
+.wc-loc-wrap {
+  position: relative;
+}
+
+.wc-loc-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--wc-green-soft);
+}
+
+.wc-loc-input {
+  width: 100%;
+  height: 48px;
+  padding-left: 40px;
+  padding-right: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--wc-border);
+  background: var(--wc-field-bg);
+  color: var(--wc-green-dark);
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Submit button */
+.wc-submit-btn {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  font-weight: 500;
+  color: var(--wc-green-darker);
+  background: var(--wc-submit-bg);
+  border: 1px solid var(--wc-dashed-border);
+  cursor: pointer;
+  font-size: 15px;
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+
+.wc-submit-btn:hover:not(:disabled) {
+  background: var(--wc-submit-bg-hover);
+}
+
+.wc-submit-btn:disabled {
+  background: var(--wc-disabled);
+  cursor: not-allowed;
+}
+
+/* Success state */
+.wc-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.wc-success-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--wc-green-mid);
+  font-weight: 500;
+}
+
+.wc-success-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: var(--wc-success-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wc-reset-btn {
+  font-size: 14px;
+  color: var(--wc-green);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Complaint-report-to-inbox animation (inside submit button) */
+.wc-anim-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+}
+
+.wc-anim-path {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  border-top: 2px dashed rgba(20, 64, 26, 0.35);
+}
+
+.wc-anim-inbox {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.wc-anim-report {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: wc-report-fly 1.7s ease-in-out forwards;
+}
+
+@keyframes wc-report-fly {
+  0% {
+    transform: translate(0, -50%) rotate(0deg);
+  }
+  50% {
+    transform: translate(calc(50% + 60px), -75%) rotate(8deg);
+  }
+  90% {
+    transform: translate(calc(100% + 200px), -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(calc(100% + 200px), -50%) rotate(0deg);
+    opacity: 0;
+  }
+}
