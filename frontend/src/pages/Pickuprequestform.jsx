@@ -1,206 +1,729 @@
-import React, { useState, useRef, useCallback } from "react";
-import { ArrowLeft, ImagePlus, MapPin, X, Check } from "lucide-react";
-import "../components/Pickuprequestform.css"
+import React, { useState, useRef } from "react";
+import "leaflet/dist/leaflet.css";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  useMapEvents,
+  useMap,
+} from "react-leaflet";
+import "../components/Pickuprequestform.css";
 
+import {
+  ArrowLeft,
+  Activity,
+  Upload,
+  X,
+  Plus,
+  Navigation,
+  MapPin,
+  Truck,
+  Trash2,
+  CheckCircle2,
+} from "lucide-react";
 
-/**
- * Pickup Request Form
- * Light-green form card on a white page background.
- * Fields: waste image, location, submit.
- * On submit, a small truck-to-bin animation plays inside the button.
- * Styling lives in PickupRequestForm.css (import it alongside this file).
- */
-export default function PickupRequestForm({ onBack, onSubmit }) {
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageName, setImageName] = useState("");
-  const [location, setLocation] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | animating | done
+// --------------------------------------------------
+// REVERSE GEOCODING
+// --------------------------------------------------
+const getPlaceName = async (lat, lng) => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      {
+        headers: {
+          "Accept-Language": "en",
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.display_name) {
+      return data.display_name;
+    }
+
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  } catch (error) {
+    console.error("Reverse geocoding failed:", error);
+
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+};
+
+// --------------------------------------------------
+// MAP CLICK HANDLER
+// --------------------------------------------------
+function LocationPicker({
+  locationMode,
+  setPinPosition,
+  setLocationText,
+}) {
+  useMapEvents({
+    click: async (e) => {
+      if (locationMode !== "pick") return;
+
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      setPinPosition({
+        lat,
+        lng,
+      });
+
+      setLocationText("Finding location...");
+
+      const placeName = await getPlaceName(lat, lng);
+
+      setLocationText(placeName);
+    },
+  });
+
+  return null;
+}
+
+// --------------------------------------------------
+// MAP CONTROLLER
+// --------------------------------------------------
+function MapController({ currentLocation }) {
+  const map = useMap();
+
+  React.useEffect(() => {
+    if (currentLocation) {
+      map.flyTo(
+        [currentLocation.lat, currentLocation.lng],
+        16,
+        {
+          duration: 1.5,
+        }
+      );
+    }
+  }, [currentLocation, map]);
+
+  return null;
+}
+
+// ==================================================
+// MAIN COMPONENT
+// ==================================================
+export default function EcoPulseWastePickup({
+  onBack = () => {},
+}) {
+  // ------------------------------------------------
+  // STATES
+  // ------------------------------------------------
+
+  const [images, setImages] = useState([]);
+
+  // 'current' | 'pick' | null
+  const [locationMode, setLocationMode] = useState(null);
+
+  // Current GPS location
+  const [currentLocation, setCurrentLocation] = useState(null);
+
+  // Manually selected location
+  const [pinPosition, setPinPosition] = useState(null);
+
+  const [geoError, setGeoError] = useState("");
+
+  // idle | submitting | success
+  const [status, setStatus] = useState("idle");
+
+  // Human-readable location
+  const [locationText, setLocationText] = useState("");
+
   const fileInputRef = useRef(null);
 
-  const handleFile = useCallback((file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    setImageName(file.name);
-    const reader = new FileReader();
-    reader.onload = (e) => setImagePreview(e.target.result);
-    reader.readAsDataURL(file);
-  }, []);
+  // ------------------------------------------------
+  // IMAGE HANDLING
+  // ------------------------------------------------
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    handleFile(e.dataTransfer.files?.[0]);
+  const handleFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+
+    if (!files.length) return;
+
+    const next = files.map((file) => ({
+      id: `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}`,
+      url: URL.createObjectURL(file),
+      name: file.name,
+    }));
+
+    setImages((prev) => [...prev, ...next]);
   };
 
-  const clearImage = () => {
-    setImagePreview(null);
-    setImageName("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const removeImage = (id) => {
+    setImages((prev) =>
+      prev.filter((img) => img.id !== id)
+    );
   };
 
-  const canSubmit = imagePreview && location.trim().length > 0 && status === "idle";
+  // ------------------------------------------------
+  // SHARE CURRENT LOCATION
+  // ------------------------------------------------
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleShareLocation = () => {
+    setLocationMode("current");
+
+    setGeoError("");
+
+    // Remove manually picked location
+    setPinPosition(null);
+
+    if (!navigator.geolocation) {
+      setGeoError(
+        "Location isn't available on this device. Try pinning it on the map instead."
+      );
+
+      return;
+    }
+
+    setLocationText(
+      "Fetching your current location..."
+    );
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        setCurrentLocation({
+          lat,
+          lng,
+        });
+
+        const placeName = await getPlaceName(
+          lat,
+          lng
+        );
+
+        setLocationText(placeName);
+      },
+
+      () => {
+        setGeoError(
+          "Couldn't get your location. Try pinning it on the map instead."
+        );
+
+        setLocationText("");
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  // ------------------------------------------------
+  // PICK LOCATION MODE
+  // ------------------------------------------------
+
+  const handlePickLocation = () => {
+    setLocationMode("pick");
+
+    // Remove current GPS location
+    setCurrentLocation(null);
+
+    setGeoError("");
+
+    // Remove previous selected location
+    setPinPosition(null);
+
+    setLocationText("");
+  };
+
+  // ------------------------------------------------
+  // CHECK LOCATION
+  // ------------------------------------------------
+
+  const hasLocation = Boolean(
+    currentLocation || pinPosition
+  );
+
+  // ------------------------------------------------
+  // SUBMIT VALIDATION
+  // ------------------------------------------------
+
+  const canSubmit =
+    images.length > 0 &&
+    hasLocation &&
+    status === "idle";
+
+  // ------------------------------------------------
+  // SUBMIT
+  // ------------------------------------------------
+
+  const handleSubmit = () => {
     if (!canSubmit) return;
-    setStatus("animating");
-    setTimeout(() => {
-      setStatus("done");
-      onSubmit && onSubmit({ image: imagePreview, imageName, location });
-    }, 1800);
+
+    const selectedLocation =
+      currentLocation || pinPosition;
+
+    console.log("Pickup Request Data:");
+
+    console.log({
+      images,
+      locationName: locationText,
+      latitude: selectedLocation?.lat,
+      longitude: selectedLocation?.lng,
+    });
+
+    setStatus("submitting");
+
+    // Temporary animation
+    window.setTimeout(() => {
+      setStatus("success");
+    }, 3400);
   };
 
-  const handleReset = () => {
+  // ------------------------------------------------
+  // RESET FORM
+  // ------------------------------------------------
+
+  const resetForm = () => {
+    setImages([]);
+
+    setLocationMode(null);
+
+    setCurrentLocation(null);
+
+    setPinPosition(null);
+
+    setGeoError("");
+
+    setLocationText("");
+
     setStatus("idle");
-    setLocation("");
-    clearImage();
   };
+
+  // ==================================================
+  // JSX
+  // ==================================================
 
   return (
-    <div className="pf-page">
-      <div className="pf-wrap">
-        {/* Top bar with back button */}
-        <div className="pf-topbar">
-          <div className="pf-topbar-row">
-            <button
-              type="button"
-              onClick={onBack}
-              aria-label="Go back"
-              className="pf-back-btn"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h1 className="pf-title">Request pickup</h1>
+    <div className="pickup-root">
+
+      {/* HEADER */}
+
+      <div className="pickup-header">
+
+        <div className="pickup-logo">
+
+          <div className="pickup-logo-badge">
+            <Activity
+              size={17}
+              strokeWidth={2.5}
+              color="#ffffff"
+            />
           </div>
-          <div className="pf-underline" />
+
+          <span className="pickup-logo-text">
+            Eco<span>Pulse</span>
+          </span>
+
         </div>
 
-        {/* Form card */}
-        <form onSubmit={handleSubmit} className="pf-card">
-          {/* Waste image field */}
-          <div>
-            <label className="pf-label">Add waste image</label>
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className="pf-dropzone"
-            >
-              {imagePreview ? (
-                <>
-                  <img
-                    src={imagePreview}
-                    alt="Waste to be collected"
-                    className="pf-dropzone-preview"
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearImage();
-                    }}
-                    aria-label="Remove image"
-                    className="pf-remove-btn"
-                  >
-                    <X size={16} />
-                  </button>
-                </>
-              ) : (
-                <div className="pf-dropzone-empty">
-                  <ImagePlus size={28} />
-                  <span className="pf-dropzone-title">Tap to add a photo</span>
-                  <span className="pf-dropzone-sub">JPG or PNG</span>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="pf-file-input"
-                onChange={(e) => handleFile(e.target.files?.[0])}
-              />
-            </div>
-          </div>
+        <button
+          className="pickup-back-btn"
+          onClick={onBack}
+          aria-label="Go back"
+        >
+          <ArrowLeft size={15} />
+          Back
+        </button>
 
-          {/* Location field */}
-          <div>
-            <label className="pf-label">Add location</label>
-            <div className="pf-loc-wrap">
-              <MapPin size={18} className="pf-loc-icon" />
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Enter pickup address"
-                className="pf-loc-input"
-              />
-            </div>
-          </div>
+      </div>
 
-          {/* Submit */}
-          {status !== "done" ? (
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="pf-submit-btn"
-            >
-              {status === "animating" ? <SubmitTruckAnimation /> : "Submit"}
-            </button>
-          ) : (
-            <div className="pf-success">
-              <div className="pf-success-row">
-                <span className="pf-success-check">
-                  <Check size={14} />
-                </span>
-                Pickup requested
+      {/* HEADING */}
+
+      <div className="pickup-heading-wrap">
+
+        <div className="pickup-heading-pill">
+          Request your waste pickup here
+          <span className="pickup-heading-bang">
+            !!
+          </span>
+        </div>
+
+      </div>
+
+      {/* MAIN SPLIT */}
+
+      <div className="pickup-split">
+
+        {/* REAL LEAFLET MAP */}
+
+        <div
+          className={`pickup-map-card${
+            locationMode === "pick"
+              ? " pickup-pick-mode"
+              : ""
+          }`}
+        >
+
+          <MapContainer
+            center={[9.6852, 76.7218]}
+            zoom={13}
+
+            /* IMPORTANT:
+               Leaflet dragging is explicitly enabled */
+            dragging={true}
+            scrollWheelZoom={true}
+            doubleClickZoom={true}
+            touchZoom={true}
+            keyboard={true}
+            zoomControl={true}
+
+            style={{
+              height: "100%",
+              width: "100%",
+            }}
+          >
+
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            {/* MAP CLICK HANDLER */}
+
+            <LocationPicker
+              locationMode={locationMode}
+              setPinPosition={setPinPosition}
+              setLocationText={setLocationText}
+            />
+
+            {/* CURRENT LOCATION CONTROLLER */}
+
+            <MapController
+              currentLocation={currentLocation}
+            />
+
+            {/* CURRENT LOCATION MARKER */}
+
+            {currentLocation && (
+              <Marker
+                position={[
+                  currentLocation.lat,
+                  currentLocation.lng,
+                ]}
+              />
+            )}
+
+            {/* PICKED LOCATION MARKER */}
+
+            {pinPosition && (
+              <Marker
+                position={[
+                  pinPosition.lat,
+                  pinPosition.lng,
+                ]}
+              />
+            )}
+
+          </MapContainer>
+
+          {/* MAP INSTRUCTION */}
+
+          {locationMode === "pick" &&
+            !pinPosition && (
+              <div className="pickup-map-hint">
+                Click the map to select pickup location
               </div>
-              <button type="button" onClick={handleReset} className="pf-reset-btn">
+            )}
+
+        </div>
+
+        {/* FORM */}
+
+        <div className="pickup-form-card">
+
+          {/* WASTE IMAGE */}
+
+          <div>
+
+            <span className="pickup-field-label">
+              Add waste image
+            </span>
+
+            <div className="pickup-upload-box">
+
+              {images.length === 0 ? (
+
+                <div
+                  className="pickup-upload-empty"
+                  onClick={() =>
+                    fileInputRef.current?.click()
+                  }
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    fileInputRef.current?.click()
+                  }
+                >
+
+                  <Upload size={26} />
+
+                  <span className="pickup-upload-title">
+                    Click to add photos of your waste
+                  </span>
+
+                  <span className="pickup-upload-sub">
+                    You can add more than one photo
+                  </span>
+
+                </div>
+
+              ) : (
+
+                <div className="pickup-thumb-grid">
+
+                  {images.map((img) => (
+
+                    <div
+                      className="pickup-thumb"
+                      key={img.id}
+                    >
+
+                      <img
+                        src={img.url}
+                        alt={img.name}
+                      />
+
+                      <button
+                        type="button"
+                        className="pickup-thumb-remove"
+                        onClick={() =>
+                          removeImage(img.id)
+                        }
+                        aria-label={`Remove ${img.name}`}
+                      >
+                        <X size={12} />
+                      </button>
+
+                    </div>
+
+                  ))}
+
+                  <div
+                    className="pickup-thumb-add"
+                    onClick={() =>
+                      fileInputRef.current?.click()
+                    }
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" &&
+                      fileInputRef.current?.click()
+                    }
+                    aria-label="Add more photos"
+                  >
+                    <Plus size={22} />
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+
+          </div>
+
+          {/* LOCATION */}
+
+          <div>
+
+            <span className="pickup-field-label">
+              Select location
+            </span>
+
+            <div className="pickup-location-buttons">
+
+              {/* CURRENT LOCATION */}
+
+              <button
+                type="button"
+                className={`pickup-loc-btn${
+                  locationMode === "current"
+                    ? " active"
+                    : ""
+                }`}
+                onClick={handleShareLocation}
+              >
+
+                <Navigation size={15} />
+
+                Share current location
+
+              </button>
+
+              {/* PICK LOCATION */}
+
+              <button
+                type="button"
+                className={`pickup-loc-btn${
+                  locationMode === "pick"
+                    ? " active"
+                    : ""
+                }`}
+                onClick={handlePickLocation}
+              >
+
+                <MapPin size={15} />
+
+                Pick a location
+
+              </button>
+
+            </div>
+
+            {/* LOCATION ERROR */}
+
+            {geoError && (
+              <div className="pickup-loc-status pickup-error">
+                {geoError}
+              </div>
+            )}
+
+            {/* LOCATION NAME */}
+
+            {locationMode && (
+
+              <div className="pickup-loc-shown">
+
+                <MapPin size={14} />
+
+                <input
+                  type="text"
+                  className="pickup-loc-input"
+                  value={locationText}
+                  readOnly
+                  placeholder={
+                    locationMode === "current"
+                      ? "Fetching your current location..."
+                      : "Click the map to select a location"
+                  }
+                  aria-label="Selected pickup location"
+                />
+
+              </div>
+
+            )}
+
+            {/* PICK LOCATION NOTE */}
+
+            {!geoError &&
+              locationMode === "pick" &&
+              pinPosition && (
+
+                <span className="pickup-loc-note">
+                  Click the map again to move the pin.
+                </span>
+
+              )}
+
+          </div>
+
+          {/* SPACER */}
+
+          <div className="pickup-spacer" />
+
+          {/* SUBMIT */}
+
+          <button
+            className="pickup-submit-btn"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+          >
+            Submit pickup request
+          </button>
+
+          {/* SUBMITTING ANIMATION */}
+
+          {status === "submitting" && (
+
+            <div className="pickup-van-stage">
+
+              <div className="pickup-van-track">
+
+                <div className="pickup-van-road" />
+
+                <div className="pickup-van-puff p1" />
+
+                <div className="pickup-van-puff p2" />
+
+                <div className="pickup-van-puff p3" />
+
+                <Truck
+                  className="pickup-van-icon"
+                  size={38}
+                />
+
+                <div className="pickup-bin">
+                  <Trash2 size={30} />
+                </div>
+
+              </div>
+
+              <p className="pickup-van-caption">
+                Sending your pickup request...
+              </p>
+
+            </div>
+
+          )}
+
+          {/* SUCCESS */}
+
+          {status === "success" && (
+
+            <div className="pickup-success">
+
+              <CheckCircle2
+                size={46}
+                color="var(--ep-primary)"
+              />
+
+              <h3>
+                Pickup requested!
+              </h3>
+
+              <p>
+                We'll send someone your way shortly.
+              </p>
+
+              <button
+                type="button"
+                className="pickup-secondary-btn"
+                onClick={resetForm}
+              >
                 Request another pickup
               </button>
+
             </div>
+
           )}
-        </form>
+
+        </div>
+
       </div>
+
     </div>
-  );
-}
-
-function SubmitTruckAnimation() {
-  return (
-    <div className="pf-anim-layer">
-      <div className="pf-anim-road" />
-      <div className="pf-anim-bin">
-        <BinIcon filled={false} />
-      </div>
-      <div className="pf-anim-truck">
-        <TruckIcon />
-      </div>
-    </div>
-  );
-}
-
-function TruckIcon() {
-  return (
-    <svg width="32" height="20" viewBox="0 0 40 26" fill="none">
-      <rect x="1" y="7" width="20" height="12" rx="1.5" fill="#4CAF50" />
-      <path d="M21 11h7l5 4.5V19h-12v-8z" fill="#1B5E20" />
-      <rect x="24" y="12.5" width="4" height="3.5" fill="#EAF6EC" />
-      <circle cx="8" cy="20.5" r="3" fill="#1B5E20" />
-      <circle cx="8" cy="20.5" r="1.2" fill="#EAF6EC" />
-      <circle cx="27" cy="20.5" r="3" fill="#1B5E20" />
-      <circle cx="27" cy="20.5" r="1.2" fill="#EAF6EC" />
-    </svg>
-  );
-}
-
-function BinIcon({ filled }) {
-  return (
-    <svg width="16" height="20" viewBox="0 0 20 26" fill="none">
-      <rect x="1" y="1" width="18" height="4" rx="1" fill="#66BB6A" />
-      <path
-        d="M3 6h14l-1.3 17.5a2 2 0 0 1-2 1.5H6.3a2 2 0 0 1-2-1.5L3 6z"
-        fill={filled ? "#4CAF50" : "#A5D6A7"}
-      />
-      <rect x="8" y="9" width="1.6" height="12" fill="#EAF6EC" />
-      <rect x="12" y="9" width="1.6" height="12" fill="#EAF6EC" />
-    </svg>
   );
 }
