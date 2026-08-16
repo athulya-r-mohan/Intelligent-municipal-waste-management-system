@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import "../components/Adminpage.css";
+import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Building2,
@@ -86,12 +87,23 @@ function DateBadge() {
   );
 }
  
-function Card({ title, sub, icon: Icon }) {
+function Card({ title, sub, icon: Icon, onClick }) {
   return (
-    <div className="admin-card" tabIndex={0}>
+    <div
+      className="admin-card"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          onClick?.();
+        }
+      }}
+      role={onClick ? "button" : undefined}
+    >
       <div className="admin-card-icon">
         <Icon size={22} strokeWidth={2} />
       </div>
+
       <div className="admin-card-text">
         <h3>{title}</h3>
         <p>{sub}</p>
@@ -105,6 +117,7 @@ export default function EcoPulseAdmin() {
  
   const goHome = () => setPage("dashboard");
   const goBack = () => setPage("dashboard");
+   const navigate = useNavigate();
  
   const heading = page === "dashboard" ? "Dashboard" : "Manage Municipality";
   const subheading =
@@ -174,15 +187,34 @@ export default function EcoPulseAdmin() {
           </div>
         )}
  
+          
+
         {page === "municipality" && (
           <div className="admin-grid admin-grid-3">
             {MUNICIPALITY_CARDS.map((c) => (
-              <Card key={c.key} title={c.title} sub={c.sub} icon={c.icon} />
+              <Card
+                key={c.key}
+                title={c.title}
+                sub={c.sub}
+                icon={c.icon}
+                onClick={() => {
+                  if (c.key === "addstaff") {
+                    navigate("/addstaff");
+                  }
+                   if (c.key === "addrecyclers") {
+                     
+                     navigate("/addrecycler");
+                    }
+                   if (c.key === "usermgmt") {
+                    navigate("/resident");
+                   }
+                }}
+              />
             ))}
           </div>
         )}
+
       </main>
     </div>
   );
 }
- 

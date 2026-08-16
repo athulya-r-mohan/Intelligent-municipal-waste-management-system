@@ -315,6 +315,8 @@ export default function EcoPulseLogin() {
       }
     );
 
+     console.log("LOGIN RESPONSE:", response.data);
+
     // Save JWT tokens
     localStorage.setItem("access", response.data.access);
     localStorage.setItem("refresh", response.data.refresh);
@@ -334,6 +336,10 @@ export default function EcoPulseLogin() {
     //login for staff
     if(response.data.role==="STAFF"){
       navigate("/staff");
+    }
+    // login for recycler
+  if (response.data.role === "RECYCLER") {
+    navigate("/recycler");
     }
 
   } catch (error) {

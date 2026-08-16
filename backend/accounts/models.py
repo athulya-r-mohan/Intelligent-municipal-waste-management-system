@@ -46,17 +46,24 @@ class UserProfile(models.Model):
     )
 
 
-    phone=models.CharField(
-        max_length=15
+    phone = models.CharField(
+    max_length=15,
+    blank=True,
+    null=True
+   )
+
+
+    address = models.TextField(
+    blank=True,
+    null=True
     )
 
 
-    address=models.TextField()
-
-
-    ward=models.ForeignKey(
-        Ward,
-        on_delete=models.CASCADE
+    ward = models.ForeignKey(
+    Ward,
+    on_delete=models.CASCADE,
+    blank=True,
+    null=True
     )
 
 
@@ -65,3 +72,88 @@ class UserProfile(models.Model):
         choices=ROLE_CHOICES,
         default="CITIZEN"
     )
+class Staff(models.Model):
+    DESIGNATION_CHOICES = (
+        ('STAFF', 'Staff'),
+        ('DRIVER', 'Driver'),
+    )
+
+    staff_id = models.AutoField(
+        primary_key=True
+    )
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE
+    )
+
+    phone = models.CharField(
+        max_length=15,
+        blank=True,
+        null=True
+    )
+
+    address = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    profile_photo = models.ImageField(
+        upload_to='staff_profiles/',
+        blank=True,
+        null=True
+    )
+
+    designation = models.CharField(
+        max_length=20,
+        choices=DESIGNATION_CHOICES
+    )
+
+    date_of_joining = models.DateField()
+
+    def __str__(self):
+        return f"{self.user.email} - {self.designation}"
+class Recycler(models.Model):
+    WASTE_TYPE_CHOICES = (
+        ('Plastic', 'Plastic'),
+        ('Paper', 'Paper'),
+        ('Glass', 'Glass'),
+        ('Metal', 'Metal'),
+        ('E-Waste', 'E-Waste'),
+        ('Organic Waste', 'Organic Waste'),
+        ('Mixed Waste', 'Mixed Waste'),
+    )
+
+    recycler_id = models.AutoField(
+        primary_key=True
+    )
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE
+    )
+
+    address = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    profile_photo = models.ImageField(
+        upload_to='recycler_profiles/',
+        blank=True,
+        null=True
+    )
+
+    organization = models.CharField(
+        max_length=200
+    )
+
+    waste_type = models.CharField(
+        max_length=50,
+        choices=WASTE_TYPE_CHOICES
+    )
+
+    date_of_registration = models.DateField()
+
+    def __str__(self):
+        return f"{self.organization} - {self.user.email}"

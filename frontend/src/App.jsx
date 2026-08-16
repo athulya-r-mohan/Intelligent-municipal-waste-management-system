@@ -10,7 +10,11 @@ import StaffTaskpage from "./pages/StaffTaskpage";
 import Taskstatusupdate from "./pages/Taskstatusupdate";
 import Recyclerpage from "./pages/Recyclerpage";
 import Pickuprequestform from "./pages/Pickuprequestform";
-import Wastecomplaintform from "./pages/Wastecomplaintform"
+import Wastecomplaintform from "./pages/Wastecomplaintform";
+import Addstaffform from "./pages/Addstaffform";
+import Addrecycler from "./pages/Addrecycler";
+import Residentdirectory from "./pages/Residentdirectory"
+
 
 export default function App() {
   return (
@@ -26,6 +30,9 @@ export default function App() {
       <Route path="/recycler" element={<Recyclerpage />} />
       <Route path="/pickupform" element={<Pickuprequestform />} />
       <Route path="/complaintform" element={<Wastecomplaintform />} />
+      <Route path="/addstaff" element={<Addstaffform />} />
+      <Route path="/addrecycler" element={<Addrecycler />} />
+      <Route path="/resident" element={<Residentdirectory />} />
     </Routes>
   );
 }

@@ -1,0 +1,438 @@
+/* =========================
+   RESET
+========================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+
+/* =========================
+   PAGE
+========================= */
+
+.add-recycler-page {
+  width: 100vw;
+  height: 100vh;
+
+  background: #ffffff;
+
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  padding: 3px 0 0 0;
+
+  overflow: hidden;
+}
+
+
+/* =========================
+   MAIN CARD
+========================= */
+
+.recycler-card {
+  width: 640px;
+  height: calc(100vh - 3px);
+
+  background: #ffffff;
+
+  border: 1px solid #d1fae5;
+
+  border-radius: 18px 18px 0 0;
+
+  box-shadow:
+    0 4px 15px rgba(16, 185, 129, 0.08);
+
+  padding: 25px 40px 18px 40px;
+
+  overflow: hidden;
+}
+
+
+/* =========================
+   LOGO
+========================= */
+
+.eco-logo {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  margin-bottom: 5px;
+}
+
+.logo-circle {
+  position: relative;
+
+  width: 45px;
+  height: 45px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulse-ring {
+  position: absolute;
+
+  inset: 0;
+
+  border-radius: 50%;
+
+  background: #34d399;
+
+  opacity: 0.5;
+
+  animation:
+    pulse-ring 2.2s
+    cubic-bezier(0.4, 0, 0.6, 1)
+    infinite;
+}
+
+.logo-inner {
+  position: relative;
+
+  width: 45px;
+  height: 45px;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    linear-gradient(
+      135deg,
+      #0f766e 0%,
+      #34d399 100%
+    );
+}
+
+.logo-text {
+  font-family: Georgia, serif;
+
+  font-size: 23px;
+
+  line-height: 1;
+}
+
+.eco-text {
+  font-weight: 700;
+
+  color: #0f172a;
+}
+
+.pulse-text {
+  font-weight: 700;
+
+  color: #10b981;
+}
+
+
+/* =========================
+   HEADING
+========================= */
+
+.heading-section {
+  margin-bottom: 4px;
+}
+
+.heading-section h1 {
+  margin: 0;
+
+  font-family: Arial, sans-serif;
+
+  font-size: 26px;
+
+  line-height: 1.2;
+
+  font-weight: 600;
+
+  color: #0f172a;
+}
+
+.heading-section p {
+  margin: 4px 0 0;
+
+  font-family: Arial, sans-serif;
+
+  font-size: 16px;
+
+  color: #64748b;
+}
+
+
+/* =========================
+   ECG DIVIDER
+========================= */
+
+.pulse-divider {
+  width: 100%;
+
+  height: 28px;
+
+  margin-bottom: 8px;
+
+  overflow: hidden;
+}
+
+.pulse-divider svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pulse-trace {
+  animation:
+    trace 2.6s linear infinite;
+}
+
+
+/* =========================
+   FORM
+========================= */
+
+.recycler-form {
+  width: 100%;
+}
+
+.form-group {
+  width: 100%;
+
+  margin-bottom: 11px;
+}
+
+.form-label {
+  display: block;
+
+  margin-bottom: 4px;
+
+  font-family: Arial, sans-serif;
+
+  font-size: 15px;
+
+  font-weight: 500;
+
+  color: #1e293b;
+}
+
+
+/* =========================
+   INPUTS
+========================= */
+
+.form-input,
+.form-select {
+  width: 100%;
+
+  height: 43px;
+
+  padding: 0 18px;
+
+  border: 1px solid #dbe3ec;
+
+  border-radius: 9px;
+
+  background: #ffffff;
+
+  color: #0f172a;
+
+  font-family: Arial, sans-serif;
+
+  font-size: 15px;
+
+  outline: none;
+
+  transition: all 0.2s ease;
+}
+
+.form-input::placeholder {
+  color: #94a3b8;
+}
+
+.form-input:focus,
+.form-select:focus {
+  border-color: #10b981;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(16, 185, 129, 0.12);
+}
+
+.form-select {
+  cursor: pointer;
+}
+
+
+/* =========================
+   ERROR
+========================= */
+
+.error-text {
+  margin: 3px 0 0;
+
+  font-family: Arial, sans-serif;
+
+  font-size: 11px;
+
+  color: #dc2626;
+}
+
+
+/* =========================
+   SUBMIT BUTTON
+========================= */
+
+.submit-button {
+  width: 100%;
+
+  height: 43px;
+
+  margin-top: 1px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  background: #10b981;
+
+  color: white;
+
+  font-family: Arial, sans-serif;
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease;
+
+  box-shadow:
+    0 3px 8px
+    rgba(16, 185, 129, 0.18);
+}
+
+.submit-button:hover {
+  background: #059669;
+}
+
+
+/* =========================
+   SUCCESS MESSAGE
+========================= */
+
+.success-banner {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  margin-bottom: 10px;
+
+  padding: 8px 12px;
+
+  border: 1px solid #a7f3d0;
+
+  border-radius: 8px;
+
+  background: #ecfdf5;
+
+  color: #047857;
+
+  font-size: 13px;
+
+  animation:
+    fade-in-up 0.35s ease-out;
+}
+
+
+/* =========================
+   ANIMATIONS
+========================= */
+
+@keyframes pulse-ring {
+
+  0% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes trace {
+
+  0% {
+    stroke-dashoffset: 100;
+  }
+
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+@keyframes fade-in-up {
+
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* =========================
+   SMALL SCREEN
+========================= */
+
+@media (max-width: 700px) {
+
+  .add-recycler-page {
+    padding: 0;
+  }
+
+  .recycler-card {
+    width: 100%;
+    height: 100vh;
+
+    border-radius: 0;
+
+    padding:
+      20px
+      22px
+      15px;
+  }
+
+  .form-group {
+    margin-bottom: 10px;
+  }
+}
