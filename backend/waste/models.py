@@ -1,3 +1,93 @@
 from django.db import models
+from django.contrib.auth.models import User
 
-# Create your models here.
+
+class WastePickupRequest(models.Model):
+
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("ASSIGNED", "Assigned"),
+        ("COLLECTED", "Collected"),
+        ("COMPLETED", "Completed"),
+        ("CANCELLED", "Cancelled"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="waste_pickup_requests"
+    )
+
+    location_name = models.CharField(
+        max_length=500
+    )
+
+    latitude = models.DecimalField(
+        max_digits=10,
+        decimal_places=7
+    )
+
+    longitude = models.DecimalField(
+        max_digits=10,
+        decimal_places=7
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="PENDING"
+    )
+
+    assigned_staff = models.ForeignKey(
+        "accounts.Staff",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_pickups"
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    def __str__(self):
+        return f"Pickup Request #{self.id}"
+
+
+class WastePickupImage(models.Model):
+
+    pickup_request = models.ForeignKey(
+        WastePickupRequest,
+        on_delete=models.CASCADE,
+        related_name="waste_images"
+    )
+
+    image = models.ImageField(
+        upload_to="waste_pickups/"
+    )
+
+    waste_type = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
+    confidence = models.FloatField(
+        blank=True,
+        null=True,
+        default=0.0
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return (
+            f"Pickup #{self.pickup_request.id} - "
+            f"{self.waste_type}"
+        )

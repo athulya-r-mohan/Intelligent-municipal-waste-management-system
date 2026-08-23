@@ -322,3 +322,56 @@ class ResidentDirectoryView(APIView):
             })
 
         return Response(data, status=status.HTTP_200_OK)
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from .models import Staff
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_staff_by_ward(request):
+
+    ward_id = request.GET.get("ward")
+
+    if not ward_id:
+        return Response(
+            {
+                "success": False,
+                "message": "Ward is required."
+            },
+            status=400
+        )
+
+    staff = Staff.objects.filter(
+        user__userprofile__ward__ward_id=ward_id
+    ).select_related(
+        "user",
+        "user__userprofile"
+    )
+
+    data = []
+
+    for staff_member in staff:
+
+        profile = getattr(
+            staff_member.user,
+            "userprofile",
+            None
+        )
+
+        data.append({
+            "staff_id": staff_member.staff_id,
+            "name": profile.name if profile else staff_member.user.username,
+            "email": staff_member.user.email,
+            "phone": staff_member.phone,
+            "designation": staff_member.designation,
+            "ward_id": profile.ward.ward_id if profile and profile.ward else None,
+            "ward_name": profile.ward.ward_name if profile and profile.ward else "",
+        })
+
+    return Response({
+        "success": True,
+        "staff": data
+    })

@@ -13,7 +13,8 @@ import Pickuprequestform from "./pages/Pickuprequestform";
 import Wastecomplaintform from "./pages/Wastecomplaintform";
 import Addstaffform from "./pages/Addstaffform";
 import Addrecycler from "./pages/Addrecycler";
-import Residentdirectory from "./pages/Residentdirectory"
+import Residentdirectory from "./pages/Residentdirectory";
+import PickupAssignment from "./pages/Pickupassignment"
 
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
       <Route path="/addstaff" element={<Addstaffform />} />
       <Route path="/addrecycler" element={<Addrecycler />} />
       <Route path="/resident" element={<Residentdirectory />} />
+      <Route path="/assign" element={<PickupAssignment />} />
     </Routes>
   );
 }

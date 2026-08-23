@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -8,31 +9,21 @@ import {
   Recycle,
   Truck,
 } from "lucide-react";
- 
-// ---------------------------------------------------------------------------
-// Mock task data — replace with real data from your backend
-// ---------------------------------------------------------------------------
-const TASKS = [
-  {
-    id: 1,
-    ward: 14,
-    pickup: "Municipal (H) Palappara",
-    wasteType: "E-Waste",
-  },
-  {
-    id: 2,
-    ward: 9,
-    pickup: "Municipal (H) Erattupetta North",
-    wasteType: "Plastic Waste",
-  },
-  {
-    id: 3,
-    ward: 21,
-    pickup: "Municipal (H) Kanjirappally Rd",
-    wasteType: "Organic Waste",
-  },
-];
- 
+
+// ============================================================
+// API BASE URL
+// ============================================================
+const API_BASE_URL = "http://127.0.0.1:8000";
+
+const getAccessToken = () => {
+  return (
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("accessToken") ||
+    ""
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Calendar widget — compact, shows the real current month, today highlighted
 // ---------------------------------------------------------------------------
@@ -165,10 +156,7 @@ function MiniCalendar() {
 // ---------------------------------------------------------------------------
 // Task table
 // ---------------------------------------------------------------------------
-// `onStatusClick` is called with the task when the Status pill is clicked.
-// Wire this up to your own navigation (React Router's `navigate(...)`,
-// Next.js `router.push(...)`, or window.location) to go to your status page.
-function TaskTable({ tasks, onStatusClick }) {
+function TaskTable({ tasks, loading, error, onStatusClick }) {
   return (
     <div
       style={{
@@ -199,7 +187,55 @@ function TaskTable({ tasks, onStatusClick }) {
           </tr>
         </thead>
         <tbody>
-          {tasks.map((t, idx) => (
+          {loading && (
+            <tr>
+              <td
+                colSpan="5"
+                style={{
+                  textAlign: "center",
+                  padding: "28px",
+                  color: "#5f8a45",
+                  fontWeight: 500,
+                }}
+              >
+                Loading assigned tasks...
+              </td>
+            </tr>
+          )}
+
+          {!loading && error && (
+            <tr>
+              <td
+                colSpan="5"
+                style={{
+                  textAlign: "center",
+                  padding: "28px",
+                  color: "#b64a4a",
+                  fontWeight: 500,
+                }}
+              >
+                {error}
+              </td>
+            </tr>
+          )}
+
+          {!loading && !error && tasks.length === 0 && (
+            <tr>
+              <td
+                colSpan="5"
+                style={{
+                  textAlign: "center",
+                  padding: "28px",
+                  color: "#5f8a45",
+                  fontWeight: 500,
+                }}
+              >
+                No pickup tasks assigned to you yet.
+              </td>
+            </tr>
+          )}
+
+          {!loading && !error && tasks.map((t, idx) => (
             <tr
               key={t.id}
               style={{
@@ -245,7 +281,7 @@ function TaskTable({ tasks, onStatusClick }) {
                   }}
                 >
                   <Truck size={13} />
-                  Status
+                  {t.status || "Status"}
                 </button>
               </td>
             </tr>
@@ -260,15 +296,78 @@ function TaskTable({ tasks, onStatusClick }) {
 // Main app
 // ---------------------------------------------------------------------------
 export default function MyTaskDashboard() {
-   const navigate = useNavigate();
-  // Replace this with your real navigation, e.g.:
-  //   const navigate = useNavigate(); // react-router
-  //   const handleStatusClick = (task) => navigate(`/status/${task.id}`);
-  // or:
-  //   const handleStatusClick = (task) => router.push(`/status/${task.id}`); // next.js
+  const navigate = useNavigate();
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchMyTasks = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const token = getAccessToken();
+
+        const config = token
+          ? {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          : {};
+
+        const response = await axios.get(
+          `${API_BASE_URL}/api/waste/staff/my-tasks/`,
+          config
+        );
+
+        if (!mounted) return;
+
+        const data = Array.isArray(response.data) ? response.data : [];
+
+        const formatted = data.map((item) => ({
+          id: item.request_id || item.id,
+          pickup: item.pickup_location || item.location_name || "N/A",
+          ward: item.ward || (item.ward_id ? `Ward ${item.ward_id}` : "N/A"),
+          wasteType: item.waste_type || "Waste",
+          status: item.status || "ASSIGNED",
+          date: item.date || "",
+          userName: item.user_name || "",
+          phone: item.phone || "",
+        }));
+
+        setTasks(formatted);
+      } catch (err) {
+        console.error("Failed to load staff tasks:", err);
+
+        if (!mounted) return;
+
+        if (err.response?.status === 401) {
+          setError("Please login to view your assigned tasks.");
+        } else if (err.response?.status === 403) {
+          setError("Access restricted to staff members only.");
+        } else {
+          setError("Failed to load assigned tasks. Please check backend server.");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchMyTasks();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleStatusClick = (task) => {
-   navigate(`/taskupdate/${task.id}`);
-    // TODO: hook this up to your status page route
+    navigate(`/taskupdate/${task.id}`);
   };
  
   return (
@@ -313,7 +412,12 @@ export default function MyTaskDashboard() {
         <MiniCalendar />
       </div>
  
-      <TaskTable tasks={TASKS} onStatusClick={handleStatusClick} />
+      <TaskTable
+        tasks={tasks}
+        loading={loading}
+        error={error}
+        onStatusClick={handleStatusClick}
+      />
     </div>
   );
 }

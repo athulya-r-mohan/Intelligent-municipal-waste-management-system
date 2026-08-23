@@ -181,9 +181,19 @@ export default function EcoPulseAdmin() {
  
         {page === "dashboard" && (
           <div className="admin-grid">
-            {DASH_CARDS.map((c) => (
-              <Card key={c.key} title={c.title} sub={c.sub} icon={c.icon} />
-            ))}
+           {DASH_CARDS.map((c) => (
+      <Card
+        key={c.key}
+        title={c.title}
+        sub={c.sub}
+        icon={c.icon}
+        onClick={() => {
+          if (c.key === "pickup") {
+            navigate("/assign");
+          }
+    }}
+  />
+))}
           </div>
         )}
  

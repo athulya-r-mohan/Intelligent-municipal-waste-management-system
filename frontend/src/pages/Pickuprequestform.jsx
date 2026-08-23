@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import "leaflet/dist/leaflet.css";
+
 import {
   MapContainer,
   TileLayer,
@@ -7,6 +8,7 @@ import {
   useMapEvents,
   useMap,
 } from "react-leaflet";
+
 import "../components/Pickuprequestform.css";
 
 import {
@@ -22,9 +24,114 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-// --------------------------------------------------
+// ==================================================
+// BACKEND URL
+// ==================================================
+
+const API_BASE_URL = "http://127.0.0.1:8000";
+
+// ==================================================
+// GET ACCESS TOKEN
+// ==================================================
+
+const getAccessToken = () => {
+  return (
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("accessToken") ||
+    ""
+  );
+};
+
+// ==================================================
+// GET CURRENT USER ID FROM JWT
+// ==================================================
+
+const getCurrentUserId = () => {
+  const token = getAccessToken();
+
+  if (!token) {
+    throw new Error(
+      "Your login session has expired. Please login again."
+    );
+  }
+
+  try {
+    const parts = token.split(".");
+
+    if (parts.length !== 3) {
+      throw new Error("Invalid JWT token.");
+    }
+
+    const payload = JSON.parse(
+      atob(
+        parts[1]
+          .replace(/-/g, "+")
+          .replace(/_/g, "/")
+      )
+    );
+
+    const userId =
+      payload.user_id ||
+      payload.userId ||
+      payload.id ||
+      payload.sub;
+
+    if (
+      userId === undefined ||
+      userId === null ||
+      userId === ""
+    ) {
+      console.error(
+        "JWT payload does not contain user ID:",
+        payload
+      );
+
+      throw new Error(
+        "User ID was not found in your login session. Please login again."
+      );
+    }
+
+    console.log(
+      "Current logged-in user ID:",
+      userId
+    );
+
+    return userId;
+  } catch (error) {
+    console.error(
+      "Unable to read user ID from access token:",
+      error
+    );
+
+    throw new Error(
+      "Invalid login session. Please login again."
+    );
+  }
+};
+
+// ==================================================
+// AUTH HEADERS
+// ==================================================
+
+const getAuthHeaders = () => {
+  const token = getAccessToken();
+
+  if (!token) {
+    throw new Error(
+      "Your login session has expired. Please login again."
+    );
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+};
+
+// ==================================================
 // REVERSE GEOCODING
-// --------------------------------------------------
+// ==================================================
+
 const getPlaceName = async (lat, lng) => {
   try {
     const response = await fetch(
@@ -36,23 +143,33 @@ const getPlaceName = async (lat, lng) => {
       }
     );
 
+    if (!response.ok) {
+      throw new Error(
+        "Reverse geocoding failed"
+      );
+    }
+
     const data = await response.json();
 
-    if (data.display_name) {
+    if (data?.display_name) {
       return data.display_name;
     }
 
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   } catch (error) {
-    console.error("Reverse geocoding failed:", error);
+    console.error(
+      "Reverse geocoding failed:",
+      error
+    );
 
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   }
 };
 
-// --------------------------------------------------
-// MAP CLICK HANDLER
-// --------------------------------------------------
+// ==================================================
+// LOCATION PICKER
+// ==================================================
+
 function LocationPicker({
   locationMode,
   setPinPosition,
@@ -60,7 +177,9 @@ function LocationPicker({
 }) {
   useMapEvents({
     click: async (e) => {
-      if (locationMode !== "pick") return;
+      if (locationMode !== "pick") {
+        return;
+      }
 
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
@@ -70,9 +189,14 @@ function LocationPicker({
         lng,
       });
 
-      setLocationText("Finding location...");
+      setLocationText(
+        "Finding location..."
+      );
 
-      const placeName = await getPlaceName(lat, lng);
+      const placeName = await getPlaceName(
+        lat,
+        lng
+      );
 
       setLocationText(placeName);
     },
@@ -81,23 +205,36 @@ function LocationPicker({
   return null;
 }
 
-// --------------------------------------------------
+// ==================================================
 // MAP CONTROLLER
-// --------------------------------------------------
-function MapController({ currentLocation }) {
+// ==================================================
+
+function MapController({
+  currentLocation,
+  pinPosition,
+}) {
   const map = useMap();
 
-  React.useEffect(() => {
-    if (currentLocation) {
-      map.flyTo(
-        [currentLocation.lat, currentLocation.lng],
-        16,
-        {
-          duration: 1.5,
-        }
-      );
+  useEffect(() => {
+    const location =
+      currentLocation || pinPosition;
+
+    if (!location) {
+      return;
     }
-  }, [currentLocation, map]);
+
+    map.flyTo(
+      [location.lat, location.lng],
+      16,
+      {
+        duration: 1.5,
+      }
+    );
+  }, [
+    currentLocation,
+    pinPosition,
+    map,
+  ]);
 
   return null;
 }
@@ -105,76 +242,148 @@ function MapController({ currentLocation }) {
 // ==================================================
 // MAIN COMPONENT
 // ==================================================
+
 export default function EcoPulseWastePickup({
   onBack = () => {},
 }) {
-  // ------------------------------------------------
-  // STATES
-  // ------------------------------------------------
+  // ==================================================
+  // IMAGE STATES
+  // ==================================================
 
   const [images, setImages] = useState([]);
 
-  // 'current' | 'pick' | null
-  const [locationMode, setLocationMode] = useState(null);
-
-  // Current GPS location
-  const [currentLocation, setCurrentLocation] = useState(null);
-
-  // Manually selected location
-  const [pinPosition, setPinPosition] = useState(null);
-
-  const [geoError, setGeoError] = useState("");
-
-  // idle | submitting | success
-  const [status, setStatus] = useState("idle");
-
-  // Human-readable location
-  const [locationText, setLocationText] = useState("");
-
   const fileInputRef = useRef(null);
 
-  // ------------------------------------------------
+  // ==================================================
+  // LOCATION STATES
+  // ==================================================
+
+  const [locationMode, setLocationMode] =
+    useState(null);
+
+  const [currentLocation, setCurrentLocation] =
+    useState(null);
+
+  const [pinPosition, setPinPosition] =
+    useState(null);
+
+  const [geoError, setGeoError] =
+    useState("");
+
+  const [locationText, setLocationText] =
+    useState("");
+
+  // ==================================================
+  // PICKUP STATUS
+  // ==================================================
+
+  const [status, setStatus] =
+    useState("idle");
+
+  // ==================================================
+  // AI STATES
+  // ==================================================
+
+  const [aiLoading, setAiLoading] =
+    useState(false);
+
+  const [aiResult, setAiResult] =
+    useState(null);
+
+  const [aiError, setAiError] =
+    useState("");
+
+  // ==================================================
   // IMAGE HANDLING
-  // ------------------------------------------------
+  // ==================================================
 
   const handleFiles = (fileList) => {
-    const files = Array.from(fileList || []);
+    const files = Array.from(
+      fileList || []
+    );
 
-    if (!files.length) return;
+    if (files.length === 0) {
+      return;
+    }
 
-    const next = files.map((file) => ({
-      id: `${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}`,
-      url: URL.createObjectURL(file),
-      name: file.name,
-    }));
+    const validFiles = files.filter(
+      (file) =>
+        file.type.startsWith("image/")
+    );
 
-    setImages((prev) => [...prev, ...next]);
+    if (validFiles.length === 0) {
+      setAiError(
+        "Please select valid image files."
+      );
+
+      return;
+    }
+
+    const nextImages =
+      validFiles.map((file) => ({
+        id:
+          `${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`,
+
+        url: URL.createObjectURL(file),
+
+        name: file.name,
+
+        file: file,
+      }));
+
+    setImages((prev) => [
+      ...prev,
+      ...nextImages,
+    ]);
+
+    setAiResult(null);
+    setAiError("");
   };
+
+  // ==================================================
+  // REMOVE IMAGE
+  // ==================================================
 
   const removeImage = (id) => {
-    setImages((prev) =>
-      prev.filter((img) => img.id !== id)
-    );
+    setImages((prev) => {
+      const imageToRemove =
+        prev.find(
+          (img) => img.id === id
+        );
+
+      if (imageToRemove?.url) {
+        URL.revokeObjectURL(
+          imageToRemove.url
+        );
+      }
+
+      return prev.filter(
+        (img) => img.id !== id
+      );
+    });
+
+    setAiResult(null);
+    setAiError("");
   };
 
-  // ------------------------------------------------
+  // ==================================================
   // SHARE CURRENT LOCATION
-  // ------------------------------------------------
+  // ==================================================
 
   const handleShareLocation = () => {
     setLocationMode("current");
 
     setGeoError("");
-
-    // Remove manually picked location
     setPinPosition(null);
 
     if (!navigator.geolocation) {
       setGeoError(
         "Location isn't available on this device. Try pinning it on the map instead."
       );
+
+      setCurrentLocation(null);
 
       return;
     }
@@ -184,24 +393,41 @@ export default function EcoPulseWastePickup({
     );
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+      async (position) => {
+        const lat =
+          position.coords.latitude;
 
-        setCurrentLocation({
+        const lng =
+          position.coords.longitude;
+
+        const newLocation = {
           lat,
           lng,
-        });
+        };
 
-        const placeName = await getPlaceName(
-          lat,
-          lng
+        setCurrentLocation(
+          newLocation
         );
 
-        setLocationText(placeName);
+        const placeName =
+          await getPlaceName(
+            lat,
+            lng
+          );
+
+        setLocationText(
+          placeName
+        );
       },
 
-      () => {
+      (error) => {
+        console.error(
+          "Geolocation error:",
+          error
+        );
+
+        setCurrentLocation(null);
+
         setGeoError(
           "Couldn't get your location. Try pinning it on the map instead."
         );
@@ -217,73 +443,651 @@ export default function EcoPulseWastePickup({
     );
   };
 
-  // ------------------------------------------------
-  // PICK LOCATION MODE
-  // ------------------------------------------------
+  // ==================================================
+  // PICK LOCATION
+  // ==================================================
 
   const handlePickLocation = () => {
     setLocationMode("pick");
 
-    // Remove current GPS location
     setCurrentLocation(null);
-
-    setGeoError("");
-
-    // Remove previous selected location
     setPinPosition(null);
 
+    setGeoError("");
     setLocationText("");
   };
 
-  // ------------------------------------------------
-  // CHECK LOCATION
-  // ------------------------------------------------
+  // ==================================================
+  // LOCATION VALIDATION
+  // ==================================================
 
   const hasLocation = Boolean(
-    currentLocation || pinPosition
+    currentLocation ||
+      pinPosition
   );
 
-  // ------------------------------------------------
+  // ==================================================
   // SUBMIT VALIDATION
-  // ------------------------------------------------
+  // ==================================================
 
   const canSubmit =
     images.length > 0 &&
     hasLocation &&
-    status === "idle";
+    locationText &&
+    status === "idle" &&
+    !aiLoading;
 
-  // ------------------------------------------------
-  // SUBMIT
-  // ------------------------------------------------
+  // ==================================================
+  // AI WASTE DETECTION
+  // ==================================================
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
+  const handleSubmit = async () => {
+    if (!canSubmit) {
+      if (images.length === 0) {
+        setAiError(
+          "Please select at least one waste image."
+        );
+      } else if (!hasLocation) {
+        setAiError(
+          "Please select a pickup location."
+        );
+      } else if (!locationText) {
+        setAiError(
+          "Please wait until the location name is found."
+        );
+      }
+
+      return;
+    }
 
     const selectedLocation =
-      currentLocation || pinPosition;
+      currentLocation ||
+      pinPosition;
 
-    console.log("Pickup Request Data:");
+    console.log(
+      "Selected pickup location:",
+      {
+        locationName:
+          locationText,
 
-    console.log({
-      images,
-      locationName: locationText,
-      latitude: selectedLocation?.lat,
-      longitude: selectedLocation?.lng,
-    });
+        latitude:
+          selectedLocation?.lat,
 
-    setStatus("submitting");
+        longitude:
+          selectedLocation?.lng,
+      }
+    );
 
-    // Temporary animation
-    window.setTimeout(() => {
-      setStatus("success");
-    }, 3400);
+    setAiLoading(true);
+    setAiError("");
+    setAiResult(null);
+
+    try {
+      const allDetections = [];
+      const imageResults = [];
+
+      // ==================================================
+      // SEND EACH IMAGE TO YOLO
+      // ==================================================
+
+      for (
+        let i = 0;
+        i < images.length;
+        i++
+      ) {
+        const image = images[i];
+
+        console.log(
+          `Sending image ${
+            i + 1
+          }/${images.length}:`,
+          image.file.name
+        );
+
+        const formData =
+          new FormData();
+
+        formData.append(
+          "image",
+          image.file
+        );
+
+        let response;
+
+        try {
+          response = await fetch(
+            `${API_BASE_URL}/api/waste/detect-waste/`,
+            {
+              method: "POST",
+
+              headers:
+                getAuthHeaders(),
+
+              body: formData,
+            }
+          );
+        } catch (error) {
+          console.error(
+            "AI network request failed:",
+            error
+          );
+
+          throw new Error(
+            "Unable to connect to the Django AI server. Please make sure the backend server is running."
+          );
+        }
+
+        const responseText =
+          await response.text();
+
+        console.log(
+          `YOLO response for ${image.file.name}:`,
+          responseText
+        );
+
+        let data = {};
+
+        try {
+          data = responseText
+            ? JSON.parse(
+                responseText
+              )
+            : {};
+        } catch {
+          throw new Error(
+            `Invalid response received from AI server for "${image.file.name}".`
+          );
+        }
+
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
+          throw new Error(
+            "Your login session has expired. Please login again."
+          );
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message ||
+              data?.detail ||
+              `AI server error (${response.status}).`
+          );
+        }
+
+        if (!data?.success) {
+          throw new Error(
+            data?.message ||
+              "Waste detection failed for this image."
+          );
+        }
+
+        const detections =
+          Array.isArray(
+            data.detections
+          )
+            ? data.detections
+            : [];
+
+        imageResults.push({
+          imageName:
+            image.file.name,
+
+          imageIndex:
+            i + 1,
+
+          detections:
+            detections,
+        });
+
+        detections.forEach(
+          (detection) => {
+            allDetections.push({
+              ...detection,
+
+              imageName:
+                image.file.name,
+
+              imageIndex:
+                i + 1,
+            });
+          }
+        );
+      }
+
+      console.log(
+        "ALL IMAGE RESULTS:",
+        imageResults
+      );
+
+      console.log(
+        "ALL AI DETECTIONS:",
+        allDetections
+      );
+
+      if (
+        allDetections.length === 0
+      ) {
+        setAiError(
+          "No waste was detected in the uploaded images."
+        );
+
+        return;
+      }
+
+      setAiResult({
+        success: true,
+
+        detections:
+          allDetections,
+
+        imageResults:
+          imageResults,
+
+        totalImages:
+          images.length,
+
+        totalDetections:
+          allDetections.length,
+      });
+    } catch (error) {
+      console.error(
+        "AI detection error:",
+        error
+      );
+
+      setAiError(
+        error?.message ||
+          "Unable to connect to the AI detection service."
+      );
+    } finally {
+      setAiLoading(false);
+    }
   };
 
-  // ------------------------------------------------
+  // ==================================================
+  // SAVE PICKUP REQUEST
+  // ==================================================
+
+  const savePickupRequest = async () => {
+    if (!aiResult) {
+      throw new Error(
+        "AI result is missing."
+      );
+    }
+
+    const selectedLocation =
+      currentLocation ||
+      pinPosition;
+
+    if (!selectedLocation) {
+      throw new Error(
+        "Pickup location is missing."
+      );
+    }
+
+    if (!locationText) {
+      throw new Error(
+        "Pickup location name is missing."
+      );
+    }
+
+    if (images.length === 0) {
+      throw new Error(
+        "No waste image selected."
+      );
+    }
+
+    // ==================================================
+    // GET CURRENT LOGGED-IN USER ID
+    // ==================================================
+
+    const userId =
+      getCurrentUserId();
+
+    console.log(
+      "================================"
+    );
+
+    console.log(
+      "LOGGED-IN USER ID:",
+      userId
+    );
+
+    console.log(
+      "================================"
+    );
+
+    // ==================================================
+    // GET DETECTIONS
+    // ==================================================
+
+    const detections =
+      Array.isArray(
+        aiResult.detections
+      )
+        ? aiResult.detections
+        : [];
+
+    if (detections.length === 0) {
+      throw new Error(
+        "No waste was detected in the uploaded images."
+      );
+    }
+
+    // ==================================================
+    // DETECTION PAYLOAD
+    // ==================================================
+
+    const detectionPayload =
+      detections.map(
+        (detection) => ({
+          class:
+            detection.class ||
+            detection.class_name ||
+            detection.name ||
+            "Unknown",
+
+          confidence:
+            Number(
+              detection.confidence
+            ),
+
+          imageName:
+            detection.imageName ||
+            null,
+
+          imageIndex:
+            detection.imageIndex ||
+            null,
+        })
+      );
+
+    // ==================================================
+    // FORM DATA
+    // ==================================================
+
+    const formData =
+      new FormData();
+
+    // ==================================================
+    // USER ID
+    //
+    // THIS IS THE IMPORTANT FIX
+    // ==================================================
+
+    formData.append(
+      "user_id",
+      String(userId)
+    );
+
+    // ==================================================
+    // LOCATION
+    // ==================================================
+
+    formData.append(
+      "location_name",
+      locationText
+    );
+
+    formData.append(
+      "latitude",
+      String(
+        selectedLocation.lat
+      )
+    );
+
+    formData.append(
+      "longitude",
+      String(
+        selectedLocation.lng
+      )
+    );
+
+    // ==================================================
+    // DETECTIONS
+    // ==================================================
+
+    formData.append(
+      "detections",
+      JSON.stringify(
+        detectionPayload
+      )
+    );
+
+    // ==================================================
+    // ALL IMAGES
+    // ==================================================
+
+    images.forEach(
+      (image) => {
+        formData.append(
+          "images",
+          image.file
+        );
+      }
+    );
+
+    // ==================================================
+    // DEBUG FOR FORMDATA
+    // ==================================================
+
+    console.log(
+      "================================"
+    );
+
+    console.log(
+      "Saving pickup request..."
+    );
+
+    console.log(
+      "User ID:",
+      userId
+    );
+
+    console.log(
+      "Total images:",
+      images.length
+    );
+
+    console.log(
+      "Location:",
+      locationText
+    );
+
+    console.log(
+      "Latitude:",
+      selectedLocation.lat
+    );
+
+    console.log(
+      "Longitude:",
+      selectedLocation.lng
+    );
+
+    console.log(
+      "Detections:",
+      detectionPayload
+    );
+
+    console.log(
+      "================================"
+    );
+
+    // ==================================================
+    // SEND TO DJANGO
+    // ==================================================
+
+    let response;
+
+    try {
+      response = await fetch(
+        `${API_BASE_URL}/api/waste/create-pickup/`,
+        {
+          method: "POST",
+
+          headers:
+            getAuthHeaders(),
+
+          body: formData,
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Pickup save network error:",
+        error
+      );
+
+      throw new Error(
+        "Unable to connect to the Django server. Please make sure the backend server is running."
+      );
+    }
+
+    const responseText =
+      await response.text();
+
+    console.log(
+      "SAVE RESPONSE STATUS:",
+      response.status
+    );
+
+    console.log(
+      "SAVE RESPONSE:",
+      responseText
+    );
+
+    let data = {};
+
+    try {
+      data = responseText
+        ? JSON.parse(
+            responseText
+          )
+        : {};
+    } catch {
+      throw new Error(
+        `Invalid response received while saving pickup request. Server returned HTTP ${response.status}.`
+      );
+    }
+
+    // ==================================================
+    // AUTH ERROR
+    // ==================================================
+
+    if (
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      throw new Error(
+        "Your login session has expired. Please login again."
+      );
+    }
+
+    // ==================================================
+    // SERVER ERROR
+    // ==================================================
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          data?.detail ||
+          `Failed to save pickup request (${response.status}).`
+      );
+    }
+
+    // ==================================================
+    // BACKEND ERROR
+    // ==================================================
+
+    if (
+      data?.success === false
+    ) {
+      throw new Error(
+        data?.message ||
+          "Pickup request could not be saved."
+      );
+    }
+
+    // ==================================================
+    // SUCCESS
+    // ==================================================
+
+    console.log(
+      "PICKUP REQUEST SAVED SUCCESSFULLY:",
+      data
+    );
+
+    return data;
+  };
+
+  // ==================================================
+  // AI RESULT OK
+  // ==================================================
+
+  const handleAiOk = async () => {
+    console.log(
+      "AI result accepted:",
+      aiResult
+    );
+
+    try {
+      setAiLoading(true);
+      setAiError("");
+
+      // SAVE TO DATABASE
+      const saved =
+        await savePickupRequest();
+
+      console.log(
+        "DATABASE SAVE SUCCESS:",
+        saved
+      );
+
+      setAiResult(null);
+
+      setStatus(
+        "submitting"
+      );
+
+      window.setTimeout(
+        () => {
+          setStatus(
+            "success"
+          );
+        },
+        3400
+      );
+    } catch (error) {
+      console.error(
+        "SAVE PICKUP REQUEST ERROR:",
+        error
+      );
+
+      setAiError(
+        error?.message ||
+          "Unable to save pickup request."
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // ==================================================
   // RESET FORM
-  // ------------------------------------------------
+  // ==================================================
 
   const resetForm = () => {
+    images.forEach(
+      (img) => {
+        if (img.url) {
+          URL.revokeObjectURL(
+            img.url
+          );
+        }
+      }
+    );
+
     setImages([]);
 
     setLocationMode(null);
@@ -297,7 +1101,38 @@ export default function EcoPulseWastePickup({
     setLocationText("");
 
     setStatus("idle");
+
+    setAiLoading(false);
+
+    setAiResult(null);
+
+    setAiError("");
+
+    if (
+      fileInputRef.current
+    ) {
+      fileInputRef.current.value =
+        "";
+    }
   };
+
+  // ==================================================
+  // CLEANUP
+  // ==================================================
+
+  useEffect(() => {
+    return () => {
+      images.forEach(
+        (img) => {
+          if (img.url) {
+            URL.revokeObjectURL(
+              img.url
+            );
+          }
+        }
+      );
+    };
+  }, [images]);
 
   // ==================================================
   // JSX
@@ -313,11 +1148,13 @@ export default function EcoPulseWastePickup({
         <div className="pickup-logo">
 
           <div className="pickup-logo-badge">
+
             <Activity
               size={17}
               strokeWidth={2.5}
               color="#ffffff"
             />
+
           </div>
 
           <span className="pickup-logo-text">
@@ -331,8 +1168,11 @@ export default function EcoPulseWastePickup({
           onClick={onBack}
           aria-label="Go back"
         >
+
           <ArrowLeft size={15} />
+
           Back
+
         </button>
 
       </div>
@@ -342,19 +1182,22 @@ export default function EcoPulseWastePickup({
       <div className="pickup-heading-wrap">
 
         <div className="pickup-heading-pill">
+
           Request your waste pickup here
+
           <span className="pickup-heading-bang">
             !!
           </span>
+
         </div>
 
       </div>
 
-      {/* MAIN SPLIT */}
+      {/* MAIN */}
 
       <div className="pickup-split">
 
-        {/* REAL LEAFLET MAP */}
+        {/* MAP */}
 
         <div
           className={`pickup-map-card${
@@ -365,18 +1208,17 @@ export default function EcoPulseWastePickup({
         >
 
           <MapContainer
-            center={[9.6852, 76.7218]}
+            center={[
+              9.6852,
+              76.7218,
+            ]}
             zoom={13}
-
-            /* IMPORTANT:
-               Leaflet dragging is explicitly enabled */
             dragging={true}
             scrollWheelZoom={true}
             doubleClickZoom={true}
             touchZoom={true}
             keyboard={true}
             zoomControl={true}
-
             style={{
               height: "100%",
               width: "100%",
@@ -388,21 +1230,29 @@ export default function EcoPulseWastePickup({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {/* MAP CLICK HANDLER */}
-
             <LocationPicker
-              locationMode={locationMode}
-              setPinPosition={setPinPosition}
-              setLocationText={setLocationText}
-            />
+              locationMode={
+                locationMode
+              }
 
-            {/* CURRENT LOCATION CONTROLLER */}
+              setPinPosition={
+                setPinPosition
+              }
+
+              setLocationText={
+                setLocationText
+              }
+            />
 
             <MapController
-              currentLocation={currentLocation}
-            />
+              currentLocation={
+                currentLocation
+              }
 
-            {/* CURRENT LOCATION MARKER */}
+              pinPosition={
+                pinPosition
+              }
+            />
 
             {currentLocation && (
               <Marker
@@ -412,8 +1262,6 @@ export default function EcoPulseWastePickup({
                 ]}
               />
             )}
-
-            {/* PICKED LOCATION MARKER */}
 
             {pinPosition && (
               <Marker
@@ -426,12 +1274,13 @@ export default function EcoPulseWastePickup({
 
           </MapContainer>
 
-          {/* MAP INSTRUCTION */}
-
           {locationMode === "pick" &&
             !pinPosition && (
               <div className="pickup-map-hint">
-                Click the map to select pickup location
+
+                Click the map to select pickup
+                location
+
               </div>
             )}
 
@@ -441,7 +1290,7 @@ export default function EcoPulseWastePickup({
 
         <div className="pickup-form-card">
 
-          {/* WASTE IMAGE */}
+          {/* IMAGE UPLOAD */}
 
           <div>
 
@@ -460,20 +1309,27 @@ export default function EcoPulseWastePickup({
                   }
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    fileInputRef.current?.click()
-                  }
+                  onKeyDown={(e) => {
+
+                    if (
+                      e.key === "Enter"
+                    ) {
+                      fileInputRef.current?.click();
+                    }
+
+                  }}
                 >
 
                   <Upload size={26} />
 
                   <span className="pickup-upload-title">
-                    Click to add photos of your waste
+                    Click to add photos of
+                    your waste
                   </span>
 
                   <span className="pickup-upload-sub">
-                    You can add more than one photo
+                    You can add more than one
+                    photo
                   </span>
 
                 </div>
@@ -482,32 +1338,38 @@ export default function EcoPulseWastePickup({
 
                 <div className="pickup-thumb-grid">
 
-                  {images.map((img) => (
+                  {images.map(
+                    (img) => (
 
-                    <div
-                      className="pickup-thumb"
-                      key={img.id}
-                    >
-
-                      <img
-                        src={img.url}
-                        alt={img.name}
-                      />
-
-                      <button
-                        type="button"
-                        className="pickup-thumb-remove"
-                        onClick={() =>
-                          removeImage(img.id)
-                        }
-                        aria-label={`Remove ${img.name}`}
+                      <div
+                        className="pickup-thumb"
+                        key={img.id}
                       >
-                        <X size={12} />
-                      </button>
 
-                    </div>
+                        <img
+                          src={img.url}
+                          alt={img.name}
+                        />
 
-                  ))}
+                        <button
+                          type="button"
+                          className="pickup-thumb-remove"
+                          onClick={() =>
+                            removeImage(
+                              img.id
+                            )
+                          }
+                          aria-label={`Remove ${img.name}`}
+                        >
+
+                          <X size={12} />
+
+                        </button>
+
+                      </div>
+
+                    )
+                  )}
 
                   <div
                     className="pickup-thumb-add"
@@ -516,13 +1378,20 @@ export default function EcoPulseWastePickup({
                     }
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" &&
-                      fileInputRef.current?.click()
-                    }
+                    onKeyDown={(e) => {
+
+                      if (
+                        e.key === "Enter"
+                      ) {
+                        fileInputRef.current?.click();
+                      }
+
+                    }}
                     aria-label="Add more photos"
                   >
+
                     <Plus size={22} />
+
                   </div>
 
                 </div>
@@ -538,8 +1407,13 @@ export default function EcoPulseWastePickup({
               multiple
               hidden
               onChange={(e) => {
-                handleFiles(e.target.files);
+
+                handleFiles(
+                  e.target.files
+                );
+
                 e.target.value = "";
+
               }}
             />
 
@@ -555,8 +1429,6 @@ export default function EcoPulseWastePickup({
 
             <div className="pickup-location-buttons">
 
-              {/* CURRENT LOCATION */}
-
               <button
                 type="button"
                 className={`pickup-loc-btn${
@@ -564,7 +1436,9 @@ export default function EcoPulseWastePickup({
                     ? " active"
                     : ""
                 }`}
-                onClick={handleShareLocation}
+                onClick={
+                  handleShareLocation
+                }
               >
 
                 <Navigation size={15} />
@@ -573,8 +1447,6 @@ export default function EcoPulseWastePickup({
 
               </button>
 
-              {/* PICK LOCATION */}
-
               <button
                 type="button"
                 className={`pickup-loc-btn${
@@ -582,7 +1454,9 @@ export default function EcoPulseWastePickup({
                     ? " active"
                     : ""
                 }`}
-                onClick={handlePickLocation}
+                onClick={
+                  handlePickLocation
+                }
               >
 
                 <MapPin size={15} />
@@ -593,18 +1467,15 @@ export default function EcoPulseWastePickup({
 
             </div>
 
-            {/* LOCATION ERROR */}
-
             {geoError && (
               <div className="pickup-loc-status pickup-error">
+
                 {geoError}
+
               </div>
             )}
 
-            {/* LOCATION NAME */}
-
             {locationMode && (
-
               <div className="pickup-loc-shown">
 
                 <MapPin size={14} />
@@ -612,7 +1483,9 @@ export default function EcoPulseWastePickup({
                 <input
                   type="text"
                   className="pickup-loc-input"
-                  value={locationText}
+                  value={
+                    locationText
+                  }
                   readOnly
                   placeholder={
                     locationMode === "current"
@@ -623,41 +1496,46 @@ export default function EcoPulseWastePickup({
                 />
 
               </div>
-
             )}
-
-            {/* PICK LOCATION NOTE */}
 
             {!geoError &&
               locationMode === "pick" &&
               pinPosition && (
-
                 <span className="pickup-loc-note">
-                  Click the map again to move the pin.
-                </span>
 
+                  Click the map again to
+                  move the pin.
+
+                </span>
               )}
 
           </div>
-
-          {/* SPACER */}
 
           <div className="pickup-spacer" />
 
           {/* SUBMIT */}
 
-          <button
-            className="pickup-submit-btn"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-          >
-            Submit pickup request
-          </button>
+          {status === "idle" && (
+            <button
+              className="pickup-submit-btn"
+              onClick={
+                handleSubmit
+              }
+              disabled={
+                !canSubmit
+              }
+            >
 
-          {/* SUBMITTING ANIMATION */}
+              {aiLoading
+                ? "Analyzing..."
+                : "Submit pickup request"}
+
+            </button>
+          )}
+
+          {/* VAN */}
 
           {status === "submitting" && (
-
             <div className="pickup-van-stage">
 
               <div className="pickup-van-track">
@@ -665,9 +1543,7 @@ export default function EcoPulseWastePickup({
                 <div className="pickup-van-road" />
 
                 <div className="pickup-van-puff p1" />
-
                 <div className="pickup-van-puff p2" />
-
                 <div className="pickup-van-puff p3" />
 
                 <Truck
@@ -676,23 +1552,25 @@ export default function EcoPulseWastePickup({
                 />
 
                 <div className="pickup-bin">
+
                   <Trash2 size={30} />
+
                 </div>
 
               </div>
 
               <p className="pickup-van-caption">
+
                 Sending your pickup request...
+
               </p>
 
             </div>
-
           )}
 
           {/* SUCCESS */}
 
           {status === "success" && (
-
             <div className="pickup-success">
 
               <CheckCircle2
@@ -705,24 +1583,297 @@ export default function EcoPulseWastePickup({
               </h3>
 
               <p>
-                We'll send someone your way shortly.
+                We'll send someone your
+                way shortly.
               </p>
 
               <button
                 type="button"
                 className="pickup-secondary-btn"
-                onClick={resetForm}
+                onClick={
+                  resetForm
+                }
               >
+
                 Request another pickup
+
+              </button>
+
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* AI LOADING */}
+
+      {aiLoading && (
+        <div className="pickup-ai-overlay">
+
+          <div className="pickup-ai-modal">
+
+            <div className="pickup-ai-spinner" />
+
+            <h3>
+              Analyzing your waste...
+            </h3>
+
+            <p>
+
+              AI is checking{" "}
+
+              <strong>
+                {images.length}
+              </strong>{" "}
+
+              {images.length === 1
+                ? "image"
+                : "images"}.
+
+            </p>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* AI RESULT */}
+
+      {aiResult &&
+        !aiLoading && (
+          <div className="pickup-ai-overlay">
+
+            <div className="pickup-ai-modal">
+
+              <div className="pickup-ai-icon success">
+
+                <Activity size={24} />
+
+              </div>
+
+              <h3>
+                Waste Detection Complete
+              </h3>
+
+              <p className="pickup-ai-summary">
+
+                Checked{" "}
+
+                <strong>
+                  {aiResult.totalImages}
+                </strong>{" "}
+
+                {aiResult.totalImages === 1
+                  ? "image"
+                  : "images"}{" "}
+
+                and detected{" "}
+
+                <strong>
+                  {aiResult.totalDetections}
+                </strong>{" "}
+
+                waste object
+
+                {aiResult.totalDetections === 1
+                  ? ""
+                  : "s"}.
+
+              </p>
+
+              {Array.isArray(
+                aiResult.imageResults
+              ) &&
+              aiResult.imageResults.length > 0 ? (
+
+                <div className="pickup-ai-detections">
+
+                  {aiResult.imageResults.map(
+                    (
+                      imageResult,
+                      imageIndex
+                    ) => (
+
+                      <div
+                        className="pickup-ai-image-result"
+                        key={`${imageResult.imageName}-${imageIndex}`}
+                      >
+
+                        <div className="pickup-ai-image-name">
+
+                          <strong>
+                            Image{" "}
+                            {
+                              imageResult.imageIndex
+                            }
+                          </strong>
+
+                          <span>
+                            {
+                              imageResult.imageName
+                            }
+                          </span>
+
+                        </div>
+
+                        {Array.isArray(
+                          imageResult.detections
+                        ) &&
+                        imageResult.detections.length >
+                          0 ? (
+
+                          <div className="pickup-ai-image-detections">
+
+                            {imageResult.detections.map(
+                              (
+                                detection,
+                                detectionIndex
+                              ) => {
+
+                                const confidence =
+                                  Number(
+                                    detection.confidence
+                                  ) *
+                                  100;
+
+                                const safeConfidence =
+                                  Math.min(
+                                    Math.max(
+                                      Number.isFinite(
+                                        confidence
+                                      )
+                                        ? confidence
+                                        : 0,
+                                      0
+                                    ),
+                                    100
+                                  );
+
+                                return (
+                                  <div
+                                    className="pickup-ai-detection"
+                                    key={
+                                      detectionIndex
+                                    }
+                                  >
+
+                                    <span>
+
+                                      {detection.class ||
+                                        detection.class_name ||
+                                        detection.name ||
+                                        "Unknown"}
+
+                                    </span>
+
+                                    <span>
+
+                                      {safeConfidence.toFixed(
+                                        2
+                                      )}
+
+                                      %
+
+                                    </span>
+
+                                  </div>
+                                );
+                              }
+                            )}
+
+                          </div>
+
+                        ) : (
+
+                          <div className="pickup-ai-no-detection">
+
+                            No waste detected
+
+                          </div>
+
+                        )}
+
+                      </div>
+
+                    )
+                  )}
+
+                </div>
+
+              ) : (
+
+                <p className="pickup-ai-message">
+
+                  No waste was detected in the
+                  uploaded images.
+
+                </p>
+
+              )}
+
+              <button
+                type="button"
+                className="pickup-ai-button"
+                onClick={
+                  aiResult.totalDetections > 0
+                    ? handleAiOk
+                    : () =>
+                        setAiResult(null)
+                }
+                disabled={aiLoading}
+              >
+
+                {aiResult.totalDetections > 0
+                  ? "OK"
+                  : "Try Again"}
+
               </button>
 
             </div>
 
-          )}
+          </div>
+        )}
 
-        </div>
+      {/* AI ERROR */}
 
-      </div>
+      {aiError &&
+        !aiLoading && (
+          <div className="pickup-ai-overlay">
+
+            <div className="pickup-ai-modal">
+
+              <div className="pickup-ai-icon error">
+
+                <X size={24} />
+
+              </div>
+
+              <h3>
+                Detection Failed
+              </h3>
+
+              <p className="pickup-ai-message">
+
+                {aiError}
+
+              </p>
+
+              <button
+                type="button"
+                className="pickup-ai-button"
+                onClick={() =>
+                  setAiError("")
+                }
+              >
+
+                OK
+
+              </button>
+
+            </div>
+
+          </div>
+        )}
 
     </div>
   );
