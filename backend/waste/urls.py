@@ -6,6 +6,8 @@ from .views import (
     StaffByWardView,
     AssignPickupView,
     StaffAssignedTasksView,
+    StaffTaskUpdateView,
+    DashboardStatsView,
 )
 
 urlpatterns = [
@@ -44,5 +46,23 @@ urlpatterns = [
         "staff/my-tasks/",
         StaffAssignedTasksView.as_view(),
         name="staff-my-tasks"
+    ),
+
+    path(
+        "staff/task-update/<int:pk>/",
+        StaffTaskUpdateView.as_view(),
+        name="staff-task-update"
+    ),
+
+    path(
+        "staff/tasks/<int:pk>/",
+        StaffTaskUpdateView.as_view(),
+        name="staff-task-detail"
+    ),
+
+    path(
+        "dashboard-stats/",
+        DashboardStatsView.as_view(),
+        name="dashboard-stats"
     ),
 ]

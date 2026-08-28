@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     WastePickupRequest,
     WastePickupImage,
+    WasteCollection,
 )
 
 
@@ -198,3 +199,48 @@ class WastePickupRequestAdmin(
     get_image_count.short_description = (
         "Images"
     )
+
+
+# ============================================================
+# WASTE COLLECTION ADMIN
+# ============================================================
+
+@admin.register(WasteCollection)
+class WasteCollectionAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "id",
+        "pickup_request",
+        "get_citizen",
+        "staff",
+        "estimated_weight",
+        "completed_at",
+    )
+
+    list_filter = (
+        "completed_at",
+    )
+
+    search_fields = (
+        "pickup_request__id",
+        "pickup_request__user__email",
+        "pickup_request__user__username",
+        "pickup_request__user__userprofile__name",
+        "staff__user__username",
+        "staff__user__email",
+    )
+
+    readonly_fields = (
+        "completed_at",
+    )
+
+    def get_citizen(self, obj):
+        try:
+            profile = getattr(obj.pickup_request.user, "userprofile", None)
+            if profile and profile.name:
+                return profile.name
+            return obj.pickup_request.user.username
+        except Exception:
+            return "-"
+
+    get_citizen.short_description = "Citizen"

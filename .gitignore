@@ -18,6 +18,7 @@ env/
 
 # Django
 *.sqlite3
+backend/media/
 
 # VS Code
 .vscode/

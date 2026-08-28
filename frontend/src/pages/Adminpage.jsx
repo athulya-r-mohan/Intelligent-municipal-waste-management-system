@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import axios from "axios";
 import "../components/Adminpage.css";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,7 +24,8 @@ import {
   Activity,
 } from "lucide-react";
 
- 
+const API_BASE_URL = "http://127.0.0.1:8000";
+
 /* ---------------------------------------------------------
    EcoPulse — Admin Console
    Palette:  --pulse-forest #1E6B4E, --pulse-leaf #3FA96B,
@@ -35,31 +37,31 @@ import {
    faint horizontal divider beneath the top bar.
    Styles live in EcoPulseAdmin.css (imported above).
 ---------------------------------------------------------- */
- 
+
 const DASH_CARDS = [
   { key: "pickup", title: "Waste Pickup Requests", sub: "Active resident requests", icon: Truck },
   { key: "complaints", title: "Complaints", sub: "Open citizen complaints", icon: MessageSquareWarning },
-  { key: "rescheduled", title: "Rescheduled", sub: "Pickups moved this week", icon: CalendarClock },
+  { key: "rescheduled", title: "Rescheduled", sub: "Pending field tasks", icon: CalendarClock },
   { key: "completed", title: "Completed Tasks", sub: "Closed out this month", icon: CheckCircle2 },
   { key: "assigned", title: "Task Assigned", sub: "Currently with staff", icon: ClipboardList },
   { key: "payment", title: "Payment History", sub: "Recent transactions", icon: CreditCard },
   { key: "mcf", title: "MCF Collection", sub: "Material collection facility", icon: Factory },
   { key: "recycled", title: "Recycled Waste", sub: "Tonnage processed", icon: Recycle },
 ];
- 
+
 const MUNICIPALITY_CARDS = [
   { key: "addstaff", title: "Add Staff", sub: "Onboard a new team member", icon: UserPlus },
   { key: "addrecyclers", title: "Add Recyclers", sub: "Register a recycling partner", icon: Users },
   { key: "usermgmt", title: "User Management", sub: "Roles & access control", icon: ShieldCheck },
 ];
- 
+
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "municipality", label: "Manage Municipality", icon: Building2 },
   { key: "profile", label: "My Profile", icon: UserCircle2 },
   { key: "notifications", label: "Notifications", icon: Bell },
 ];
- 
+
 function Logo({ onClick }) {
   return (
     <button className="admin-logo" onClick={onClick} aria-label="Go to home">
@@ -72,7 +74,7 @@ function Logo({ onClick }) {
     </button>
   );
 }
- 
+
 function DateBadge() {
   const today = useMemo(() => {
     const d = new Date();
@@ -86,8 +88,8 @@ function DateBadge() {
     </div>
   );
 }
- 
-function Card({ title, sub, icon: Icon, onClick }) {
+
+function Card({ title, sub, count, icon: Icon, onClick }) {
   return (
     <div
       className="admin-card"
@@ -100,8 +102,26 @@ function Card({ title, sub, icon: Icon, onClick }) {
       }}
       role={onClick ? "button" : undefined}
     >
-      <div className="admin-card-icon">
-        <Icon size={22} strokeWidth={2} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="admin-card-icon">
+          <Icon size={22} strokeWidth={2} />
+        </div>
+        {count !== undefined && count !== null && (
+          <span
+            style={{
+              fontSize: "17px",
+              fontWeight: 700,
+              fontFamily: "'Poppins', sans-serif",
+              color: "var(--pulse-forest)",
+              background: "var(--pulse-mint)",
+              padding: "2px 10px",
+              borderRadius: "10px",
+              border: "1px solid var(--pulse-border)",
+            }}
+          >
+            {count}
+          </span>
+        )}
       </div>
 
       <div className="admin-card-text">
@@ -111,20 +131,52 @@ function Card({ title, sub, icon: Icon, onClick }) {
     </div>
   );
 }
- 
+
 export default function EcoPulseAdmin() {
   const [page, setPage] = useState("dashboard");
- 
+  const [stats, setStats] = useState({
+    pending_count: 0,
+    completed_count: 0,
+    assigned_count: 0,
+    total_requests: 0,
+  });
+
   const goHome = () => setPage("dashboard");
   const goBack = () => setPage("dashboard");
-   const navigate = useNavigate();
- 
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStats = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/waste/dashboard-stats/`);
+        if (isMounted && response.data?.stats) {
+          setStats(response.data.stats);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard stats:", err);
+      }
+    };
+    fetchStats();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const heading = page === "dashboard" ? "Dashboard" : "Manage Municipality";
   const subheading =
     page === "dashboard"
       ? "Overview of today's waste management activity"
       : "Manage staff, recyclers, and platform users";
- 
+
+  const getCardCount = (key) => {
+    if (key === "rescheduled") return stats.pending_count;
+    if (key === "completed") return stats.completed_count;
+    if (key === "assigned") return stats.assigned_count;
+    if (key === "pickup") return stats.total_requests;
+    return null;
+  };
+
   return (
     <div className="admin-root">
       <aside className="admin-sidebar">
@@ -150,12 +202,18 @@ export default function EcoPulseAdmin() {
           })}
         </nav>
         <div className="admin-sidebar-spacer" />
-        <button className="admin-logout">
+        <button
+          className="admin-logout"
+          onClick={() => {
+            localStorage.clear();
+            navigate("/login");
+          }}
+        >
           <LogOut size={17} strokeWidth={2} />
           <span>Logout</span>
         </button>
       </aside>
- 
+
       <main className="admin-main">
         <div className="admin-topbar">
           <button className="admin-back-btn" onClick={goBack} disabled={page === "dashboard"}>
@@ -164,7 +222,7 @@ export default function EcoPulseAdmin() {
           </button>
           <DateBadge />
         </div>
- 
+
         <svg className="admin-pulse-divider" viewBox="0 0 800 22" preserveAspectRatio="none">
           <polyline
             points="0,11 260,11 285,2 305,20 325,11 800,11"
@@ -175,29 +233,34 @@ export default function EcoPulseAdmin() {
             strokeLinejoin="round"
           />
         </svg>
- 
+
         <h1 className="admin-page-heading">{heading}</h1>
         <p className="admin-page-sub">{subheading}</p>
- 
+
         {page === "dashboard" && (
           <div className="admin-grid">
-           {DASH_CARDS.map((c) => (
-      <Card
-        key={c.key}
-        title={c.title}
-        sub={c.sub}
-        icon={c.icon}
-        onClick={() => {
-          if (c.key === "pickup") {
-            navigate("/assign");
-          }
-    }}
-  />
-))}
+            {DASH_CARDS.map((c) => (
+              <Card
+                key={c.key}
+                title={c.title}
+                sub={c.sub}
+                count={getCardCount(c.key)}
+                icon={c.icon}
+                onClick={() => {
+                  if (c.key === "pickup") {
+                    navigate("/assign");
+                  } else if (c.key === "rescheduled") {
+                    navigate("/assign?status=STAFF_PENDING");
+                  } else if (c.key === "completed") {
+                    navigate("/assign?status=COMPLETED");
+                  } else if (c.key === "assigned") {
+                    navigate("/assign?status=ASSIGNED");
+                  }
+                }}
+              />
+            ))}
           </div>
         )}
- 
-          
 
         {page === "municipality" && (
           <div className="admin-grid admin-grid-3">
@@ -211,19 +274,17 @@ export default function EcoPulseAdmin() {
                   if (c.key === "addstaff") {
                     navigate("/addstaff");
                   }
-                   if (c.key === "addrecyclers") {
-                     
-                     navigate("/addrecycler");
-                    }
-                   if (c.key === "usermgmt") {
+                  if (c.key === "addrecyclers") {
+                    navigate("/addrecycler");
+                  }
+                  if (c.key === "usermgmt") {
                     navigate("/resident");
-                   }
+                  }
                 }}
               />
             ))}
           </div>
         )}
-
       </main>
     </div>
   );

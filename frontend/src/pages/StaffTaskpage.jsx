@@ -20,6 +20,7 @@ const getAccessToken = () => {
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     localStorage.getItem("accessToken") ||
+    localStorage.getItem("token") ||
     ""
   );
 };
@@ -326,7 +327,16 @@ export default function MyTaskDashboard() {
 
         if (!mounted) return;
 
-        const data = Array.isArray(response.data) ? response.data : [];
+        const raw = response.data;
+        const data = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.tasks)
+          ? raw.tasks
+          : Array.isArray(raw?.results)
+          ? raw.results
+          : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
 
         const formatted = data.map((item) => ({
           id: item.request_id || item.id,

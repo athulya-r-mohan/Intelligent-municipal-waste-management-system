@@ -1,5 +1,17 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock3,
+  Scale,
+  Calendar,
+  User,
+  MapPin,
+  ImageIcon,
+  Eye,
+} from "lucide-react";
 import "../components/pickupassign.css";
 
 // ============================================================
@@ -56,6 +68,169 @@ const statusClass = {
 };
 
 // ============================================================
+// COMPLETED DETAILS MODAL (Admin Completed Task Proof)
+// ============================================================
+function CompletedDetailsModal({
+  request,
+  onClose,
+}) {
+  if (!request) return null;
+
+  return (
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+    >
+      <div
+        className="assign-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 540 }}
+      >
+        {/* HEADER */}
+        <div className="modal-header">
+          <div>
+            <div className="modal-request">
+              Request #{request.requestId} · Completed Task
+            </div>
+            <h2>
+              Collection Details & Proof
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className="modal-body">
+          {/* COMPLETION IMAGE */}
+          <div className="modal-field">
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <ImageIcon size={14} color="#1f8a5f" />
+              Completion Photo Proof
+            </label>
+
+            {request.completionImage ? (
+              <div
+                style={{
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  border: "1px solid #dcede0",
+                  background: "#f7fbf8",
+                  maxHeight: 260,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <img
+                  src={request.completionImage}
+                  alt={`Completion Proof #${request.requestId}`}
+                  style={{
+                    width: "100%",
+                    maxHeight: 260,
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="modal-value" style={{ color: "#8fa896" }}>
+                No completion photo recorded.
+              </div>
+            )}
+          </div>
+
+          {/* WEIGHT & COMPLETION TIME */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="modal-field">
+              <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <Scale size={13} color="#1f8a5f" />
+                Estimated Weight
+              </label>
+              <div
+                className="modal-value"
+                style={{
+                  fontWeight: 700,
+                  color: "#1f2e22",
+                  fontSize: 15,
+                }}
+              >
+                {request.estimatedWeight !== null && request.estimatedWeight !== undefined
+                  ? `${request.estimatedWeight} kg`
+                  : "N/A"}
+              </div>
+            </div>
+
+            <div className="modal-field">
+              <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <Clock3 size={13} color="#1f8a5f" />
+                Completed Date / Time
+              </label>
+              <div
+                className="modal-value"
+                style={{
+                  fontWeight: 600,
+                  color: "#1f2e22",
+                  fontSize: 13.5,
+                }}
+              >
+                {request.completedAt || request.date || "N/A"}
+              </div>
+            </div>
+          </div>
+
+          {/* STAFF */}
+          <div className="modal-field">
+            <label>Assigned Staff Member</label>
+            <div className="modal-value">
+              {request.assignedStaff || "Staff Member"}
+            </div>
+          </div>
+
+          {/* CITIZEN & LOCATION */}
+          <div className="modal-field">
+            <label>Citizen & Location</label>
+            <div className="modal-value">
+              <strong>{request.userName || "Citizen"}</strong> ({request.ward || "Ward"})
+              <br />
+              <span style={{ color: "#5f8268", fontSize: 12.5 }}>
+                {request.pickupLocation || "N/A"}
+              </span>
+            </div>
+          </div>
+
+          {/* WASTE TYPE */}
+          <div className="modal-field">
+            <label>Waste Type</label>
+            <div className="modal-value">
+              {request.wasteType || "Waste"}
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="modal-footer">
+          <button
+            type="button"
+            className="confirm-button"
+            onClick={onClose}
+            style={{ width: "100%" }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // ASSIGN MODAL
 // ============================================================
 function AssignModal({
@@ -64,7 +239,9 @@ function AssignModal({
   onConfirm,
 }) {
   const [staff, setStaff] = useState(
-    request?.assignedStaff || ""
+    request?.assignedStaffId
+      ? String(request.assignedStaffId)
+      : ""
   );
 
   const [staffList, setStaffList] = useState([]);
@@ -162,6 +339,20 @@ function AssignModal({
 
         setStaffList(staffData);
 
+        // If request already has an assigned staff name or ID, preselect matching staff
+        if (request?.assignedStaffId) {
+          setStaff(String(request.assignedStaffId));
+        } else if (request?.assignedStaff && staffData.length > 0) {
+          const match = staffData.find(
+            (p) =>
+              String(p?.name).toLowerCase() === String(request.assignedStaff).toLowerCase() ||
+              String(p?.username).toLowerCase() === String(request.assignedStaff).toLowerCase()
+          );
+          if (match) {
+            setStaff(String(match.staff_id ?? match.id ?? ""));
+          }
+        }
+
       } catch (error) {
         console.error(
           "Failed to fetch staff:",
@@ -177,7 +368,7 @@ function AssignModal({
           );
 
           console.error(
-            "Staff API response:",
+            "Backend error response:",
             error.response.data
           );
 
@@ -234,6 +425,7 @@ function AssignModal({
   // STAFF NAME
   // ==========================================================
   const getStaffName = (person) => {
+    if (!person) return "";
     if (typeof person === "string") {
       return person;
     }
@@ -244,25 +436,24 @@ function AssignModal({
       person?.fullName ||
       person?.username ||
       person?.email ||
-      `Staff #${person?.id || person?.staff_id || ""}`
+      `Staff #${person?.staff_id || person?.id || ""}`
     );
   };
 
   // ==========================================================
-  // STAFF VALUE
+  // STAFF VALUE (Returns database staff_id as string)
   // ==========================================================
   const getStaffValue = (person) => {
-    if (typeof person === "string") {
-      return person;
+    if (!person) return "";
+    if (typeof person === "string" || typeof person === "number") {
+      return String(person);
     }
 
     return String(
-      person?.id ||
-      person?.staff_id ||
-      person?.staffId ||
-      person?.username ||
-      person?.email ||
-      person?.name ||
+      person?.staff_id ??
+      person?.id ??
+      person?.staffId ??
+      person?.username ??
       ""
     );
   };
@@ -277,7 +468,11 @@ function AssignModal({
 
     const selectedStaff = staffList.find(
       (person) =>
-        getStaffValue(person) === String(staff)
+        String(person?.staff_id) === String(staff) ||
+        String(person?.id) === String(staff) ||
+        String(person?.staffId) === String(staff) ||
+        String(person?.username).toLowerCase() === String(staff).toLowerCase() ||
+        String(person?.name).toLowerCase() === String(staff).toLowerCase()
     );
 
     const staffName = selectedStaff
@@ -285,9 +480,9 @@ function AssignModal({
       : staff;
 
     const staffId =
-      selectedStaff?.staff_id ||
-      selectedStaff?.id ||
-      selectedStaff?.staffId ||
+      selectedStaff?.staff_id ??
+      selectedStaff?.id ??
+      selectedStaff?.staffId ??
       staff;
 
     onConfirm(
@@ -521,14 +716,27 @@ function AssignModal({
 // MAIN COMPONENT
 // ============================================================
 export default function PickupRequests() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [requests, setRequests] = useState([]);
 
   const [searchDate, setSearchDate] = useState("");
   const [selectedWard, setSelectedWard] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
 
-  const [modalRequest, setModalRequest] =
-    useState(null);
+  const urlStatus = searchParams.get("status");
+  const [selectedStatus, setSelectedStatus] = useState(
+    urlStatus ? urlStatus.toUpperCase() : ""
+  );
+
+  useEffect(() => {
+    if (urlStatus) {
+      setSelectedStatus(urlStatus.toUpperCase());
+    }
+  }, [urlStatus]);
+
+  const [modalRequest, setModalRequest] = useState(null);
+  const [detailsModalRequest, setDetailsModalRequest] = useState(null);
 
   const [toast, setToast] = useState("");
 
@@ -623,8 +831,6 @@ export default function PickupRequests() {
 
             // =================================================
             // IMAGE RESULTS
-            // IMPORTANT:
-            // Keep EVERY uploaded image and its AI result.
             // =================================================
             const imageResults =
               images.map(
@@ -651,8 +857,6 @@ export default function PickupRequests() {
 
             // =================================================
             // WASTE TYPES FROM DETECTED IMAGES
-            // Only actual detections are included here.
-            // "Unknown" is NOT considered a detection.
             // =================================================
             let wasteTypes =
               imageResults
@@ -833,14 +1037,10 @@ export default function PickupRequests() {
                 request?.pickupLocation ??
                 "",
 
-              // Main detected waste types
               wasteType,
 
-              // IMPORTANT:
-              // Every image and its result
               imageResults,
 
-              // Keep original images too
               images,
 
               status:
@@ -858,6 +1058,29 @@ export default function PickupRequests() {
               assignedStaffId:
                 request?.assigned_staff_id ??
                 request?.assignedStaffId ??
+                null,
+
+              staffMarkedPending:
+                Boolean(
+                  request?.staff_marked_pending ||
+                  request?.staffMarkedPending
+                ),
+
+              completionImage:
+                request?.completion_image ||
+                request?.collection?.completion_image_url ||
+                request?.collection?.completion_image ||
+                null,
+
+              estimatedWeight:
+                request?.estimated_weight ??
+                request?.collection?.estimated_weight ??
+                null,
+
+              completedAt:
+                request?.completed_at ||
+                request?.collection?.completed_at_formatted ||
+                request?.collection?.completed_at ||
                 null,
 
               latitude:
@@ -923,18 +1146,25 @@ export default function PickupRequests() {
 
           } else {
             setError(
-              "Failed to load pickup requests."
+              "Failed to fetch pickup requests from backend."
             );
           }
 
         } else if (err.request) {
+          console.error(
+            "No backend response received:",
+            err.request
+          );
+
           setError(
-            "Cannot connect to Django server. Please start the backend server."
+            "Cannot connect to backend server at " +
+              API_BASE_URL
           );
 
         } else {
           setError(
-            "Failed to load pickup requests."
+            "An error occurred while loading pickup requests: " +
+              err.message
           );
         }
 
@@ -954,26 +1184,24 @@ export default function PickupRequests() {
   }, []);
 
   // ==========================================================
-  // AVAILABLE WARDS FROM LOADED REQUESTS
+  // AVAILABLE WARDS
   // ==========================================================
   const availableWards = useMemo(() => {
-    const wardMap = new Map();
-    requests.forEach((req) => {
-      if (req.ward && req.ward !== "N/A" && req.ward !== "") {
-        const key = String(req.ward).trim();
-        if (!wardMap.has(key)) {
-          wardMap.set(key, {
-            id: req.wardId,
-            name: req.ward,
-          });
-        }
+    const map = new Map();
+
+    requests.forEach((r) => {
+      const wardName = String(r.ward || "").trim();
+      const wardId = r.wardId;
+
+      if (wardName && !map.has(wardName)) {
+        map.set(wardName, {
+          name: wardName,
+          id: wardId,
+        });
       }
     });
 
-    return Array.from(wardMap.values()).sort((a, b) => {
-      if (a.id && b.id) return a.id - b.id;
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
-    });
+    return Array.from(map.values());
   }, [requests]);
 
   // ==========================================================
@@ -1002,9 +1230,15 @@ export default function PickupRequests() {
 
       // 3. Status Filter
       if (selectedStatus) {
-        const reqStatus = String(request.status || "").trim().toUpperCase();
         const targetStatus = selectedStatus.trim().toUpperCase();
-        if (reqStatus !== targetStatus) {
+        const reqStatus = String(request.status || "").trim().toUpperCase();
+
+        if (targetStatus === "STAFF_PENDING" || targetStatus === "RESCHEDULED") {
+          // ONLY tasks assigned to staff AND explicitly marked PENDING by staff
+          if (!(request.staffMarkedPending && reqStatus === "PENDING")) {
+            return false;
+          }
+        } else if (reqStatus !== targetStatus) {
           return false;
         }
       }
@@ -1094,7 +1328,29 @@ export default function PickupRequests() {
       {/* HEADER */}
       <header className="top-header">
 
-        <EcoPulseLogo />
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <button
+            type="button"
+            onClick={() => navigate("/admin")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#f0f7f2",
+              border: "1px solid #cfe7bb",
+              color: "#1f6b4e",
+              borderRadius: 8,
+              padding: "7px 12px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <ArrowLeft size={15} /> Dashboard
+          </button>
+
+          <EcoPulseLogo />
+        </div>
 
         <div className="header-title">
           Pickup Requests
@@ -1118,6 +1374,45 @@ export default function PickupRequests() {
               Showing {filteredRequests.length} {filteredRequests.length === 1 ? "pickup request" : "pickup requests"}
               {requests.length !== filteredRequests.length ? ` (filtered from ${requests.length} total)` : ""}
             </p>
+
+            {/* QUICK STATUS TABS */}
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              {[
+                { label: "All Requests", value: "" },
+                { label: "Rescheduled Tasks", value: "STAFF_PENDING" },
+                { label: "Assigned Tasks", value: "ASSIGNED" },
+                { label: "Completed Tasks", value: "COMPLETED" },
+              ].map((tab) => {
+                const isActive = (selectedStatus || "").toUpperCase() === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStatus(tab.value);
+                      if (tab.value) {
+                        setSearchParams({ status: tab.value });
+                      } else {
+                        setSearchParams({});
+                      }
+                    }}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 20,
+                      border: isActive ? "1.5px solid #1f8a5f" : "1px solid #dcede0",
+                      background: isActive ? "#1f8a5f" : "#ffffff",
+                      color: isActive ? "#ffffff" : "#2f4a1c",
+                      fontWeight: 600,
+                      fontSize: 12.5,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
 
           </div>
 
@@ -1177,18 +1472,23 @@ export default function PickupRequests() {
               <select
                 id="filter-status"
                 value={selectedStatus}
-                onChange={(e) =>
-                  setSelectedStatus(
-                    e.target.value
-                  )
-                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedStatus(val);
+                  if (val) {
+                    setSearchParams({ status: val });
+                  } else {
+                    setSearchParams({});
+                  }
+                }}
                 className="filter-select"
               >
                 <option value="">All Status</option>
-                <option value="PENDING">Pending</option>
+                <option value="STAFF_PENDING">Rescheduled (Staff Pending)</option>
                 <option value="ASSIGNED">Assigned</option>
-                <option value="COLLECTED">Collected</option>
                 <option value="COMPLETED">Completed</option>
+                <option value="PENDING">All Pending (including Unassigned)</option>
+                <option value="COLLECTED">Collected</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
@@ -1276,7 +1576,7 @@ export default function PickupRequests() {
                 </th>
 
                 <th>
-                  DATE
+                  {selectedStatus === "COMPLETED" ? "COMPLETED AT" : "DATE"}
                 </th>
 
                 <th>
@@ -1380,10 +1680,7 @@ export default function PickupRequests() {
                         }
                       </td>
 
-                      {/* =================================================
-                          WASTE
-                          SHOW EVERY IMAGE RESULT
-                          ================================================= */}
+                      {/* WASTE */}
                       <td>
                         {request.imageResults?.length >
                         0 ? (
@@ -1486,8 +1783,27 @@ export default function PickupRequests() {
 
                         ) : (
                           <span>
-                            No detection
+                            {request.wasteType || "No detection"}
                           </span>
+                        )}
+
+                        {request.status === "COMPLETED" && request.estimatedWeight !== null && request.estimatedWeight !== undefined && (
+                          <div
+                            style={{
+                              marginTop: "5px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "11.5px",
+                              fontWeight: 600,
+                              color: "#1e6b4e",
+                              background: "#eaf7ef",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            <Scale size={11} /> {request.estimatedWeight} kg
+                          </div>
                         )}
                       </td>
 
@@ -1507,30 +1823,70 @@ export default function PickupRequests() {
                           }
                         </span>
 
+                        {request.assignedStaff && (
+                          <div style={{ fontSize: "11px", color: "#5f8268", marginTop: "3px" }}>
+                            Staff: {request.assignedStaff}
+                          </div>
+                        )}
+
                       </td>
 
                       {/* DATE */}
                       <td className="date-cell">
                         {
-                          request.date ||
-                          "N/A"
+                          request.status === "COMPLETED" && request.completedAt
+                            ? request.completedAt
+                            : (request.date || "N/A")
                         }
                       </td>
 
                       {/* ACTION */}
                       <td className="action-cell">
 
-                        <button
-                          type="button"
-                          className="assign-button"
-                          onClick={() =>
-                            setModalRequest(
-                              request
-                            )
-                          }
-                        >
-                          Assign
-                        </button>
+                        {request.status === "COMPLETED" ? (
+                          <button
+                            type="button"
+                            className="assign-button"
+                            style={{
+                              background: "#2e7d32",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                            onClick={() =>
+                              setDetailsModalRequest(
+                                request
+                              )
+                            }
+                          >
+                            <Eye size={13} /> View Proof
+                          </button>
+                        ) : request.status === "ASSIGNED" ? (
+                          <button
+                            type="button"
+                            className="assign-button"
+                            style={{ background: "#397358" }}
+                            onClick={() =>
+                              setModalRequest(
+                                request
+                              )
+                            }
+                          >
+                            Reassign
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="assign-button"
+                            onClick={() =>
+                              setModalRequest(
+                                request
+                              )
+                            }
+                          >
+                            Assign
+                          </button>
+                        )}
 
                       </td>
 
@@ -1570,6 +1926,16 @@ export default function PickupRequests() {
             setModalRequest(null)
           }
           onConfirm={handleAssign}
+        />
+      )}
+
+      {/* COMPLETED DETAILS MODAL */}
+      {detailsModalRequest && (
+        <CompletedDetailsModal
+          request={detailsModalRequest}
+          onClose={() =>
+            setDetailsModalRequest(null)
+          }
         />
       )}
 

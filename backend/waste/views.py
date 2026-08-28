@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 
+from django.db import models
 from django.http import JsonResponse
 
 from rest_framework.decorators import (
@@ -9,21 +10,24 @@ from rest_framework.decorators import (
     permission_classes,
 )
 
-from rest_framework.permissions import IsAuthenticated,AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .serializers import WastePickupRequestSerializer
 
 from ultralytics import YOLO
-from accounts.models import UserProfile,Staff
+from accounts.models import UserProfile, Staff
 
 
 from .models import (
     WastePickupRequest,
     WastePickupImage,
+    WasteCollection,
 )
 
 
@@ -929,13 +933,18 @@ class AdminPickupRequestListView(APIView):
                 "assigned_staff",
                 "assigned_staff__user",
                 "assigned_staff__user__userprofile",
+                "collection",
+                "collection__staff",
+                "collection__staff__user",
+                "collection__staff__user__userprofile",
             )
             .order_by("-id")
         )
 
         serializer = WastePickupRequestSerializer(
             requests,
-            many=True
+            many=True,
+            context={"request": request}
         )
 
         return Response(serializer.data)
@@ -1040,23 +1049,49 @@ class AssignPickupView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Lookup staff by staff_id or user_id
+        # Lookup staff by staff_id, user_id, username, email, or profile name
         staff = None
-        try:
-            staff = Staff.objects.select_related(
-                "user", "user__userprofile", "user__userprofile__ward"
-            ).get(staff_id=staff_id)
-        except (Staff.DoesNotExist, ValueError):
-            try:
-                staff = Staff.objects.select_related(
-                    "user", "user__userprofile", "user__userprofile__ward"
-                ).get(user_id=staff_id)
-            except (Staff.DoesNotExist, ValueError):
-                pass
+        staff_id_str = str(staff_id).strip()
+
+        # 1. Numeric lookup by staff_id or user_id or userprofile_id
+        if staff_id_str.isdigit():
+            numeric_id = int(staff_id_str)
+            staff = (
+                Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward")
+                .filter(
+                    models.Q(staff_id=numeric_id) |
+                    models.Q(user_id=numeric_id) |
+                    models.Q(user__userprofile__id=numeric_id)
+                )
+                .first()
+            )
+
+        # 2. Case-insensitive lookup by username, email, or profile name
+        if not staff:
+            staff = (
+                Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward")
+                .filter(
+                    models.Q(user__username__iexact=staff_id_str) |
+                    models.Q(user__email__iexact=staff_id_str) |
+                    models.Q(user__userprofile__name__iexact=staff_id_str)
+                )
+                .first()
+            )
+
+        # 3. Partial contains fallback
+        if not staff:
+            staff = (
+                Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward")
+                .filter(
+                    models.Q(user__username__icontains=staff_id_str) |
+                    models.Q(user__userprofile__name__icontains=staff_id_str)
+                )
+                .first()
+            )
 
         if not staff:
             return Response(
-                {"success": False, "error": f"Staff member with ID {staff_id} not found."},
+                {"success": False, "error": f"Staff member '{staff_id}' not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -1086,7 +1121,7 @@ class AssignPickupView(APIView):
         pickup_request.save(update_fields=["assigned_staff", "status", "updated_at"])
 
         staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
-        serializer = WastePickupRequestSerializer(pickup_request)
+        serializer = WastePickupRequestSerializer(pickup_request, context={"request": request})
 
         return Response(
             {
@@ -1103,14 +1138,14 @@ class AssignPickupView(APIView):
 # ============================================================
 
 class StaffAssignedTasksView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
 
-        try:
-            staff = Staff.objects.get(user=user)
-        except Staff.DoesNotExist:
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
             return Response(
                 {"success": False, "error": "No Staff profile associated with the current user."},
                 status=status.HTTP_403_FORBIDDEN
@@ -1127,9 +1162,265 @@ class StaffAssignedTasksView(APIView):
                 "assigned_staff",
                 "assigned_staff__user",
                 "assigned_staff__user__userprofile",
+                "collection",
             )
-            .order_by("-id")
+            .order_by("-updated_at", "-id")
         )
 
-        serializer = WastePickupRequestSerializer(tasks, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = WastePickupRequestSerializer(
+            tasks,
+            many=True,
+            context={"request": request}
+        )
+
+        return Response(
+            {
+                "success": True,
+                "count": tasks.count(),
+                "tasks": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# STAFF TASK STATUS UPDATE VIEW (Pending & Completed)
+# ============================================================
+
+class StaffTaskUpdateView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request, pk):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "Staff profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            task = (
+                WastePickupRequest.objects
+                .select_related(
+                    "user",
+                    "user__userprofile",
+                    "user__userprofile__ward",
+                    "assigned_staff",
+                    "assigned_staff__user",
+                    "assigned_staff__user__userprofile",
+                    "collection",
+                )
+                .get(id=pk)
+            )
+        except WastePickupRequest.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Task #{pk} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if task.assigned_staff_id != staff.staff_id:
+            return Response(
+                {
+                    "success": False,
+                    "error": "You are not authorized to view this task because it is assigned to another staff member."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = WastePickupRequestSerializer(task, context={"request": request})
+        return Response(
+            {"success": True, "task": serializer.data},
+            status=status.HTTP_200_OK
+        )
+
+    def post(self, request, pk):
+        # 1. Staff verification
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "Staff profile not found for logged-in user."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2. Task lookup
+        try:
+            task = (
+                WastePickupRequest.objects
+                .select_related(
+                    "user",
+                    "user__userprofile",
+                    "user__userprofile__ward",
+                    "assigned_staff",
+                    "assigned_staff__user",
+                    "assigned_staff__user__userprofile",
+                    "collection",
+                )
+                .get(id=pk)
+            )
+        except WastePickupRequest.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Task #{pk} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 3. Ownership / assignment verification
+        if task.assigned_staff_id != staff.staff_id:
+            return Response(
+                {
+                    "success": False,
+                    "error": "You are not authorized to update this task because it is assigned to another staff member."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 4. Status extraction & normalization
+        status_input = request.data.get("status") or request.POST.get("status") or ""
+        new_status = str(status_input).strip().upper()
+
+        if new_status not in ["PENDING", "COMPLETED"]:
+            return Response(
+                {"success": False, "error": "Invalid status. Must be 'PENDING' or 'COMPLETED'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ====================================================
+        # CASE 1: PENDING (Explicitly marked by assigned staff)
+        # ====================================================
+        if new_status == "PENDING":
+            task.status = "PENDING"
+            task.staff_marked_pending = True
+            task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
+
+            serializer = WastePickupRequestSerializer(task, context={"request": request})
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Task #{task.id} status successfully updated to PENDING.",
+                    "task": serializer.data,
+                },
+                status=status.HTTP_200_OK
+            )
+
+        # ====================================================
+        # CASE 2: COMPLETED
+        # ====================================================
+        if new_status == "COMPLETED":
+            completion_image = (
+                request.FILES.get("completion_image") or
+                request.FILES.get("image")
+            )
+            estimated_weight = (
+                request.data.get("estimated_weight") or
+                request.data.get("weight") or
+                request.POST.get("estimated_weight") or
+                request.POST.get("weight")
+            )
+
+            # Check completion image requirement
+            has_existing_collection = hasattr(task, "collection") and task.collection
+            if not completion_image and not has_existing_collection:
+                return Response(
+                    {"success": False, "error": "Completion image is required when completing a task."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate image file type if uploaded
+            if completion_image:
+                allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"]
+                ext = os.path.splitext(completion_image.name)[1].lower()
+                if ext not in allowed_extensions:
+                    return Response(
+                        {"success": False, "error": f"Invalid image format ({ext}). Supported formats: PNG, JPG, JPEG, WEBP, GIF."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Validate estimated weight
+            if estimated_weight is None or str(estimated_weight).strip() == "":
+                return Response(
+                    {"success": False, "error": "Estimated waste weight is required when completing a task."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                weight_val = float(str(estimated_weight).strip())
+                if weight_val < 0:
+                    return Response(
+                        {"success": False, "error": "Estimated weight cannot be negative."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {"success": False, "error": "Invalid estimated weight format. Please enter a valid number."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create or update WasteCollection (prevent duplicates)
+            collection, created = WasteCollection.objects.get_or_create(
+                pickup_request=task,
+                defaults={
+                    "staff": staff,
+                    "completion_image": completion_image,
+                    "estimated_weight": weight_val,
+                }
+            )
+
+            if not created:
+                collection.staff = staff
+                if completion_image:
+                    collection.completion_image = completion_image
+                collection.estimated_weight = weight_val
+                collection.save()
+
+            # Update WastePickupRequest status and reset staff_marked_pending
+            task.status = "COMPLETED"
+            task.staff_marked_pending = False
+            task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
+
+            # Reload with updated relationships
+            task.refresh_from_db()
+            serializer = WastePickupRequestSerializer(task, context={"request": request})
+
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Task #{task.id} successfully marked as COMPLETED.",
+                    "task": serializer.data,
+                    "payment_qr": serializer.data.get("payment_qr_data"),
+                },
+                status=status.HTTP_200_OK
+            )
+
+
+# ============================================================
+# DASHBOARD STATS VIEW (For Admin Dashboard Live Counts)
+# ============================================================
+
+class DashboardStatsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        # ONLY tasks that were assigned and explicitly marked PENDING by staff
+        pending_count = WastePickupRequest.objects.filter(
+            staff_marked_pending=True,
+            status="PENDING"
+        ).count()
+        completed_count = WastePickupRequest.objects.filter(status="COMPLETED").count()
+        assigned_count = WastePickupRequest.objects.filter(status="ASSIGNED").count()
+        total_requests = WastePickupRequest.objects.count()
+
+        return Response(
+            {
+                "success": True,
+                "stats": {
+                    "pending_count": pending_count,
+                    "completed_count": completed_count,
+                    "assigned_count": assigned_count,
+                    "total_requests": total_requests,
+                }
+            },
+            status=status.HTTP_200_OK
+        )
