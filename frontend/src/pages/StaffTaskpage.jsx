@@ -157,7 +157,7 @@ function MiniCalendar() {
 // ---------------------------------------------------------------------------
 // Task table
 // ---------------------------------------------------------------------------
-function TaskTable({ tasks, loading, error, onStatusClick }) {
+function TaskTable({ tasks, loading, error, onStatusClick, onOpenRoute }) {
   return (
     <div
       style={{
@@ -244,8 +244,45 @@ function TaskTable({ tasks, loading, error, onStatusClick }) {
               }}
             >
               <td style={{ padding: "14px 16px", color: "#39511f" }}>{idx + 1}</td>
-              <td style={{ padding: "14px 16px", color: "#243515", fontWeight: 500 }}>
-                {t.pickup}
+              <td style={{ padding: "14px 16px", color: "#243515" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "#243515",
+                    marginBottom: 4,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                  onClick={() => onOpenRoute && onOpenRoute(t)}
+                  title="Click to view pickup route on map"
+                >
+                  <span>📍</span>
+                  <span>{t.pickup}</span>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => onOpenRoute && onOpenRoute(t)}
+                    style={{
+                      background: "#eaf5e0",
+                      border: "1px solid #cfe7bb",
+                      color: "#2f4a1c",
+                      borderRadius: 6,
+                      padding: "3px 8px",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                    title="Click to view pickup route on map"
+                  >
+                    🗺️ View Route
+                  </button>
+                </div>
               </td>
               <td style={{ padding: "14px 16px", color: "#39511f" }}>{t.ward}</td>
               <td style={{ padding: "14px 16px", color: "#39511f" }}>
@@ -292,6 +329,205 @@ function TaskTable({ tasks, loading, error, onStatusClick }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Pickup Route Modal
+// ---------------------------------------------------------------------------
+function PickupRouteModal({ task, onClose }) {
+  if (!task) return null;
+
+  const lat = task.latitude;
+  const lng = task.longitude;
+  const locationName = task.pickup || task.location_name || "Pickup Location";
+  const hasCoords = lat !== null && lng !== null && lat !== undefined && lng !== undefined && !isNaN(Number(lat)) && !isNaN(Number(lng));
+
+  const handleOpenGoogleMaps = () => {
+    if (hasCoords) {
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+        "_blank"
+      );
+    } else if (locationName) {
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`,
+        "_blank"
+      );
+    } else {
+      alert("Location coordinates or address not available for navigation.");
+    }
+  };
+
+  const handleOpenOSM = () => {
+    if (hasCoords) {
+      window.open(
+        `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=%2C;${lat}%2C${lng}`,
+        "_blank"
+      );
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 36, 26, 0.48)",
+        backdropFilter: "blur(2px)",
+        zIndex: 999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: 16,
+          width: "100%",
+          maxWidth: 480,
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.15)",
+          overflow: "hidden",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid #cfe7bb",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#f5faf0",
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#2f4a1c" }}>
+            Route to Pickup #{task.id}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 22,
+              cursor: "pointer",
+              color: "#5f8a45",
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ padding: "20px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#5f8a45", textTransform: "uppercase" }}>
+              Pickup Destination
+            </span>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#243515", marginTop: 4 }}>
+              {locationName}
+            </div>
+            {task.ward && (
+              <div style={{ fontSize: 12.5, color: "#4c7a2e", marginTop: 2, fontWeight: 500 }}>
+                {task.ward}
+              </div>
+            )}
+            {hasCoords && (
+              <div style={{ fontSize: 12, color: "#6c8479", marginTop: 4 }}>
+                Coordinates: {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              background: "#eaf5e0",
+              borderRadius: 10,
+              padding: "12px 14px",
+              marginBottom: 20,
+              fontSize: 12.5,
+              color: "#2f4a1c",
+            }}
+          >
+            🗺️ Click below to launch GPS turn-by-turn navigation directly to this pickup spot.
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              type="button"
+              onClick={handleOpenGoogleMaps}
+              style={{
+                background: "#1e6b4e",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: 10,
+                padding: "12px 16px",
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              📍 Open Google Maps Live Navigation
+            </button>
+
+            {hasCoords && (
+              <button
+                type="button"
+                onClick={handleOpenOSM}
+                style={{
+                  background: "#ffffff",
+                  color: "#2f4a1c",
+                  border: "1px solid #cfe7bb",
+                  borderRadius: 10,
+                  padding: "10px 16px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                OpenStreetMap Route Directions
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 20px",
+            borderTop: "1px solid #cfe7bb",
+            background: "#f5faf0",
+            textAlign: "right",
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              background: "#ffffff",
+              border: "1px solid #cfe7bb",
+              color: "#5f8a45",
+              borderRadius: 8,
+              padding: "6px 14px",
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
  
 // ---------------------------------------------------------------------------
 // Complaint Route Modal
@@ -1043,6 +1279,7 @@ export default function MyTaskDashboard() {
   const [loadingComplaints, setLoadingComplaints] = useState(false);
   const [complaintError, setComplaintError] = useState("");
 
+  const [activeRoutePickup, setActiveRoutePickup] = useState(null);
   const [activeRouteComplaint, setActiveRouteComplaint] = useState(null);
   const [activeResolveComplaint, setActiveResolveComplaint] = useState(null);
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
@@ -1082,6 +1319,9 @@ export default function MyTaskDashboard() {
       const formatted = data.map((item) => ({
         id: item.request_id || item.id,
         pickup: item.pickup_location || item.location_name || "N/A",
+        location_name: item.location_name || item.pickup_location || "N/A",
+        latitude: item.latitude,
+        longitude: item.longitude,
         ward: item.ward || (item.ward_id ? `Ward ${item.ward_id}` : "N/A"),
         wasteType: item.waste_type || "Waste",
         status: item.status || "ASSIGNED",
@@ -1284,6 +1524,7 @@ export default function MyTaskDashboard() {
           loading={loading}
           error={error}
           onStatusClick={handleStatusClick}
+          onOpenRoute={(task) => setActiveRoutePickup(task)}
         />
       ) : (
         <ComplaintTaskTable
@@ -1297,13 +1538,22 @@ export default function MyTaskDashboard() {
         />
       )}
 
-      {/* ROUTE MODAL */}
+      {/* PICKUP ROUTE MODAL */}
+      {activeRoutePickup && (
+        <PickupRouteModal
+          task={activeRoutePickup}
+          onClose={() => setActiveRoutePickup(null)}
+        />
+      )}
+
+      {/* COMPLAINT ROUTE MODAL */}
       {activeRouteComplaint && (
         <ComplaintRouteModal
           complaint={activeRouteComplaint}
           onClose={() => setActiveRouteComplaint(null)}
         />
       )}
+
 
       {/* RESOLVE & PROOF MODAL */}
       {activeResolveComplaint && (

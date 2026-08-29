@@ -86,9 +86,7 @@ export default function TaskStatusUpdate() {
           config
         );
 
-        if (!mounted) return;
-
-        const data = response.data;
+        const data = response.data?.task || response.data;
         setTask(data);
 
         // Pre-fill existing status & collection details if already completed
@@ -336,9 +334,64 @@ export default function TaskStatusUpdate() {
                 ({task.ward || (task.ward_id ? `Ward ${task.ward_id}` : "Ward")})
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#5f8268" }}>
-              <MapPin size={14} color="#4c9a5f" />
-              <span>{task.pickup_location || "Location not specified"}</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#5f8268" }}>
+                <MapPin size={14} color="#4c9a5f" />
+                <span>{task.pickup_location || task.location_name || "Location not specified"}</span>
+              </div>
+              {(task.latitude || task.longitude || task.pickup_location || task.location_name) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lat = task.latitude;
+                    const lng = task.longitude;
+                    const hasCoords =
+                      lat !== null &&
+                      lng !== null &&
+                      lat !== undefined &&
+                      lng !== undefined &&
+                      !isNaN(Number(lat)) &&
+                      !isNaN(Number(lng));
+
+                    if (hasCoords) {
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+                        "_blank"
+                      );
+                    } else {
+                      const loc = task.pickup_location || task.location_name || "";
+                      window.open(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`,
+                        "_blank"
+                      );
+                    }
+                  }}
+                  style={{
+                    background: "#eaf5e0",
+                    border: "1px solid #cfe7bb",
+                    color: "#2f4a1c",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                  title="Open live route in Google Maps"
+                >
+                  🗺️ View Route
+                </button>
+              )}
             </div>
           </div>
         )}

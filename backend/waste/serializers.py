@@ -251,6 +251,9 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             "ward_id",
 
             "pickup_location",
+            "location_name",
+            "latitude",
+            "longitude",
 
             "waste_type",
             "ai_confidence",

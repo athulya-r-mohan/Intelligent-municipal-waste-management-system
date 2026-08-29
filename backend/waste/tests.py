@@ -978,6 +978,52 @@ class WasteComplaintWorkflowTests(TestCase):
         self.assertIsNotNone(c_data.get("resolved_at"))
         self.assertIsNotNone(c_data.get("resolved_at_formatted"))
 
+    def test_staff_assigned_pickup_tasks_include_coordinates(self):
+        req = WastePickupRequest.objects.create(
+            user=self.citizen1,
+            location_name="Erattupetta Market Square",
+            latitude=9.6825,
+            longitude=76.8430,
+            status="ASSIGNED",
+            assigned_staff=self.staff1
+        )
+        WastePickupImage.objects.create(
+            pickup_request=req,
+            image=create_test_image(),
+            waste_type="Plastic",
+            confidence=0.92
+        )
+
+        self.client.force_authenticate(user=self.staff_user1)
+        response = self.client.get("/api/waste/staff/my-tasks/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("success"))
+        tasks = response.data.get("tasks", [])
+        task_match = next((t for t in tasks if t["request_id"] == req.id), None)
+        self.assertIsNotNone(task_match)
+        self.assertEqual(task_match["pickup_location"], "Erattupetta Market Square")
+        self.assertEqual(float(task_match["latitude"]), 9.6825)
+        self.assertEqual(float(task_match["longitude"]), 76.8430)
+
+    def test_staff_pickup_task_detail_includes_coordinates(self):
+        req = WastePickupRequest.objects.create(
+            user=self.citizen1,
+            location_name="Town Bus Stand",
+            latitude=9.6850,
+            longitude=76.8450,
+            status="ASSIGNED",
+            assigned_staff=self.staff1
+        )
+
+        self.client.force_authenticate(user=self.staff_user1)
+        response = self.client.get(f"/api/waste/staff/tasks/{req.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        task_data = response.data.get("task", response.data)
+        self.assertEqual(task_data["pickup_location"], "Town Bus Stand")
+        self.assertEqual(float(task_data["latitude"]), 9.6850)
+        self.assertEqual(float(task_data["longitude"]), 76.8450)
+
+
 
 
 
