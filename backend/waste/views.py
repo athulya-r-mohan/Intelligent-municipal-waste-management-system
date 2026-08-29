@@ -1424,3 +1424,115 @@ class DashboardStatsView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+# ============================================================
+# USER PICKUP / ROUTE HISTORY VIEW (For Authenticated Users)
+# ============================================================
+
+class UserPickupHistoryView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Query only the authenticated user's requests
+        requests_qs = (
+            WastePickupRequest.objects
+            .filter(user=user)
+            .select_related(
+                "user",
+                "user__userprofile",
+                "user__userprofile__ward",
+                "assigned_staff",
+                "assigned_staff__user",
+                "assigned_staff__user__userprofile",
+                "collection",
+                "collection__staff",
+                "collection__staff__user",
+                "collection__staff__user__userprofile",
+            )
+            .prefetch_related("waste_images")
+        )
+
+        # Filter by status (default is COMPLETED for pickup history)
+        status_param = request.query_params.get("status", "COMPLETED").strip().upper()
+        if status_param != "ALL":
+            requests_qs = requests_qs.filter(status=status_param)
+
+        # Sort by completion date descending (most recently completed first)
+        requests_qs = requests_qs.order_by("-collection__completed_at", "-updated_at", "-id")
+
+        serializer = WastePickupRequestSerializer(
+            requests_qs,
+            many=True,
+            context={"request": request}
+        )
+
+        return Response(
+            {
+                "success": True,
+                "count": requests_qs.count(),
+                "history": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# USER LATEST PICKUP VIEW (For Waste Pickup Tracking Timeline)
+# ============================================================
+
+class UserLatestPickupView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        latest_pickup = (
+            WastePickupRequest.objects
+            .filter(user=user)
+            .select_related(
+                "user",
+                "user__userprofile",
+                "user__userprofile__ward",
+                "assigned_staff",
+                "assigned_staff__user",
+                "assigned_staff__user__userprofile",
+                "collection",
+                "collection__staff",
+                "collection__staff__user",
+                "collection__staff__user__userprofile",
+            )
+            .prefetch_related("waste_images")
+            .order_by("-id")
+            .first()
+        )
+
+        if not latest_pickup:
+            return Response(
+                {
+                    "success": True,
+                    "has_pickup": False,
+                    "latest_pickup": None,
+                    "message": "No pickup requests found for this user."
+                },
+                status=status.HTTP_200_OK
+            )
+
+        serializer = WastePickupRequestSerializer(
+            latest_pickup,
+            context={"request": request}
+        )
+
+        return Response(
+            {
+                "success": True,
+                "has_pickup": True,
+                "latest_pickup": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+

@@ -226,6 +226,9 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
     completion_image = serializers.SerializerMethodField()
     estimated_weight = serializers.SerializerMethodField()
     completed_at = serializers.SerializerMethodField()
+    completed_date = serializers.SerializerMethodField()
+    completed_time = serializers.SerializerMethodField()
+    ai_confidence = serializers.SerializerMethodField()
     payment_qr_data = serializers.SerializerMethodField()
 
     # ========================================================
@@ -250,6 +253,7 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             "pickup_location",
 
             "waste_type",
+            "ai_confidence",
             "images",
 
             "status",
@@ -263,6 +267,8 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             "completion_image",
             "estimated_weight",
             "completed_at",
+            "completed_date",
+            "completed_time",
             "payment_qr_data",
         ]
 
@@ -338,6 +344,32 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             pass
 
         return "Unknown"
+
+    # ========================================================
+    # GET AI CONFIDENCE
+    # ========================================================
+
+    def get_ai_confidence(self, obj):
+
+        try:
+
+            image = (
+                WastePickupImage.objects
+                .filter(
+                    pickup_request=obj
+                )
+                .order_by("id")
+                .first()
+            )
+
+            if image and image.confidence:
+                return round(float(image.confidence) * 100, 1)
+
+        except Exception:
+
+            pass
+
+        return None
 
     # ========================================================
     # GET ASSIGNED STAFF
@@ -434,6 +466,30 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
         try:
             if hasattr(obj, "collection") and obj.collection and obj.collection.completed_at:
                 return obj.collection.completed_at.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+        return None
+
+    # ========================================================
+    # GET COMPLETED DATE
+    # ========================================================
+
+    def get_completed_date(self, obj):
+        try:
+            if hasattr(obj, "collection") and obj.collection and obj.collection.completed_at:
+                return obj.collection.completed_at.strftime("%B %d, %Y")
+        except Exception:
+            pass
+        return None
+
+    # ========================================================
+    # GET COMPLETED TIME
+    # ========================================================
+
+    def get_completed_time(self, obj):
+        try:
+            if hasattr(obj, "collection") and obj.collection and obj.collection.completed_at:
+                return obj.collection.completed_at.strftime("%I:%M %p")
         except Exception:
             pass
         return None

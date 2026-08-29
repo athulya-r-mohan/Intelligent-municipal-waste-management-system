@@ -8,9 +8,22 @@ from .views import (
     StaffAssignedTasksView,
     StaffTaskUpdateView,
     DashboardStatsView,
+    UserPickupHistoryView,
+    UserLatestPickupView,
 )
 
 urlpatterns = [
+    path(
+        "user/latest-pickup/",
+        UserLatestPickupView.as_view(),
+        name="user-latest-pickup"
+    ),
+
+    path(
+        "user/pickup-history/",
+        UserPickupHistoryView.as_view(),
+        name="user-pickup-history"
+    ),
 
     path(
         "detect-waste/",

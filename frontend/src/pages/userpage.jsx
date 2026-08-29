@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../api/api";
 import "../components/userpage.css";
-
  
 const WARD_DATA = [
   { name: "Rosewood", code: "W1" },
@@ -65,6 +65,7 @@ const TruckSVG = ({ spinning }) => (
  
 const MENU_ITEMS = [
   {
+    key: "history",
     label: "Route history",
     icon: (
       <svg viewBox="0 0 24 24" fill="none">
@@ -75,6 +76,7 @@ const MENU_ITEMS = [
     ),
   },
   {
+    key: "complaints",
     label: "Complaint queue",
     icon: (
       <svg viewBox="0 0 24 24" fill="none">
@@ -83,15 +85,7 @@ const MENU_ITEMS = [
     ),
   },
   {
-    label: "Payroll",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M3 10h18" stroke="currentColor" strokeWidth="1.8" />
-      </svg>
-    ),
-  },
-  {
+    key: "tracking",
     label: "Live tracking",
     icon: (
       <svg viewBox="0 0 24 24" fill="none">
@@ -101,8 +95,9 @@ const MENU_ITEMS = [
     ),
     active: true,
   },
-  { label: "Notifications", icon: <BellIcon /> },
+  { key: "notifications", label: "Notifications", icon: <BellIcon /> },
   {
+    key: "profile",
     label: "My profile",
     icon: (
       <svg viewBox="0 0 24 24" fill="none">
@@ -114,7 +109,7 @@ const MENU_ITEMS = [
 ];
  
 export default function EcoPulseStaff() {
-   const navigate = useNavigate();
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeWard, setActiveWard] = useState(0);
   const [houses, setHouses] = useState(Array(HOUSE_COUNT).fill("pending"));
@@ -124,12 +119,31 @@ export default function EcoPulseStaff() {
   const [truckLeft, setTruckLeft] = useState(0);
   const [truckIdx, setTruckIdx] = useState(-1);
   const [wardsInView, setWardsInView] = useState(false);
+
+  // User History State
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRecords, setHistoryRecords] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // Live Pickup Tracking State
+  const [trackingOpen, setTrackingOpen] = useState(false);
+  const [latestPickup, setLatestPickup] = useState(null);
+  const [hasPickup, setHasPickup] = useState(false);
+  const [loadingTracking, setLoadingTracking] = useState(false);
+  const [trackingError, setTrackingError] = useState("");
+
+  // User info
+  const userName = localStorage.getItem("name") || "Citizen User";
+  const userRole = localStorage.getItem("role") || "Resident";
  
   const housesRowRef = useRef(null);
   const houseRefs = useRef([]);
   const wardsTrackRef = useRef(null);
   const wardsSectionRef = useRef(null);
   const trackerRef = useRef(null);
+  const pickupTrackingRef = useRef(null);
   const [arrows, setArrows] = useState({ prev: true, next: true });
  
   // Inject font once
@@ -263,12 +277,250 @@ export default function EcoPulseStaff() {
     wardsTrackRef.current?.scrollBy({ left: dir * 232, behavior: "smooth" });
   };
  
+  // Fetch completed pickup history for logged-in user
+  const fetchUserHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    setHistoryError("");
+    try {
+      const token =
+        localStorage.getItem("access") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("token") ||
+        "";
+
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await API.get("/waste/user/pickup-history/", { headers });
+
+      if (response.data && response.data.success) {
+        setHistoryRecords(response.data.history || []);
+      } else {
+        setHistoryRecords([]);
+      }
+    } catch (err) {
+      console.error("Error fetching user pickup history:", err);
+      const errMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to load pickup history. Please make sure you are logged in.";
+      setHistoryError(errMsg);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  // Fetch latest active pickup request for live tracking
+  const fetchLatestPickup = useCallback(async () => {
+    setLoadingTracking(true);
+    setTrackingError("");
+    try {
+      const token =
+        localStorage.getItem("access") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("token") ||
+        "";
+
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await API.get("/waste/user/latest-pickup/", { headers });
+
+      if (response.data && response.data.success) {
+        setHasPickup(Boolean(response.data.has_pickup && response.data.latest_pickup));
+        setLatestPickup(response.data.latest_pickup || null);
+      } else {
+        setHasPickup(false);
+        setLatestPickup(null);
+      }
+    } catch (err) {
+      console.error("Error fetching user latest pickup request:", err);
+      const errMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Unable to load active pickup status. Please make sure you are logged in.";
+      setTrackingError(errMsg);
+      setHasPickup(false);
+      setLatestPickup(null);
+    } finally {
+      setLoadingTracking(false);
+    }
+  }, []);
+
+  const openHistory = () => {
+    setDrawerOpen(false);
+    setHistoryOpen(true);
+    fetchUserHistory();
+  };
+
+  const openTracking = () => {
+    setDrawerOpen(false);
+    setTrackingOpen(true);
+    fetchLatestPickup();
+  };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
+
+  const handleMenuClick = (key) => {
+    if (key === "history") {
+      openHistory();
+    } else if (key === "complaints") {
+      setDrawerOpen(false);
+      navigate("/complaintform");
+    } else if (key === "tracking") {
+      openTracking();
+    }
+  };
+
+  // Group history by date
+  const groupedHistory = historyRecords.reduce((acc, item) => {
+    const dateKey = item.completed_date || item.date || "Recent Pickups";
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(item);
+    return acc;
+  }, {});
+
   const selectWard = (i) => {
     setActiveWard(i);
     trackerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
  
   const wardTagText = `${WARD_DATA[activeWard].name} — Ward ${WARD_DATA[activeWard].code.replace("W", "")}`;
+
+  // Helper for tracking timeline stages
+  const getTimelineStages = (pickup) => {
+    if (!pickup) return [];
+
+    const rawStatus = (pickup.status || "").toUpperCase();
+    const isCancelled = rawStatus === "CANCELLED";
+    const hasStaff = Boolean(pickup.assigned_staff || pickup.assigned_staff_id);
+    const isCollected = rawStatus === "COLLECTED" || rawStatus === "COMPLETED";
+    const isCompleted = rawStatus === "COMPLETED";
+
+    // Index mapping:
+    // 0: Request Submitted
+    // 1: AI Analysis Completed
+    // 2: Admin Assigned
+    // 3: Staff Assigned
+    // 4: Waste Collected
+    // 5: Completed
+
+    let currentStageIndex = 0;
+    if (isCompleted) {
+      currentStageIndex = 5;
+    } else if (rawStatus === "COLLECTED") {
+      currentStageIndex = 4;
+    } else if (rawStatus === "ASSIGNED" || hasStaff) {
+      currentStageIndex = 3;
+    } else if (pickup.waste_type && pickup.waste_type !== "Unknown") {
+      currentStageIndex = 2;
+    } else {
+      currentStageIndex = 0;
+    }
+
+    const stages = [
+      {
+        title: "Request Submitted",
+        desc: pickup.date ? `Submitted on ${pickup.date}` : "Request registered in EcoPulse system",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        title: "AI Analysis Completed",
+        desc: pickup.waste_type && pickup.waste_type !== "Unknown"
+          ? `Detected: ${pickup.waste_type}${pickup.ai_confidence ? ` (${pickup.ai_confidence}% confidence)` : ""}`
+          : "AI waste classification verified",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="11" width="18" height="10" rx="2" stroke="currentColor" strokeWidth="2.2"/>
+            <circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="2.2"/>
+            <path d="M12 7v4" stroke="currentColor" strokeWidth="2.2"/>
+            <line x1="8" y1="16" x2="8" y2="16.01" stroke="currentColor" strokeWidth="2.4"/>
+            <line x1="16" y1="16" x2="16" y2="16.01" stroke="currentColor" strokeWidth="2.4"/>
+          </svg>
+        ),
+      },
+      {
+        title: "Admin Assigned",
+        desc: hasStaff || rawStatus !== "PENDING"
+          ? (pickup.ward ? `Approved for Ward ${pickup.ward}` : "Request verified & approved by Admin")
+          : "Under review by municipal admin",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+            <circle cx="8.5" cy="7" r="4" stroke="currentColor" strokeWidth="2.2"/>
+            <polyline points="17 11 19 13 23 9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
+      {
+        title: "Staff Assigned",
+        desc: pickup.assigned_staff
+          ? `Assigned to ${pickup.assigned_staff}`
+          : "Assigning field staff for collection",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2.2"/>
+          </svg>
+        ),
+      },
+      {
+        title: "Waste Collected",
+        desc: isCollected
+          ? (pickup.estimated_weight ? `Collected (${pickup.estimated_weight} kg)` : "Waste collected by field crew")
+          : (rawStatus === "ASSIGNED" ? "Field crew dispatched to pickup address" : "Awaiting field collection"),
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <rect x="1" y="3" width="15" height="13" rx="2" stroke="currentColor" strokeWidth="2.2"/>
+            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="5.5" cy="18.5" r="2.5" stroke="currentColor" strokeWidth="2.2"/>
+            <circle cx="18.5" cy="18.5" r="2.5" stroke="currentColor" strokeWidth="2.2"/>
+          </svg>
+        ),
+      },
+      {
+        title: "Completed",
+        desc: isCompleted
+          ? (pickup.completed_time ? `Completed at ${pickup.completed_time}` : (pickup.completed_date || "Pickup completed & verified"))
+          : "Final record verification & closing",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
+    ];
+
+    return stages.map((s, idx) => {
+      let state = "upcoming";
+      if (isCancelled) {
+        if (idx <= 1) state = "completed";
+        else if (idx === 2) state = "cancelled";
+        else state = "upcoming";
+      } else {
+        if (idx < currentStageIndex) {
+          state = "completed";
+        } else if (idx === currentStageIndex) {
+          state = isCompleted && idx === 5 ? "completed" : "current";
+        } else {
+          state = "upcoming";
+        }
+      }
+      return { ...s, state };
+    });
+  };
  
   return (
     <div className="staff-root">
@@ -319,10 +571,122 @@ export default function EcoPulseStaff() {
         .staff-hero p b{ color:var(--ink); font-weight:600; }
         .staff-hero-actions{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
         .staff-action-pill{ background:var(--mint); color:var(--green-deep); border:1px solid var(--mint-3);
-          padding:12px 20px; border-radius:12px; font-size:14px; font-weight:600; transition:all .18s ease; }
+          padding:12px 20px; border-radius:12px; font-size:14px; font-weight:600; transition:all .18s ease; display:inline-flex; align-items:center; gap:8px; }
         .staff-action-pill:hover{ background:var(--green); color:#fff; transform:translateY(-2px); box-shadow:var(--shadow); }
+        .staff-action-pill-accent{ background:var(--green); color:#fff; }
+        .staff-action-pill-accent:hover{ background:var(--green-deep); }
         .staff-hero-note{ font-size:13.5px; color:var(--muted); font-style:italic; }
- 
+
+        /* History & Tracking Modal Styles */
+        .ep-modal-overlay{ position:fixed; inset:0; background:rgba(9,26,18,.58); backdrop-filter:blur(5px);
+          z-index:70; display:flex; align-items:center; justify-content:center; padding:16px; animation:staffRiseIn .25s ease; }
+        .ep-modal-card{ background:#fff; width:100%; max-width:860px; max-height:88vh; border-radius:24px;
+          border:1px solid var(--mint-3); box-shadow:0 30px 60px -20px rgba(12,107,69,.45); display:flex; flex-direction:column;
+          overflow:hidden; position:relative; }
+        .ep-modal-head{ padding:22px 28px; background:linear-gradient(135deg, var(--panel) 0%, #fff 70%);
+          border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+        .ep-modal-title-area h2{ font-size:22px; font-weight:700; color:var(--ink); margin:0 0 4px; display:flex; align-items:center; gap:10px; }
+        .ep-modal-title-area p{ font-size:13.5px; color:var(--muted); margin:0; }
+        .ep-modal-actions{ display:flex; align-items:center; gap:10px; }
+        .ep-modal-refresh-btn{ background:#fff; border:1px solid var(--mint-3); color:var(--green-deep); padding:8px 14px;
+          border-radius:10px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px; transition:all .18s ease; }
+        .ep-modal-refresh-btn:hover{ background:var(--mint); border-color:var(--green); }
+        .ep-modal-close-btn{ width:34px; height:34px; border-radius:50%; border:1px solid var(--mint-3); background:#fff;
+          display:flex; align-items:center; justify-content:center; color:var(--muted); transition:all .18s ease; }
+        .ep-modal-close-btn:hover{ background:var(--mint); color:var(--ink); }
+        .ep-modal-body{ padding:24px 28px; overflow-y:auto; flex:1; }
+        
+        .ep-date-group{ margin-bottom:28px; }
+        .ep-date-badge{ display:inline-flex; align-items:center; gap:8px; background:var(--mint); color:var(--green-deep);
+          padding:6px 14px; border-radius:999px; font-size:12.5px; font-weight:700; letter-spacing:.02em; margin-bottom:14px; border:1px solid var(--mint-3); }
+        .ep-history-grid{ display:flex; flex-direction:column; gap:14px; }
+        .ep-history-card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:18px 20px;
+          box-shadow:0 2px 8px rgba(12,107,69,.04); transition:all .2s ease; display:flex; flex-direction:column; gap:14px; }
+        .ep-history-card:hover{ border-color:var(--green-bright); box-shadow:0 12px 24px -10px rgba(12,107,69,.18); transform:translateY(-2px); }
+        .ep-card-top{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+        .ep-req-id{ font-size:13.5px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:8px; }
+        .ep-req-pill{ background:var(--panel); color:var(--green-deep); padding:3px 10px; border-radius:6px; border:1px solid var(--mint-3); font-size:12px; }
+        .ep-status-pill{ display:inline-flex; align-items:center; gap:5px; background:rgba(31,184,116,.15); color:var(--green-deep);
+          padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; border:1px solid rgba(31,184,116,.3); }
+        .ep-waste-type-pill{ background:#edf7f2; color:#125232; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid #d0ecdc; }
+        
+        .ep-card-details{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; padding:12px 0; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
+        .ep-detail-item{ display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--muted); }
+        .ep-detail-item b{ color:var(--ink); font-weight:600; }
+        .ep-detail-icon{ width:16px; height:16px; color:var(--green); flex-shrink:0; margin-top:2px; }
+
+        .ep-card-media{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+        .ep-image-thumb-btn{ display:inline-flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--mint-3);
+          border-radius:10px; padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--green-deep); transition:all .18s ease; cursor:pointer; }
+        .ep-image-thumb-btn:hover{ background:var(--mint); border-color:var(--green); transform:scale(1.02); }
+        .ep-thumb-img{ width:30px; height:30px; border-radius:6px; object-fit:cover; border:1px solid var(--mint-3); }
+
+        /* Tracking Details & Timeline Styles */
+        .ep-track-overview-card{ background:linear-gradient(145deg, #ffffff 0%, var(--panel) 100%);
+          border:1px solid var(--mint-3); border-radius:18px; padding:22px 24px; margin-bottom:24px;
+          box-shadow:0 6px 16px -8px rgba(12,107,69,.12); }
+        .ep-track-header-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+        .ep-track-id-badge{ display:inline-flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--ink); }
+        .ep-track-id-pill{ background:var(--green); color:#fff; padding:4px 12px; border-radius:8px; font-size:13px; font-weight:700; }
+        
+        .ep-badge-status{ display:inline-flex; align-items:center; gap:6px; padding:5px 14px; border-radius:999px; font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+        .ep-badge-pending{ background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+        .ep-badge-assigned{ background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; }
+        .ep-badge-collected{ background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
+        .ep-badge-completed{ background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+        .ep-badge-cancelled{ background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+
+        .ep-track-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; padding-top:14px; border-top:1px solid var(--line); }
+        .ep-track-field{ display:flex; align-items:flex-start; gap:10px; }
+        .ep-track-icon-box{ width:32px; height:32px; border-radius:8px; background:var(--mint); border:1px solid var(--mint-3);
+          display:flex; align-items:center; justify-content:center; color:var(--green-deep); font-size:15px; flex-shrink:0; }
+        .ep-track-label{ font-size:11.5px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:.03em; }
+        .ep-track-value{ font-size:13.5px; color:var(--ink); font-weight:600; margin-top:2px; word-break:break-word; }
+
+        /* Visual Timeline */
+        .ep-timeline-section{ background:#fff; border:1px solid var(--line); border-radius:18px; padding:22px 24px; box-shadow:0 2px 10px rgba(12,107,69,.04); }
+        .ep-timeline-title{ font-size:16px; font-weight:700; color:var(--ink); margin:0 0 20px; display:flex; align-items:center; gap:8px; }
+        .ep-timeline{ display:flex; flex-direction:column; gap:0; position:relative; }
+        
+        .ep-timeline-step{ display:flex; position:relative; padding-bottom:22px; }
+        .ep-timeline-step:last-child{ padding-bottom:4px; }
+        .ep-timeline-rail{ position:absolute; left:17px; top:36px; bottom:0; width:2px; background:var(--line); z-index:1; }
+        .ep-timeline-step.completed .ep-timeline-rail{ background:var(--green); }
+        .ep-timeline-step.current .ep-timeline-rail{ background:linear-gradient(to bottom, var(--green-bright) 0%, var(--line) 100%); }
+        .ep-timeline-step:last-child .ep-timeline-rail{ display:none; }
+
+        .ep-timeline-marker{ width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+          flex-shrink:0; z-index:2; position:relative; transition:all .25s ease; }
+        
+        .ep-timeline-step.completed .ep-timeline-marker{ background:var(--green); color:#fff; border:2px solid var(--green); box-shadow:0 0 0 3px var(--mint); }
+        .ep-timeline-step.current .ep-timeline-marker{ background:#fff; color:var(--green); border:2.5px solid var(--green); box-shadow:0 0 0 4px var(--mint-2); animation:epPulseRing 2s infinite; }
+        .ep-timeline-step.upcoming .ep-timeline-marker{ background:#fff; color:var(--muted); border:2px solid var(--line); opacity:.75; }
+        .ep-timeline-step.cancelled .ep-timeline-marker{ background:#ef4444; color:#fff; border:2px solid #ef4444; }
+
+        @keyframes epPulseRing{
+          0%{ box-shadow:0 0 0 0 rgba(24,168,98,.5); }
+          70%{ box-shadow:0 0 0 8px rgba(24,168,98,0); }
+          100%{ box-shadow:0 0 0 0 rgba(24,168,98,0); }
+        }
+
+        .ep-timeline-content{ margin-left:16px; flex:1; display:flex; flex-direction:column; justify-content:center; min-height:36px; }
+        .ep-timeline-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+        .ep-timeline-name{ font-size:14px; font-weight:700; color:var(--ink); }
+        .ep-timeline-step.upcoming .ep-timeline-name{ color:var(--muted); font-weight:600; }
+        .ep-timeline-step.current .ep-timeline-name{ color:var(--green-deep); font-weight:700; }
+        .ep-timeline-state-pill{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; text-transform:uppercase; letter-spacing:.04em; }
+        .ep-timeline-step.completed .ep-timeline-state-pill{ background:var(--mint); color:var(--green-deep); border:1px solid var(--mint-3); }
+        .ep-timeline-step.current .ep-timeline-state-pill{ background:rgba(46,203,132,.18); color:var(--green-deep); border:1px solid var(--green-bright); }
+        .ep-timeline-step.upcoming .ep-timeline-state-pill{ background:#f3f4f6; color:#9ca3af; }
+        .ep-timeline-desc{ font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4; }
+
+        .ep-lightbox{ position:fixed; inset:0; background:rgba(6,26,17,.88); backdrop-filter:blur(8px);
+          z-index:90; display:flex; align-items:center; justify-content:center; padding:20px; }
+        .ep-lightbox-content{ position:relative; max-width:600px; width:100%; background:#fff; border-radius:20px; overflow:hidden;
+          box-shadow:0 30px 60px rgba(0,0,0,.5); }
+        .ep-lightbox-img{ width:100%; max-height:480px; object-fit:cover; display:block; }
+        .ep-lightbox-foot{ padding:16px 20px; display:flex; align-items:center; justify-content:space-between; background:#fff; }
+
         .staff-tracker-wrap{ padding:8px 0 60px; }
         .staff-tracker{ position:relative; background:linear-gradient(160deg, var(--panel) 0%, #ffffff 62%);
           border:1px solid var(--mint-3);
@@ -447,12 +811,15 @@ export default function EcoPulseStaff() {
           .staff-house{ width:44px; }
           .staff-house-roof{ border-left-width:17px; border-right-width:17px; border-bottom-width:16px; }
           .staff-house-body{ width:30px; height:22px; }
+          .ep-modal-body{ padding:18px 16px; }
+          .ep-track-header-row{ flex-direction:column; align-items:flex-start; }
+          .ep-timeline-desc{ font-size:12px; }
         }
         @media (prefers-reduced-motion: reduce){
           .staff-root *{ animation:none !important; transition:none !important; }
         }
       `}</style>
- 
+
       <header className="staff-header">
         <div className="staff-header-left">
           <button className="staff-back-btn" aria-label="Back">
@@ -470,7 +837,7 @@ export default function EcoPulseStaff() {
         <div className="staff-header-right">
           <button
             className="staff-btn staff-btn-ghost"
-            onClick={() => trackerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            onClick={openTracking}
           >
             track status
           </button>
@@ -479,7 +846,7 @@ export default function EcoPulseStaff() {
           </button>
         </div>
       </header>
- 
+
       <main className="staff-main">
         <section className="staff-hero">
           <div className="staff-eyebrow">
@@ -494,19 +861,33 @@ export default function EcoPulseStaff() {
           </p>
           <div className="staff-hero-actions">
             <button
-              className="staff-action-pill"
+              className="staff-action-pill staff-action-pill-accent"
               onClick={() => navigate("/pickupform")}
             >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              </svg>
               pickup request
             </button>
-            <button className="staff-action-pill" 
-            onClick={() => navigate("/complaintform")}
+            <button
+              className="staff-action-pill"
+              onClick={openHistory}
             >
-              complaint</button>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              pickup history
+            </button>
+            <button
+              className="staff-action-pill" 
+              onClick={() => navigate("/complaintform")}
+            >
+              complaint
+            </button>
             <span className="staff-hero-note">Rosewood is running 8 minutes ahead today.</span>
           </div>
         </section>
- 
+
         <section className="staff-tracker-wrap">
           <div className="staff-tracker" ref={trackerRef}>
             <div className="staff-tracker-top">
@@ -518,7 +899,7 @@ export default function EcoPulseStaff() {
                 <span>resident notified · return visit offered</span>
               </div>
             </div>
- 
+
             <div className="staff-route-stage">
               <div className="staff-ward-tag">{wardTagText}</div>
               <div
@@ -528,7 +909,7 @@ export default function EcoPulseStaff() {
                 <span className="staff-dot" />
                 <span>no bin out · photo logged from the cab</span>
               </div>
- 
+
               <div className="staff-houses" ref={housesRowRef}>
                 {houses.map((status, i) => (
                   <div
@@ -553,7 +934,7 @@ export default function EcoPulseStaff() {
             </div>
           </div>
         </section>
- 
+
         <section
           className={"staff-wards-section" + (wardsInView ? " staff-in-view" : "")}
           ref={wardsSectionRef}
@@ -591,15 +972,15 @@ export default function EcoPulseStaff() {
           </div>
         </section>
       </main>
- 
+
       <div className={"staff-overlay" + (drawerOpen ? " staff-show" : "")} onClick={() => setDrawerOpen(false)} />
       <div className={"staff-drawer" + (drawerOpen ? " staff-show" : "")}>
         <div className="staff-drawer-head">
-          <div className="staff-avatar">R</div>
+          <div className="staff-avatar">{userName.charAt(0).toUpperCase()}</div>
           <div className="staff-who">
-            <h3>Staff Account</h3>
+            <h3>{userName}</h3>
             <p>
-              Ward {WARD_DATA[activeWard].code.replace("W", "")} · {WARD_DATA[activeWard].name}
+              {userRole} · Ward {WARD_DATA[activeWard].code.replace("W", "")} ({WARD_DATA[activeWard].name})
             </p>
           </div>
           <button className="staff-drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Close">
@@ -608,7 +989,11 @@ export default function EcoPulseStaff() {
         </div>
         <div className="staff-drawer-menu">
           {MENU_ITEMS.map((item) => (
-            <button key={item.label} className={"staff-menu-item" + (item.active ? " staff-active" : "")}>
+            <button
+              key={item.key || item.label}
+              className={"staff-menu-item" + (item.active ? " staff-active" : "")}
+              onClick={() => handleMenuClick(item.key)}
+            >
               <span className="staff-ic">{item.icon}</span>
               {item.label}
             </button>
@@ -616,7 +1001,7 @@ export default function EcoPulseStaff() {
         </div>
         <div className="staff-drawer-divider" />
         <div className="staff-drawer-foot">
-          <button className="staff-menu-item">
+          <button className="staff-menu-item" onClick={handleLogout}>
             <span className="staff-ic">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -627,6 +1012,498 @@ export default function EcoPulseStaff() {
           </button>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* LIVE PICKUP STATUS MODAL */}
+      {/* ============================================================ */}
+      {trackingOpen && (
+        <div className="ep-modal-overlay" onClick={() => setTrackingOpen(false)}>
+          <div className="ep-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ep-modal-head">
+              <div className="ep-modal-title-area">
+                <h2>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="9" stroke="var(--green)" strokeWidth="2.2" />
+                    <path d="M12 7v5l3.5 2" stroke="var(--green)" strokeWidth="2.2" strokeLinecap="round" />
+                  </svg>
+                  Live Pickup Status
+                </h2>
+                <p>Real-time tracking for your active municipal waste collection request</p>
+              </div>
+              <div className="ep-modal-actions">
+                <button
+                  className="ep-modal-refresh-btn"
+                  onClick={fetchLatestPickup}
+                  disabled={loadingTracking}
+                  title="Refresh tracking status"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    style={{ animation: loadingTracking ? "staffSpin 1s linear infinite" : "none" }}
+                  >
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {loadingTracking ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  className="ep-modal-close-btn"
+                  onClick={() => setTrackingOpen(false)}
+                  aria-label="Close"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="ep-modal-body">
+              {loadingTracking && !latestPickup ? (
+                <div style={{ textAlign: "center", padding: "48px 20px" }}>
+                  <div style={{ width: 36, height: 36, border: "3px solid var(--mint-3)", borderTopColor: "var(--green)", borderRadius: "50%", margin: "0 auto 16px", animation: "staffSpin 1s linear infinite" }} />
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>Checking active pickup request...</div>
+                  <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Connecting to EcoPulse dispatch system</div>
+                </div>
+              ) : trackingError ? (
+                <div style={{ textAlign: "center", padding: "36px 20px", background: "#fef2f2", borderRadius: 16, border: "1px solid #fecaca" }}>
+                  <div style={{ color: "#b91c1c", fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Unable to load pickup status</div>
+                  <div style={{ color: "#7f1d1d", fontSize: 13, marginBottom: 16 }}>{trackingError}</div>
+                  <button
+                    className="staff-btn staff-btn-solid"
+                    onClick={fetchLatestPickup}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : !hasPickup || !latestPickup ? (
+                <div style={{ textAlign: "center", padding: "56px 20px" }}>
+                  <div style={{ width: 68, height: 68, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--mint-3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px", color: "var(--green-deep)" }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                      <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--ink)", margin: "0 0 6px" }}>No active pickup request found.</h3>
+                  <p style={{ fontSize: 13.5, color: "var(--muted)", maxWidth: 440, margin: "0 auto 22px", lineHeight: 1.5 }}>
+                    You currently do not have an active or pending waste collection request in the queue.
+                  </p>
+                  <button
+                    className="staff-btn staff-btn-solid"
+                    onClick={() => { setTrackingOpen(false); navigate("/pickupform"); }}
+                  >
+                    Create New Pickup Request
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  {/* Latest Request Overview Card */}
+                  <div className="ep-track-overview-card">
+                    <div className="ep-track-header-row">
+                      <div className="ep-track-id-badge">
+                        <span className="ep-track-id-pill">Pickup #{latestPickup.request_id}</span>
+                        <span style={{ fontSize: 13.5, color: "var(--muted)" }}>
+                          • {latestPickup.date || "Today"}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span
+                          className={
+                            "ep-badge-status " +
+                            (latestPickup.status === "PENDING"
+                              ? "ep-badge-pending"
+                              : latestPickup.status === "ASSIGNED"
+                              ? "ep-badge-assigned"
+                              : latestPickup.status === "COLLECTED"
+                              ? "ep-badge-collected"
+                              : latestPickup.status === "COMPLETED"
+                              ? "ep-badge-completed"
+                              : "ep-badge-cancelled")
+                          }
+                        >
+                          <span
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              background: "currentColor",
+                            }}
+                          />
+                          {latestPickup.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detailed Fields Grid */}
+                    <div className="ep-track-grid">
+                      <div className="ep-track-field">
+                        <div className="ep-track-icon-box">🏷️</div>
+                        <div>
+                          <div className="ep-track-label">AI Waste Type</div>
+                          <div className="ep-track-value">
+                            {latestPickup.waste_type || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="ep-track-field">
+                        <div className="ep-track-icon-box">🎯</div>
+                        <div>
+                          <div className="ep-track-label">Detection Confidence</div>
+                          <div className="ep-track-value">
+                            {latestPickup.ai_confidence !== null && latestPickup.ai_confidence !== undefined
+                              ? `${latestPickup.ai_confidence}%`
+                              : latestPickup.images?.[0]?.confidence
+                              ? `${Math.round(latestPickup.images[0].confidence * 100)}%`
+                              : "Verified"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="ep-track-field">
+                        <div className="ep-track-icon-box">📍</div>
+                        <div>
+                          <div className="ep-track-label">Pickup Location</div>
+                          <div className="ep-track-value">
+                            {latestPickup.pickup_location || "N/A"}
+                            {latestPickup.ward && (
+                              <span style={{ color: "var(--green-deep)", marginLeft: 6, fontWeight: 700 }}>
+                                ({latestPickup.ward})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="ep-track-field">
+                        <div className="ep-track-icon-box">📅</div>
+                        <div>
+                          <div className="ep-track-label">Request Date</div>
+                          <div className="ep-track-value">{latestPickup.date || "N/A"}</div>
+                        </div>
+                      </div>
+
+                      <div className="ep-track-field">
+                        <div className="ep-track-icon-box">👷</div>
+                        <div>
+                          <div className="ep-track-label">Assigned Field Staff</div>
+                          <div className="ep-track-value" style={{ color: latestPickup.assigned_staff ? "var(--green-deep)" : "var(--muted)" }}>
+                            {latestPickup.assigned_staff || "Not yet assigned"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="ep-track-field">
+                        <div className="ep-track-icon-box">⚡</div>
+                        <div>
+                          <div className="ep-track-label">Current Status</div>
+                          <div className="ep-track-value" style={{ fontWeight: 700 }}>
+                            {latestPickup.status}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Uploaded waste image thumbnail or completion proof */}
+                    {(latestPickup.images?.length > 0 || latestPickup.completion_image) && (
+                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px dashed var(--line)", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                        {latestPickup.images?.[0]?.image && (
+                          <button
+                            type="button"
+                            className="ep-image-thumb-btn"
+                            onClick={() => setPreviewImage(latestPickup.images[0].image)}
+                            title="Click to view submitted waste photo"
+                          >
+                            <img
+                              src={latestPickup.images[0].image}
+                              alt="Submitted waste"
+                              className="ep-thumb-img"
+                            />
+                            <span>View Submitted Waste Photo</span>
+                          </button>
+                        )}
+                        {latestPickup.completion_image && (
+                          <button
+                            type="button"
+                            className="ep-image-thumb-btn"
+                            onClick={() => setPreviewImage(latestPickup.completion_image)}
+                            title="Click to view completion proof photo"
+                          >
+                            <img
+                              src={latestPickup.completion_image}
+                              alt="Completion proof"
+                              className="ep-thumb-img"
+                            />
+                            <span>View Completion Proof</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Progress Timeline / Tracker */}
+                  <div className="ep-timeline-section">
+                    <div className="ep-timeline-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="var(--green)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Pickup Progress Timeline
+                    </div>
+
+                    <div className="ep-timeline">
+                      {getTimelineStages(latestPickup).map((step, idx) => (
+                        <div key={idx} className={`ep-timeline-step ${step.state}`}>
+                          <div className="ep-timeline-rail" />
+                          <div className="ep-timeline-marker">
+                            {step.state === "completed" ? (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : step.state === "cancelled" ? (
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                              </svg>
+                            ) : (
+                              step.icon
+                            )}
+                          </div>
+                          <div className="ep-timeline-content">
+                            <div className="ep-timeline-head">
+                              <div className="ep-timeline-name">{step.title}</div>
+                              <span className="ep-timeline-state-pill">
+                                {step.state === "completed"
+                                  ? "Completed"
+                                  : step.state === "current"
+                                  ? "In Progress"
+                                  : step.state === "cancelled"
+                                  ? "Cancelled"
+                                  : "Pending"}
+                              </span>
+                            </div>
+                            <div className="ep-timeline-desc">{step.desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* USER PICKUP / ROUTE HISTORY MODAL */}
+      {/* ============================================================ */}
+      {historyOpen && (
+        <div className="ep-modal-overlay" onClick={() => setHistoryOpen(false)}>
+          <div className="ep-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ep-modal-head">
+              <div className="ep-modal-title-area">
+                <h2>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="var(--green)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Pickup History
+                </h2>
+                <p>Permanent records of your completed waste collections & route pickups</p>
+              </div>
+              <div className="ep-modal-actions">
+                <button
+                  className="ep-modal-refresh-btn"
+                  onClick={fetchUserHistory}
+                  disabled={loadingHistory}
+                  title="Refresh history"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    style={{ animation: loadingHistory ? "staffSpin 1s linear infinite" : "none" }}
+                  >
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {loadingHistory ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  className="ep-modal-close-btn"
+                  onClick={() => setHistoryOpen(false)}
+                  aria-label="Close"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="ep-modal-body">
+              {loadingHistory && historyRecords.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 20px" }}>
+                  <div style={{ width: 36, height: 36, border: "3px solid var(--mint-3)", borderTopColor: "var(--green)", borderRadius: "50%", margin: "0 auto 16px", animation: "staffSpin 1s linear infinite" }} />
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>Loading your pickup history...</div>
+                  <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Retrieving verified collection records</div>
+                </div>
+              ) : historyError ? (
+                <div style={{ textAlign: "center", padding: "36px 20px", background: "#fef2f2", borderRadius: 16, border: "1px solid #fecaca" }}>
+                  <div style={{ color: "#b91c1c", fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Unable to load history</div>
+                  <div style={{ color: "#7f1d1d", fontSize: 13, marginBottom: 16 }}>{historyError}</div>
+                  <button
+                    className="staff-btn staff-btn-solid"
+                    onClick={fetchUserHistory}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : historyRecords.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "56px 20px" }}>
+                  <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--mint-3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "var(--green-deep)" }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "var(--ink)", margin: "0 0 6px" }}>No Completed Pickups Yet</h3>
+                  <p style={{ fontSize: 13.5, color: "var(--muted)", maxWidth: 420, margin: "0 auto 20px", lineHeight: 1.5 }}>
+                    When field staff completes your waste pickup request with weight verification and image proof, it will appear here permanently.
+                  </p>
+                  <button
+                    className="staff-btn staff-btn-solid"
+                    onClick={() => { setHistoryOpen(false); navigate("/pickupform"); }}
+                  >
+                    Create New Pickup Request
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  {Object.entries(groupedHistory).map(([dateLabel, items]) => (
+                    <div key={dateLabel} className="ep-date-group">
+                      <div className="ep-date-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+                          <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2" />
+                        </svg>
+                        <span>{dateLabel}</span>
+                        <span style={{ opacity: 0.65, fontWeight: 500 }}>({items.length} {items.length === 1 ? "pickup" : "pickups"})</span>
+                      </div>
+
+                      <div className="ep-history-grid">
+                        {items.map((item) => (
+                          <div key={item.request_id} className="ep-history-card">
+                            <div className="ep-card-top">
+                              <div className="ep-req-id">
+                                <span className="ep-req-pill">Pickup #{item.request_id}</span>
+                                <span className="ep-status-pill">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                    <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                  {item.status}
+                                </span>
+                              </div>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <span className="ep-waste-type-pill">
+                                  AI Type: <b>{item.waste_type || "Waste"}</b>
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="ep-card-details">
+                              <div className="ep-detail-item">
+                                <span className="ep-detail-icon">📍</span>
+                                <div>
+                                  <b>Location:</b> {item.pickup_location || "N/A"}
+                                  {item.ward && <span style={{ color: "var(--green-deep)", marginLeft: 6 }}>({item.ward})</span>}
+                                </div>
+                              </div>
+
+                              <div className="ep-detail-item">
+                                <span className="ep-detail-icon">⚖️</span>
+                                <div>
+                                  <b>Weight:</b>{" "}
+                                  <span style={{ color: "var(--green-deep)", fontWeight: 700, fontSize: 13.5 }}>
+                                    {item.estimated_weight ? `${item.estimated_weight} kg` : "N/A"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="ep-detail-item">
+                                <span className="ep-detail-icon">🕒</span>
+                                <div>
+                                  <b>Completed:</b> {item.completed_time ? `${item.completed_time}` : (item.completed_at || item.date)}
+                                </div>
+                              </div>
+
+                              {item.assigned_staff && (
+                                <div className="ep-detail-item">
+                                  <span className="ep-detail-icon">👷</span>
+                                  <div>
+                                    <b>Field Staff:</b> {item.assigned_staff}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="ep-card-media">
+                              {item.completion_image ? (
+                                <button
+                                  type="button"
+                                  className="ep-image-thumb-btn"
+                                  onClick={() => setPreviewImage(item.completion_image)}
+                                  title="Click to view completion photo proof"
+                                >
+                                  <img
+                                    src={item.completion_image}
+                                    alt={`Pickup #${item.request_id} completion proof`}
+                                    className="ep-thumb-img"
+                                  />
+                                  <span>View Completion Proof</span>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                    <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: 12, color: "var(--muted)" }}>No completion image uploaded</span>
+                              )}
+
+                              {item.payment_qr_data && (
+                                <div style={{ fontSize: 12, color: "var(--green-deep)", fontWeight: 600, background: "var(--panel)", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--mint-3)" }}>
+                                  ₹{item.payment_qr_data.amount} Processed
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* COMPLETION IMAGE LIGHTBOX */}
+      {/* ============================================================ */}
+      {previewImage && (
+        <div className="ep-lightbox" onClick={() => setPreviewImage(null)}>
+          <div className="ep-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <img src={previewImage} alt="Completion Proof Full View" className="ep-lightbox-img" />
+            <div className="ep-lightbox-foot">
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>Field Collection Proof Photo</span>
+              <button
+                className="staff-btn staff-btn-solid"
+                style={{ padding: "6px 14px", fontSize: 12.5 }}
+                onClick={() => setPreviewImage(null)}
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

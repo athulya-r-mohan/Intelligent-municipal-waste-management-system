@@ -304,6 +304,238 @@ class WasteCollectionWorkflowTests(TestCase):
         tasks2 = response2.data.get("tasks", [])
         self.assertFalse(any(t["request_id"] == self.pickup_request.id for t in tasks2))
 
+    def test_unauthenticated_user_cannot_access_history(self):
+        response = self.client.get("/api/waste/user/pickup-history/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_can_view_own_completed_pickup_history(self):
+        # 1. Complete the pickup request for citizen_user
+        self.pickup_request.status = "COMPLETED"
+        self.pickup_request.save()
+
+        WastePickupImage.objects.create(
+            pickup_request=self.pickup_request,
+            image=create_test_image(),
+            waste_type="Plastic",
+            confidence=0.92
+        )
+
+        test_img = create_test_image()
+        collection = WasteCollection.objects.create(
+            pickup_request=self.pickup_request,
+            staff=self.staff1,
+            completion_image=test_img,
+            estimated_weight=7.25
+        )
+
+        # 2. Authenticate as citizen_user and fetch history
+        self.client.force_authenticate(user=self.citizen_user)
+        response = self.client.get("/api/waste/user/pickup-history/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("success"))
+        history = response.data.get("history", [])
+        self.assertEqual(len(history), 1)
+
+        item = history[0]
+        self.assertEqual(item["request_id"], self.pickup_request.id)
+        self.assertEqual(item["pickup_location"], "123 Main Street")
+        self.assertEqual(item["ward"], "Ward 1")
+        self.assertEqual(item["waste_type"], "Plastic")
+        self.assertEqual(item["status"], "COMPLETED")
+        self.assertEqual(item["estimated_weight"], 7.25)
+        self.assertIsNotNone(item["completion_image"])
+        self.assertIsNotNone(item["completed_at"])
+        self.assertIsNotNone(item["completed_date"])
+        self.assertIsNotNone(item["completed_time"])
+        self.assertIsNotNone(item["payment_qr_data"])
+
+    def test_user_isolation_cannot_view_other_user_history(self):
+        # 1. Create a completed pickup for citizen 1
+        self.pickup_request.status = "COMPLETED"
+        self.pickup_request.save()
+        WasteCollection.objects.create(
+            pickup_request=self.pickup_request,
+            staff=self.staff1,
+            completion_image=create_test_image(),
+            estimated_weight=5.0
+        )
+
+        # 2. Create citizen 2
+        citizen_user2 = User.objects.create_user(
+            username="citizen2",
+            email="citizen2@example.com",
+            password="Password123!"
+        )
+        UserProfile.objects.create(
+            user=citizen_user2,
+            name="Jane Citizen",
+            phone="9876543219",
+            ward=self.ward,
+            role="CITIZEN"
+        )
+
+        # 3. Authenticate as citizen 2 and query history
+        self.client.force_authenticate(user=citizen_user2)
+        response = self.client.get("/api/waste/user/pickup-history/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        history = response.data.get("history", [])
+        # Citizen 2 must not see Citizen 1's history
+        self.assertEqual(len(history), 0)
+        self.assertFalse(any(h["request_id"] == self.pickup_request.id for h in history))
+
+    def test_only_completed_pickups_in_completed_history(self):
+        # 1. Citizen 1 has one PENDING request and one COMPLETED request
+        pending_req = WastePickupRequest.objects.create(
+            user=self.citizen_user,
+            location_name="999 Pending Lane",
+            latitude=12.971,
+            longitude=77.594,
+            status="PENDING"
+        )
+
+        completed_req = WastePickupRequest.objects.create(
+            user=self.citizen_user,
+            location_name="888 Completed Road",
+            latitude=12.972,
+            longitude=77.595,
+            status="COMPLETED",
+            assigned_staff=self.staff1
+        )
+        WasteCollection.objects.create(
+            pickup_request=completed_req,
+            staff=self.staff1,
+            completion_image=create_test_image(),
+            estimated_weight=3.5
+        )
+
+        # 2. Query history
+        self.client.force_authenticate(user=self.citizen_user)
+        response = self.client.get("/api/waste/user/pickup-history/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        history = response.data.get("history", [])
+
+        history_ids = [h["request_id"] for h in history]
+        self.assertIn(completed_req.id, history_ids)
+        self.assertNotIn(pending_req.id, history_ids)
+
+    def test_history_sorting_by_completion_date(self):
+        import time
+
+        # Complete req 1
+        req1 = WastePickupRequest.objects.create(
+            user=self.citizen_user,
+            location_name="First Location",
+            latitude=12.971,
+            longitude=77.594,
+            status="COMPLETED",
+            assigned_staff=self.staff1
+        )
+        c1 = WasteCollection.objects.create(
+            pickup_request=req1,
+            staff=self.staff1,
+            completion_image=create_test_image(),
+            estimated_weight=2.0
+        )
+
+        # Complete req 2 later
+        req2 = WastePickupRequest.objects.create(
+            user=self.citizen_user,
+            location_name="Second Location",
+            latitude=12.972,
+            longitude=77.595,
+            status="COMPLETED",
+            assigned_staff=self.staff1
+        )
+        c2 = WasteCollection.objects.create(
+            pickup_request=req2,
+            staff=self.staff1,
+            completion_image=create_test_image(),
+            estimated_weight=4.0
+        )
+
+        self.client.force_authenticate(user=self.citizen_user)
+        response = self.client.get("/api/waste/user/pickup-history/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        history = response.data.get("history", [])
+        self.assertGreaterEqual(len(history), 2)
+        # Most recent completion should be first
+        self.assertEqual(history[0]["request_id"], req2.id)
+
+    def test_user_latest_pickup_unauthenticated(self):
+        response = self.client.get("/api/waste/user/latest-pickup/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_latest_pickup_empty_state(self):
+        new_user = User.objects.create_user(username="newuser", email="newuser@example.com", password="Password123!")
+        UserProfile.objects.create(user=new_user, name="New Resident", phone="9998887776", ward=self.ward, role="CITIZEN")
+        self.client.force_authenticate(user=new_user)
+
+        response = self.client.get("/api/waste/user/latest-pickup/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("success"))
+        self.assertFalse(response.data.get("has_pickup"))
+        self.assertIsNone(response.data.get("latest_pickup"))
+
+    def test_user_latest_pickup_returns_most_recent_request_and_details(self):
+        # 1. First request
+        req1 = WastePickupRequest.objects.create(
+            user=self.citizen_user,
+            location_name="Old Location 1",
+            latitude=12.971,
+            longitude=77.594,
+            status="COMPLETED"
+        )
+
+        # 2. Second request (most recent)
+        req2 = WastePickupRequest.objects.create(
+            user=self.citizen_user,
+            location_name="Latest Location 2",
+            latitude=12.975,
+            longitude=77.598,
+            status="ASSIGNED",
+            assigned_staff=self.staff1
+        )
+        WastePickupImage.objects.create(
+            pickup_request=req2,
+            image=create_test_image(),
+            waste_type="Plastic",
+            confidence=0.965
+        )
+
+        self.client.force_authenticate(user=self.citizen_user)
+        response = self.client.get("/api/waste/user/latest-pickup/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("success"))
+        self.assertTrue(response.data.get("has_pickup"))
+        latest = response.data.get("latest_pickup")
+        self.assertIsNotNone(latest)
+        self.assertEqual(latest["request_id"], req2.id)
+        self.assertEqual(latest["pickup_location"], "Latest Location 2")
+        self.assertEqual(latest["waste_type"], "Plastic")
+        self.assertEqual(latest["status"], "ASSIGNED")
+        self.assertEqual(latest["assigned_staff"], "Staff Member One")
+        self.assertEqual(latest["ai_confidence"], 96.5)
+
+    def test_user_latest_pickup_user_isolation(self):
+        # Citizen 1 has self.pickup_request
+        # Citizen 2 queries latest pickup
+        citizen2 = User.objects.create_user(username="citizen_iso", email="iso@example.com", password="Password123!")
+        UserProfile.objects.create(user=citizen2, name="Iso Citizen", phone="9988776655", ward=self.ward, role="CITIZEN")
+
+        self.client.force_authenticate(user=citizen2)
+        response = self.client.get("/api/waste/user/latest-pickup/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data.get("has_pickup"))
+        self.assertIsNone(response.data.get("latest_pickup"))
+
+
+
 
 
 
