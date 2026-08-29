@@ -4,6 +4,8 @@ import tempfile
 
 from django.db import models
 from django.http import JsonResponse
+from django.utils import timezone
+
 
 from rest_framework.decorators import (
     api_view,
@@ -18,7 +20,10 @@ from rest_framework.authentication import BasicAuthentication, SessionAuthentica
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .serializers import WastePickupRequestSerializer
+from .serializers import (
+    WastePickupRequestSerializer,
+    WasteComplaintSerializer,
+)
 
 from ultralytics import YOLO
 from accounts.models import UserProfile, Staff
@@ -28,7 +33,10 @@ from .models import (
     WastePickupRequest,
     WastePickupImage,
     WasteCollection,
+    WasteComplaint,
 )
+
+from .priority_detector import determine_complaint_priority
 
 
 # ============================================================
@@ -1535,4 +1543,480 @@ class UserLatestPickupView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+# ============================================================
+# CREATE WASTE COMPLAINT (Authenticated User)
+# ============================================================
+
+class WasteComplaintCreateView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response(
+                {"success": False, "message": "Authentication required. Please login again."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        data = request.data
+        location_name = data.get("location_name") or request.POST.get("location_name") or ""
+        description = data.get("description") or request.POST.get("description") or ""
+        latitude = data.get("latitude") or request.POST.get("latitude")
+        longitude = data.get("longitude") or request.POST.get("longitude")
+        image = request.FILES.get("image") or request.FILES.get("complaint_image") or request.FILES.get("photo")
+
+        if not location_name.strip():
+            return Response(
+                {"success": False, "message": "Location name is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not description.strip():
+            return Response(
+                {"success": False, "message": "Complaint description is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        lat_val = None
+        lon_val = None
+        if latitude is not None and str(latitude).strip() != "":
+            try:
+                lat_val = float(str(latitude).strip())
+            except (ValueError, TypeError):
+                pass
+
+        if longitude is not None and str(longitude).strip() != "":
+            try:
+                lon_val = float(str(longitude).strip())
+            except (ValueError, TypeError):
+                pass
+
+        # Automatically determine location-based priority
+        priority = determine_complaint_priority(
+            location_name=location_name,
+            latitude=lat_val,
+            longitude=lon_val,
+        )
+
+        complaint = WasteComplaint.objects.create(
+            user=user,
+            image=image,
+            location_name=location_name.strip(),
+            latitude=lat_val,
+            longitude=lon_val,
+            description=description.strip(),
+            priority=priority,
+            status="NEW",
+        )
+
+        serializer = WasteComplaintSerializer(complaint, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Waste complaint registered successfully with {priority} priority.",
+                "complaint": serializer.data,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+# ============================================================
+# USER COMPLAINTS LIST VIEW (My Complaints)
+# ============================================================
+
+class UserComplaintListView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        complaints = (
+            WasteComplaint.objects
+            .filter(user=user)
+            .select_related(
+                "user",
+                "user__userprofile",
+                "user__userprofile__ward",
+                "assigned_staff",
+                "assigned_staff__user",
+                "assigned_staff__user__userprofile",
+            )
+            .order_by("-id")
+        )
+
+        serializer = WasteComplaintSerializer(complaints, many=True, context={"request": request})
+        return Response(
+            {
+                "success": True,
+                "count": complaints.count(),
+                "complaints": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# USER COMPLAINT DETAIL VIEW
+# ============================================================
+
+class UserComplaintDetailView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            complaint = (
+                WasteComplaint.objects
+                .select_related(
+                    "user",
+                    "user__userprofile",
+                    "user__userprofile__ward",
+                    "assigned_staff",
+                    "assigned_staff__user",
+                    "assigned_staff__user__userprofile",
+                )
+                .get(id=pk)
+            )
+        except WasteComplaint.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Complaint #{pk} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Enforce security: authenticated user must be the owner, or assigned staff, or admin/superuser
+        user = request.user
+        is_owner = (complaint.user_id == user.id)
+        is_assigned_staff = hasattr(user, "staff") and (complaint.assigned_staff_id == user.staff.staff_id)
+        is_admin = user.is_staff or user.is_superuser
+
+        if not (is_owner or is_assigned_staff or is_admin):
+            return Response(
+                {"success": False, "error": "You do not have permission to view this complaint."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = WasteComplaintSerializer(complaint, context={"request": request})
+        return Response(
+            {
+                "success": True,
+                "complaint": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# ADMIN COMPLAINTS LIST VIEW (Sorted HIGH -> MEDIUM -> LOW, Newest first)
+# ============================================================
+
+
+class AdminComplaintListView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        # Priority sort order: HIGH = 1, MEDIUM = 2, LOW = 3
+        priority_order = models.Case(
+            models.When(priority="HIGH", then=models.Value(1)),
+            models.When(priority="MEDIUM", then=models.Value(2)),
+            models.When(priority="LOW", then=models.Value(3)),
+            default=models.Value(4),
+            output_field=models.IntegerField(),
+        )
+
+        complaints = (
+            WasteComplaint.objects
+            .select_related(
+                "user",
+                "user__userprofile",
+                "user__userprofile__ward",
+                "assigned_staff",
+                "assigned_staff__user",
+                "assigned_staff__user__userprofile",
+            )
+            .annotate(priority_rank=priority_order)
+            .order_by("priority_rank", "-created_at", "-id")
+        )
+
+        # Optional filtering by priority or status
+        priority_filter = request.query_params.get("priority")
+        if priority_filter and priority_filter.upper() in ["HIGH", "MEDIUM", "LOW"]:
+            complaints = complaints.filter(priority=priority_filter.upper())
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            complaints = complaints.filter(status=status_filter.upper())
+
+        serializer = WasteComplaintSerializer(complaints, many=True, context={"request": request})
+        return Response(
+            {
+                "success": True,
+                "count": complaints.count(),
+                "complaints": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# ADMIN ASSIGN COMPLAINT TO STAFF
+# ============================================================
+
+class AdminAssignComplaintView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk=None):
+        data = request.data
+        complaint_id = pk or data.get("complaint_id") or data.get("id")
+        staff_id = data.get("staff_id")
+
+        if not complaint_id:
+            return Response(
+                {"success": False, "error": "complaint_id is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not staff_id:
+            return Response(
+                {"success": False, "error": "staff_id is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            complaint = (
+                WasteComplaint.objects
+                .select_related("user", "user__userprofile", "user__userprofile__ward")
+                .get(id=complaint_id)
+            )
+        except (WasteComplaint.DoesNotExist, ValueError):
+            return Response(
+                {"success": False, "error": f"Complaint #{complaint_id} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Robust staff lookup matching AssignPickupView
+        staff = None
+        staff_id_str = str(staff_id).strip()
+
+        # 1. Numeric lookup by staff_id or user_id or userprofile_id
+        if staff_id_str.isdigit():
+            numeric_id = int(staff_id_str)
+            staff = (
+                Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward")
+                .filter(
+                    models.Q(staff_id=numeric_id) |
+                    models.Q(user_id=numeric_id) |
+                    models.Q(user__userprofile__id=numeric_id)
+                )
+                .first()
+            )
+
+        # 2. Case-insensitive lookup by username, email, or profile name
+        if not staff:
+            staff = (
+                Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward")
+                .filter(
+                    models.Q(user__username__iexact=staff_id_str) |
+                    models.Q(user__email__iexact=staff_id_str) |
+                    models.Q(user__userprofile__name__iexact=staff_id_str)
+                )
+                .first()
+            )
+
+        # 3. Partial contains fallback
+        if not staff:
+            staff = (
+                Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward")
+                .filter(
+                    models.Q(user__username__icontains=staff_id_str) |
+                    models.Q(user__userprofile__name__icontains=staff_id_str)
+                )
+                .first()
+            )
+
+        if not staff:
+            return Response(
+                {"success": False, "error": f"Staff member '{staff_id}' not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Save assignment and update status
+        complaint.assigned_staff = staff
+        complaint.status = "ASSIGNED"
+        complaint.save(update_fields=["assigned_staff", "status", "updated_at"])
+
+        staff_user_profile = getattr(staff.user, "userprofile", None)
+        staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
+        serializer = WasteComplaintSerializer(complaint, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Complaint #{complaint.id} successfully assigned to {staff_name}.",
+                "complaint": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# STAFF ASSIGNED COMPLAINTS VIEW (For Authenticated Staff)
+# ============================================================
+
+class StaffAssignedComplaintsView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "No Staff profile associated with the current user."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Return ONLY complaints assigned to this specific staff member
+        complaints = (
+            WasteComplaint.objects
+            .filter(assigned_staff=staff)
+            .select_related(
+                "user",
+                "user__userprofile",
+                "user__userprofile__ward",
+                "assigned_staff",
+                "assigned_staff__user",
+                "assigned_staff__user__userprofile",
+            )
+            .order_by("-updated_at", "-id")
+        )
+
+        serializer = WasteComplaintSerializer(complaints, many=True, context={"request": request})
+        return Response(
+            {
+                "success": True,
+                "count": complaints.count(),
+                "complaints": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================
+# ALL AVAILABLE STAFF LIST VIEW (FOR ANY-WARD COMPLAINTS)
+# ============================================================
+
+class AllStaffListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        staff_queryset = Staff.objects.select_related("user", "user__userprofile", "user__userprofile__ward").all()
+        data = []
+        for s in staff_queryset:
+            profile = getattr(s.user, "userprofile", None)
+            ward_name = profile.ward.ward_name if profile and profile.ward else "General Ward"
+            ward_id = profile.ward.ward_id if profile and profile.ward else None
+            name = profile.name if profile and profile.name else (s.user.get_full_name() or s.user.username)
+            phone = profile.phone if profile and profile.phone else s.phone
+            data.append({
+                "staff_id": s.staff_id,
+                "id": s.staff_id,
+                "user_id": s.user.id,
+                "name": name,
+                "username": s.user.username,
+                "email": s.user.email,
+                "phone": phone,
+                "designation": s.designation or "Field Staff",
+                "ward": ward_name,
+                "ward_id": ward_id,
+                "address": s.address,
+            })
+        return Response(data, status=status.HTTP_200_OK)
+
+
+# ============================================================
+# STAFF COMPLAINT STATUS UPDATE & RESOLUTION VIEW
+# ============================================================
+
+class StaffComplaintUpdateView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "Staff profile not found."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            complaint = (
+                WasteComplaint.objects
+                .select_related("user", "user__userprofile", "user__userprofile__ward", "assigned_staff")
+                .get(id=pk)
+            )
+        except WasteComplaint.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Complaint #{pk} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if complaint.assigned_staff_id != staff.staff_id:
+            return Response(
+                {"success": False, "error": "You are not authorized to update this complaint."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        status_input = (request.data.get("status") or request.POST.get("status") or "").strip().upper()
+        if status_input not in ["ASSIGNED", "IN_PROGRESS", "RESOLVED"]:
+            return Response(
+                {"success": False, "error": "Invalid status. Must be 'ASSIGNED', 'IN_PROGRESS', or 'RESOLVED'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        proof_image = request.FILES.get("proof_image") or request.FILES.get("image")
+        update_fields = ["status", "updated_at"]
+
+        if status_input == "RESOLVED":
+            if not proof_image and not complaint.proof_image:
+                return Response(
+                    {
+                        "success": False,
+                        "error": "A proof image showing cleared waste is required to resolve this complaint."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if proof_image:
+                complaint.proof_image = proof_image
+                update_fields.append("proof_image")
+
+            complaint.resolved_at = timezone.now()
+            update_fields.append("resolved_at")
+        elif proof_image:
+            complaint.proof_image = proof_image
+            update_fields.append("proof_image")
+
+        complaint.status = status_input
+        complaint.save(update_fields=update_fields)
+
+        serializer = WasteComplaintSerializer(complaint, context={"request": request})
+        return Response(
+            {
+                "success": True,
+                "message": f"Complaint #{complaint.id} status updated to {status_input}.",
+                "complaint": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
 

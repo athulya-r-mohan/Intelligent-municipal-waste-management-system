@@ -134,9 +134,17 @@ export default function EcoPulseStaff() {
   const [loadingTracking, setLoadingTracking] = useState(false);
   const [trackingError, setTrackingError] = useState("");
 
+  // User Complaints Queue State
+  const [complaintsOpen, setComplaintsOpen] = useState(false);
+  const [userComplaints, setUserComplaints] = useState([]);
+  const [loadingComplaints, setLoadingComplaints] = useState(false);
+  const [complaintsError, setComplaintsError] = useState("");
+  const [selectedComplaintDetail, setSelectedComplaintDetail] = useState(null);
+
   // User info
   const userName = localStorage.getItem("name") || "Citizen User";
   const userRole = localStorage.getItem("role") || "Resident";
+
  
   const housesRowRef = useRef(null);
   const houseRefs = useRef([]);
@@ -347,6 +355,39 @@ export default function EcoPulseStaff() {
     }
   }, []);
 
+  // Fetch complaints submitted by logged-in user
+  const fetchUserComplaints = useCallback(async () => {
+    setLoadingComplaints(true);
+    setComplaintsError("");
+    try {
+      const token =
+        localStorage.getItem("access") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("token") ||
+        "";
+
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await API.get("/waste/complaints/my/", { headers });
+
+      if (response.data && response.data.success) {
+        setUserComplaints(response.data.complaints || []);
+      } else {
+        setUserComplaints([]);
+      }
+    } catch (err) {
+      console.error("Error fetching user complaints:", err);
+      const errMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to load your complaint queue. Please make sure you are logged in.";
+      setComplaintsError(errMsg);
+    } finally {
+      setLoadingComplaints(false);
+    }
+  }, []);
+
   const openHistory = () => {
     setDrawerOpen(false);
     setHistoryOpen(true);
@@ -359,6 +400,12 @@ export default function EcoPulseStaff() {
     fetchLatestPickup();
   };
 
+  const openComplaintsQueue = () => {
+    setDrawerOpen(false);
+    setComplaintsOpen(true);
+    fetchUserComplaints();
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     navigate("/login");
@@ -368,12 +415,12 @@ export default function EcoPulseStaff() {
     if (key === "history") {
       openHistory();
     } else if (key === "complaints") {
-      setDrawerOpen(false);
-      navigate("/complaintform");
+      openComplaintsQueue();
     } else if (key === "tracking") {
       openTracking();
     }
   };
+
 
   // Group history by date
   const groupedHistory = historyRecords.reduce((acc, item) => {
@@ -1485,6 +1532,559 @@ export default function EcoPulseStaff() {
       )}
 
       {/* ============================================================ */}
+      {/* PUBLIC COMPLAINT QUEUE MODAL */}
+      {/* ============================================================ */}
+      {complaintsOpen && (
+        <div className="ep-modal-overlay" onClick={() => setComplaintsOpen(false)}>
+          <div className="ep-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ep-modal-head">
+              <div className="ep-modal-title-area">
+                <h2>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 5h16v11H8l-4 4V5z" stroke="var(--green)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  My Complaint Queue
+                </h2>
+                <p>Track status and verified clearing proof for your reported waste complaints</p>
+              </div>
+              <div className="ep-modal-actions">
+                <button
+                  className="ep-modal-refresh-btn"
+                  onClick={fetchUserComplaints}
+                  disabled={loadingComplaints}
+                  title="Refresh complaints"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    style={{ animation: loadingComplaints ? "staffSpin 1s linear infinite" : "none" }}
+                  >
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {loadingComplaints ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  className="ep-modal-close-btn"
+                  onClick={() => setComplaintsOpen(false)}
+                  aria-label="Close"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="ep-modal-body">
+              {loadingComplaints && userComplaints.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 20px" }}>
+                  <div style={{ width: 36, height: 36, border: "3px solid var(--mint-3)", borderTopColor: "var(--green)", borderRadius: "50%", margin: "0 auto 16px", animation: "staffSpin 1s linear infinite" }} />
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>Loading your complaints...</div>
+                  <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Checking municipal grievance system</div>
+                </div>
+              ) : complaintsError ? (
+                <div style={{ textAlign: "center", padding: "36px 20px", background: "#fef2f2", borderRadius: 16, border: "1px solid #fecaca" }}>
+                  <div style={{ color: "#b91c1c", fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Unable to load complaints</div>
+                  <div style={{ color: "#7f1d1d", fontSize: 13, marginBottom: 16 }}>{complaintsError}</div>
+                  <button
+                    className="staff-btn staff-btn-solid"
+                    onClick={fetchUserComplaints}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : userComplaints.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "56px 20px" }}>
+                  <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--mint-3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "var(--green-deep)" }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 5h16v11H8l-4 4V5z" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  </div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "var(--ink)", margin: "0 0 6px" }}>No Complaints In Queue</h3>
+                  <p style={{ fontSize: 13.5, color: "var(--muted)", maxWidth: 420, margin: "0 auto 20px", lineHeight: 1.5 }}>
+                    You have not registered any public waste complaints yet. If you spot dumped waste anywhere in the city, report it for immediate pickup.
+                  </p>
+                  <button
+                    className="staff-btn staff-btn-solid"
+                    onClick={() => { setComplaintsOpen(false); navigate("/complaintform"); }}
+                  >
+                    Report Public Waste
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>
+                      Showing {userComplaints.length} {userComplaints.length === 1 ? "complaint" : "complaints"}
+                    </span>
+                    <button
+                      className="staff-btn staff-btn-ghost"
+                      style={{ fontSize: 12, padding: "5px 12px" }}
+                      onClick={() => { setComplaintsOpen(false); navigate("/complaintform"); }}
+                    >
+                      + Report New Spot
+                    </button>
+                  </div>
+
+                  <div className="ep-history-grid">
+                    {userComplaints.map((c) => (
+                      <div
+                        key={c.id || c.complaint_id}
+                        className="ep-history-card"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setSelectedComplaintDetail(c)}
+                      >
+                        <div className="ep-card-top">
+                          <div className="ep-req-id">
+                            <span className="ep-req-pill">Complaint #{c.id || c.complaint_id}</span>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                background:
+                                  c.priority === "HIGH"
+                                    ? "#fee2e2"
+                                    : c.priority === "MEDIUM"
+                                    ? "#fef3c7"
+                                    : "#dcfce7",
+                                color:
+                                  c.priority === "HIGH"
+                                    ? "#dc2626"
+                                    : c.priority === "MEDIUM"
+                                    ? "#d97706"
+                                    : "#16a34a",
+                              }}
+                            >
+                              {c.priority} Priority
+                            </span>
+                          </div>
+
+                          <div>
+                            <span
+                              className="ep-status-pill"
+                              style={{
+                                background:
+                                  c.status === "RESOLVED"
+                                    ? "#dcfce7"
+                                    : c.status === "IN_PROGRESS"
+                                    ? "#fef3c7"
+                                    : c.status === "ASSIGNED"
+                                    ? "#f3e8ff"
+                                    : "#eff6ff",
+                                color:
+                                  c.status === "RESOLVED"
+                                    ? "#16a34a"
+                                    : c.status === "IN_PROGRESS"
+                                    ? "#b45309"
+                                    : c.status === "ASSIGNED"
+                                    ? "#7e22ce"
+                                    : "#1d4ed8",
+                              }}
+                            >
+                              {c.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="ep-card-details">
+                          <div className="ep-detail-item">
+                            <span className="ep-detail-icon">📍</span>
+                            <div>
+                              <b>Location:</b> {c.location_name || "N/A"}
+                            </div>
+                          </div>
+
+                          <div className="ep-detail-item">
+                            <span className="ep-detail-icon">📝</span>
+                            <div style={{ color: "var(--muted)", fontSize: 12.5 }}>
+                              {c.description}
+                            </div>
+                          </div>
+
+                          <div className="ep-detail-item">
+                            <span className="ep-detail-icon">📅</span>
+                            <div>
+                              <b>Submitted Date:</b> {c.created_at_formatted || (c.created_at ? new Date(c.created_at).toLocaleDateString() : "-")}
+                            </div>
+                          </div>
+
+                          {c.assigned_staff_name && (
+                            <div className="ep-detail-item">
+                              <span className="ep-detail-icon">👷</span>
+                              <div>
+                                <b>Assigned Staff:</b> {c.assigned_staff_name}
+                              </div>
+                            </div>
+                          )}
+
+                          {c.resolved_at_formatted && (
+                            <div className="ep-detail-item">
+                              <span className="ep-detail-icon">✅</span>
+                              <div style={{ color: "var(--green-deep)", fontWeight: 600 }}>
+                                <b>Resolved Date:</b> {c.resolved_at_formatted}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          className="ep-card-media"
+                          style={{ justifyContent: "space-between", alignItems: "center" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div style={{ display: "flex", gap: 8 }}>
+                            {c.image_url || c.image ? (
+                              <button
+                                type="button"
+                                className="ep-image-thumb-btn"
+                                onClick={() => setPreviewImage(c.image_url || c.image)}
+                                title="Click to view original waste photo"
+                              >
+                                <img
+                                  src={c.image_url || c.image}
+                                  alt="Reported waste"
+                                  className="ep-thumb-img"
+                                />
+                                <span>Waste Photo</span>
+                              </button>
+                            ) : null}
+
+                            {c.proof_image_url || c.proof_image ? (
+                              <button
+                                type="button"
+                                className="ep-image-thumb-btn"
+                                style={{ borderColor: "#86efac", background: "#f0fdf4" }}
+                                onClick={() => setPreviewImage(c.proof_image_url || c.proof_image)}
+                                title="Click to view waste cleared proof"
+                              >
+                                <img
+                                  src={c.proof_image_url || c.proof_image}
+                                  alt="Cleared proof"
+                                  className="ep-thumb-img"
+                                />
+                                <span style={{ color: "#16a34a" }}>Cleared Proof</span>
+                              </button>
+                            ) : null}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="staff-btn staff-btn-solid"
+                            style={{ padding: "6px 14px", fontSize: 12.5 }}
+                            onClick={() => setSelectedComplaintDetail(c)}
+                          >
+                            View Details →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* COMPLAINT DETAIL & PROGRESS MODAL */}
+      {/* ============================================================ */}
+      {selectedComplaintDetail && (
+        <div className="ep-modal-overlay" onClick={() => setSelectedComplaintDetail(null)}>
+          <div className="ep-modal-card" style={{ maxWidth: 660 }} onClick={(e) => e.stopPropagation()}>
+            <div className="ep-modal-head">
+              <div className="ep-modal-title-area">
+                <h2>
+                  Complaint #{selectedComplaintDetail.id || selectedComplaintDetail.complaint_id} Details
+                </h2>
+                <p>{selectedComplaintDetail.location_name}</p>
+              </div>
+              <div className="ep-modal-actions">
+                <button
+                  className="ep-modal-close-btn"
+                  onClick={() => setSelectedComplaintDetail(null)}
+                  aria-label="Close"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="ep-modal-body">
+              {/* STATUS & PRIORITY OVERVIEW */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "#f6fbf8",
+                  border: "1px solid var(--mint-3)",
+                  borderRadius: 12,
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>
+                    Assigned Priority
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2, color: selectedComplaintDetail.priority === "HIGH" ? "#dc2626" : selectedComplaintDetail.priority === "MEDIUM" ? "#d97706" : "#16a34a" }}>
+                    {selectedComplaintDetail.priority} PRIORITY
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>
+                    Current Status
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2, color: "var(--green-deep)" }}>
+                    {selectedComplaintDetail.status}
+                  </div>
+                </div>
+
+                {selectedComplaintDetail.assigned_staff_name && (
+                  <div>
+                    <div style={{ fontSize: 11.5, color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>
+                      Assigned Field Staff
+                    </div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 2, color: "var(--ink)" }}>
+                      {selectedComplaintDetail.assigned_staff_name}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* DETAILS GRID */}
+              <div
+                style={{
+                  background: "#fafafa",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  marginBottom: 20,
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px 16px",
+                  fontSize: 13,
+                }}
+              >
+                <div>
+                  <span style={{ color: "var(--muted)", fontWeight: 600 }}>Location:</span>{" "}
+                  <b>{selectedComplaintDetail.location_name || "N/A"}</b>
+                </div>
+
+                {selectedComplaintDetail.latitude && selectedComplaintDetail.longitude && (
+                  <div>
+                    <span style={{ color: "var(--muted)", fontWeight: 600 }}>Coordinates:</span>{" "}
+                    <b>{selectedComplaintDetail.latitude}, {selectedComplaintDetail.longitude}</b>
+                  </div>
+                )}
+
+                <div>
+                  <span style={{ color: "var(--muted)", fontWeight: 600 }}>Submitted Date:</span>{" "}
+                  <b>{selectedComplaintDetail.created_at_formatted || (selectedComplaintDetail.created_at ? new Date(selectedComplaintDetail.created_at).toLocaleDateString() : "-")}</b>
+                </div>
+
+                {selectedComplaintDetail.resolved_at_formatted && (
+                  <div>
+                    <span style={{ color: "var(--muted)", fontWeight: 600 }}>Resolved Date:</span>{" "}
+                    <b style={{ color: "var(--green-deep)" }}>{selectedComplaintDetail.resolved_at_formatted}</b>
+                  </div>
+                )}
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span style={{ color: "var(--muted)", fontWeight: 600 }}>Description:</span>{" "}
+                  <span>{selectedComplaintDetail.description || "No description provided."}</span>
+                </div>
+              </div>
+
+              {/* PROGRESS TIMELINE */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>⏳ Complaint Resolution Timeline</span>
+                </div>
+
+                {[
+                  {
+                    title: "COMPLAINT SUBMITTED",
+                    desc: `Registered on ${selectedComplaintDetail.created_at_formatted || "System"}`,
+                    done: true,
+                    statusText: "● NEW",
+                  },
+                  {
+                    title: "ASSIGNED TO STAFF",
+                    desc: selectedComplaintDetail.assigned_staff_name
+                      ? `Assigned to field staff: ${selectedComplaintDetail.assigned_staff_name}`
+                      : "Awaiting staff assignment by municipal office",
+                    done: ["ASSIGNED", "IN_PROGRESS", "RESOLVED"].includes(selectedComplaintDetail.status),
+                    statusText: "● ASSIGNED",
+                  },
+                  {
+                    title: "IN PROGRESS",
+                    desc: ["IN_PROGRESS", "RESOLVED"].includes(selectedComplaintDetail.status)
+                      ? "Field staff dispatched to location"
+                      : "Pending work commencement",
+                    done: ["IN_PROGRESS", "RESOLVED"].includes(selectedComplaintDetail.status),
+                    statusText: "● IN PROGRESS",
+                  },
+                  {
+                    title: "RESOLVED",
+                    desc: selectedComplaintDetail.status === "RESOLVED"
+                      ? `Waste cleared and verified on ${selectedComplaintDetail.resolved_at_formatted || "Completion"}`
+                      : "Proof of clearing pending",
+                    done: selectedComplaintDetail.status === "RESOLVED",
+                    statusText: "● RESOLVED",
+                  },
+                ].map((step, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      gap: 14,
+                      position: "relative",
+                      paddingBottom: idx === 3 ? 0 : 18,
+                    }}
+                  >
+                    {idx < 3 && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: 12,
+                          top: 24,
+                          bottom: 0,
+                          width: 2,
+                          background: step.done ? "var(--green)" : "var(--mint-3)",
+                        }}
+                      />
+                    )}
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        background: step.done ? "var(--green)" : "#e5e7eb",
+                        color: step.done ? "#ffffff" : "#9ca3af",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        zIndex: 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {step.done ? "✓" : idx + 1}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: step.done ? "var(--ink)" : "var(--muted)" }}>
+                          {step.title}
+                        </div>
+                        {selectedComplaintDetail.status === step.statusText.replace("● ", "") && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--green-deep)", background: "#dcfce7", padding: "2px 8px", borderRadius: 8 }}>
+                            Current Stage
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                        {step.desc}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* PHOTOS COMPARISON: ORIGINAL VS PROOF */}
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", marginBottom: 12 }}>
+                  📸 Photographic Proof Records
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {/* Original Waste Photo */}
+                  <div
+                    style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 12,
+                      padding: 12,
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>
+                      Original Reported Waste
+                    </div>
+                    {selectedComplaintDetail.image_url || selectedComplaintDetail.image ? (
+                      <img
+                        src={selectedComplaintDetail.image_url || selectedComplaintDetail.image}
+                        alt="Original Waste"
+                        onClick={() => setPreviewImage(selectedComplaintDetail.image_url || selectedComplaintDetail.image)}
+                        style={{
+                          width: "100%",
+                          height: 140,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                        }}
+                        title="Click to zoom"
+                      />
+                    ) : (
+                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 12 }}>
+                        No image uploaded
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Staff Waste Cleared Proof */}
+                  <div
+                    style={{
+                      background: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      borderRadius: 12,
+                      padding: 12,
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 8 }}>
+                      Staff Cleared Proof Photo
+                    </div>
+                    {selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image ? (
+                      <img
+                        src={selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image}
+                        alt="Cleared Waste Proof"
+                        onClick={() => setPreviewImage(selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image)}
+                        style={{
+                          width: "100%",
+                          height: 140,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          border: "1px solid #86efac",
+                        }}
+                        title="Click to zoom"
+                      />
+                    ) : (
+                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: 12 }}>
+                        {selectedComplaintDetail.status === "RESOLVED"
+                          ? "Waste marked cleared"
+                          : "Pending staff cleanup"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ============================================================ */}
       {/* COMPLETION IMAGE LIGHTBOX */}
       {/* ============================================================ */}
       {previewImage && (
@@ -1492,7 +2092,7 @@ export default function EcoPulseStaff() {
           <div className="ep-lightbox-content" onClick={(e) => e.stopPropagation()}>
             <img src={previewImage} alt="Completion Proof Full View" className="ep-lightbox-img" />
             <div className="ep-lightbox-foot">
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>Field Collection Proof Photo</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>Photographic Record View</span>
               <button
                 className="staff-btn staff-btn-solid"
                 style={{ padding: "6px 14px", fontSize: 12.5 }}
@@ -1507,4 +2107,5 @@ export default function EcoPulseStaff() {
     </div>
   );
 }
+
  

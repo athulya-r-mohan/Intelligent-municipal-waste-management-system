@@ -4,6 +4,7 @@ from .models import (
     WastePickupRequest,
     WastePickupImage,
     WasteCollection,
+    WasteComplaint,
 )
 
 
@@ -243,4 +244,57 @@ class WasteCollectionAdmin(admin.ModelAdmin):
         except Exception:
             return "-"
 
-    get_citizen.short_description = "Citizen"
+    get_citizen.short_description = "Citizen"
+
+
+# ============================================================
+# WASTE COMPLAINT ADMIN
+# ============================================================
+
+@admin.register(WasteComplaint)
+class WasteComplaintAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "id",
+        "get_email",
+        "get_name",
+        "location_name",
+        "priority",
+        "status",
+        "assigned_staff",
+        "created_at",
+    )
+
+    list_filter = (
+        "priority",
+        "status",
+        "created_at",
+    )
+
+    search_fields = (
+        "user__email",
+        "user__username",
+        "user__userprofile__name",
+        "location_name",
+        "description",
+        "assigned_staff__user__username",
+    )
+
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+    def get_email(self, obj):
+        return obj.user.email
+
+    get_email.short_description = "Email"
+
+    def get_name(self, obj):
+        profile = getattr(obj.user, "userprofile", None)
+        if profile and profile.name:
+            return profile.name
+        return obj.user.username
+
+    get_name.short_description = "Name"
+

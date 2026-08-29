@@ -3,12 +3,15 @@ from PIL import Image
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 
+
 from accounts.models import Ward, UserProfile, Staff
-from waste.models import WastePickupRequest, WastePickupImage, WasteCollection
-from waste.serializers import WastePickupRequestSerializer
+from waste.models import WastePickupRequest, WastePickupImage, WasteCollection, WasteComplaint
+from waste.serializers import WastePickupRequestSerializer, WasteComplaintSerializer
+from waste.priority_detector import determine_complaint_priority
 
 
 def create_test_image():
@@ -533,6 +536,450 @@ class WasteCollectionWorkflowTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data.get("has_pickup"))
         self.assertIsNone(response.data.get("latest_pickup"))
+
+
+class WasteComplaintWorkflowTests(TestCase):
+
+    def setUp(self):
+        # 1. Create Ward
+        self.ward = Ward.objects.create(ward_name="Central Ward", location="City Center")
+
+        # 2. Create Citizen 1
+        self.citizen1 = User.objects.create_user(
+            username="citizen_complaint1",
+            email="citizen1@waste.com",
+            password="Password123!"
+        )
+        self.citizen_profile1 = UserProfile.objects.create(
+            user=self.citizen1,
+            name="Alice Smith",
+            phone="9876500001",
+            ward=self.ward,
+            role="CITIZEN"
+        )
+
+        # 3. Create Citizen 2
+        self.citizen2 = User.objects.create_user(
+            username="citizen_complaint2",
+            email="citizen2@waste.com",
+            password="Password123!"
+        )
+        self.citizen_profile2 = UserProfile.objects.create(
+            user=self.citizen2,
+            name="Bob Jones",
+            phone="9876500002",
+            ward=self.ward,
+            role="CITIZEN"
+        )
+
+        # 4. Create Staff 1
+        self.staff_user1 = User.objects.create_user(
+            username="staff_john",
+            email="staffjohn@waste.com",
+            password="Password123!"
+        )
+        self.staff_profile1 = UserProfile.objects.create(
+            user=self.staff_user1,
+            name="John Staff",
+            phone="9876500011",
+            ward=self.ward,
+            role="STAFF"
+        )
+        self.staff1 = Staff.objects.create(
+            user=self.staff_user1,
+            phone="9876500011",
+            designation="STAFF",
+            date_of_joining="2024-01-01"
+        )
+
+        # 5. Create Staff 2
+        self.staff_user2 = User.objects.create_user(
+            username="staff_mary",
+            email="staffmary@waste.com",
+            password="Password123!"
+        )
+        self.staff_profile2 = UserProfile.objects.create(
+            user=self.staff_user2,
+            name="Mary Staff",
+            phone="9876500022",
+            ward=self.ward,
+            role="STAFF"
+        )
+        self.staff2 = Staff.objects.create(
+            user=self.staff_user2,
+            phone="9876500022",
+            designation="STAFF",
+            date_of_joining="2024-01-01"
+        )
+
+        self.client = APIClient()
+
+    def test_unauthenticated_complaint_creation_blocked(self):
+        response = self.client.post(
+            "/api/waste/complaints/",
+            {
+                "location_name": "Government Hospital, Kottayam",
+                "description": "Garbage dumped near hospital gate"
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_complaint_high_priority_hospital(self):
+        self.client.force_authenticate(user=self.citizen1)
+        test_img = create_test_image()
+        response = self.client.post(
+            "/api/waste/complaints/",
+            {
+                "location_name": "Government Hospital, Kottayam",
+                "latitude": 9.5916,
+                "longitude": 76.5222,
+                "description": "Medical and plastic waste dumped near main gate",
+                "image": test_img
+            },
+            format="multipart"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.data.get("complaint", {})
+        self.assertEqual(data.get("priority"), "HIGH")
+        self.assertEqual(data.get("status"), "NEW")
+        self.assertEqual(data.get("user_name"), "Alice Smith")
+        self.assertIn("complaint_images/", data.get("image", "") or data.get("image_url", ""))
+
+    def test_create_complaint_medium_priority_school(self):
+        self.client.force_authenticate(user=self.citizen1)
+        response = self.client.post(
+            "/api/waste/complaints/",
+            {
+                "location_name": "St. Mary's School, Erattupetta",
+                "latitude": 9.6916,
+                "longitude": 76.7822,
+                "description": "Overflowing waste bin outside school premises",
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.data.get("complaint", {})
+        self.assertEqual(data.get("priority"), "MEDIUM")
+        self.assertEqual(data.get("status"), "NEW")
+
+    def test_create_complaint_medium_priority_college(self):
+        self.client.force_authenticate(user=self.citizen1)
+        response = self.client.post(
+            "/api/waste/complaints/",
+            {
+                "location_name": "Engineering College Campus, Ward 4",
+                "description": "Dumped paper and plastic waste near campus entrance",
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.data.get("complaint", {})
+        self.assertEqual(data.get("priority"), "MEDIUM")
+
+    def test_create_complaint_low_priority_roadside(self):
+        self.client.force_authenticate(user=self.citizen1)
+        response = self.client.post(
+            "/api/waste/complaints/",
+            {
+                "location_name": "Normal Roadside Public Area, Street 12",
+                "latitude": 9.5000,
+                "longitude": 76.5000,
+                "description": "Litter on the sidewalk",
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.data.get("complaint", {})
+        self.assertEqual(data.get("priority"), "LOW")
+        self.assertEqual(data.get("status"), "NEW")
+
+    def test_admin_complaints_sorting_high_medium_low(self):
+        # Create Low priority first
+        c_low = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="General Public Road",
+            description="Litter",
+            priority="LOW",
+            status="NEW"
+        )
+        # Create Medium priority second
+        c_med = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="National High School Area",
+            description="School waste",
+            priority="MEDIUM",
+            status="NEW"
+        )
+        # Create High priority third
+        c_high = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="General Hospital Ward",
+            description="Medical waste",
+            priority="HIGH",
+            status="NEW"
+        )
+
+        response = self.client.get("/api/waste/admin/complaints/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        complaints = response.data.get("complaints", [])
+        self.assertGreaterEqual(len(complaints), 3)
+
+        # Check order: HIGH first, then MEDIUM, then LOW
+        priorities = [c["priority"] for c in complaints[:3]]
+        self.assertEqual(priorities, ["HIGH", "MEDIUM", "LOW"])
+
+    def test_admin_assign_staff_by_numeric_id(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="City Hospital Road",
+            description="Illegal waste dumping",
+            priority="HIGH",
+            status="NEW"
+        )
+
+        response = self.client.post(
+            "/api/waste/admin/complaints/assign/",
+            {
+                "complaint_id": complaint.id,
+                "staff_id": self.staff1.staff_id
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, "ASSIGNED")
+        self.assertEqual(complaint.assigned_staff, self.staff1)
+
+    def test_admin_assign_staff_by_username_lookup(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="City High School",
+            description="Garbage dump",
+            priority="MEDIUM",
+            status="NEW"
+        )
+
+        response = self.client.post(
+            f"/api/waste/admin/complaints/{complaint.id}/assign/",
+            {
+                "staff_id": "staff_mary"
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, "ASSIGNED")
+        self.assertEqual(complaint.assigned_staff, self.staff2)
+
+    def test_staff_assigned_complaints_isolation(self):
+        # Create complaint assigned to staff1
+        c1 = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Hospital Gate",
+            description="Task for John",
+            priority="HIGH",
+            status="ASSIGNED",
+            assigned_staff=self.staff1
+        )
+        # Create complaint assigned to staff2
+        c2 = WasteComplaint.objects.create(
+            user=self.citizen2,
+            location_name="School Ground",
+            description="Task for Mary",
+            priority="MEDIUM",
+            status="ASSIGNED",
+            assigned_staff=self.staff2
+        )
+
+        # Authenticate as staff 1
+        self.client.force_authenticate(user=self.staff_user1)
+        response1 = self.client.get("/api/waste/staff/my-complaints/")
+        self.assertEqual(response1.status_code, status.HTTP_200_OK)
+        task_ids1 = [c["id"] for c in response1.data.get("complaints", [])]
+        self.assertIn(c1.id, task_ids1)
+        self.assertNotIn(c2.id, task_ids1)
+
+        # Authenticate as staff 2
+        self.client.force_authenticate(user=self.staff_user2)
+        response2 = self.client.get("/api/waste/staff/my-complaints/")
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+        task_ids2 = [c["id"] for c in response2.data.get("complaints", [])]
+        self.assertIn(c2.id, task_ids2)
+        self.assertNotIn(c1.id, task_ids2)
+
+    def test_staff_complaint_status_update_in_progress(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Primary Health Centre",
+            description="Waste near PHC",
+            priority="HIGH",
+            status="ASSIGNED",
+            assigned_staff=self.staff1
+        )
+
+        self.client.force_authenticate(user=self.staff_user1)
+        response = self.client.post(
+            f"/api/waste/staff/complaints/{complaint.id}/update/",
+            {"status": "IN_PROGRESS"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, "IN_PROGRESS")
+
+    def test_staff_resolve_complaint_with_proof_image(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="City Hospital Gate",
+            description="Waste pile outside gate",
+            priority="HIGH",
+            status="IN_PROGRESS",
+            assigned_staff=self.staff1
+        )
+
+        self.client.force_authenticate(user=self.staff_user1)
+        proof = create_test_image()
+        response = self.client.post(
+            f"/api/waste/staff/complaints/{complaint.id}/update/",
+            {"status": "RESOLVED", "proof_image": proof},
+            format="multipart"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, "RESOLVED")
+        self.assertIsNotNone(complaint.resolved_at)
+        self.assertTrue(bool(complaint.proof_image))
+
+    def test_staff_resolve_without_proof_image_rejected(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="City School Road",
+            description="School gate waste",
+            priority="MEDIUM",
+            status="IN_PROGRESS",
+            assigned_staff=self.staff1
+        )
+
+        self.client.force_authenticate(user=self.staff_user1)
+        response = self.client.post(
+            f"/api/waste/staff/complaints/{complaint.id}/update/",
+            {"status": "RESOLVED"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("proof image", response.data.get("error", "").lower())
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, "IN_PROGRESS")
+
+    def test_admin_assign_staff_from_any_ward_to_complaint(self):
+        # Create Ward 2 and Staff in Ward 2
+        ward2 = Ward.objects.create(ward_name="North Ward", location="North Sector")
+        staff_user_w2 = User.objects.create_user(username="staff_w2", email="w2@waste.com", password="Password123!")
+        UserProfile.objects.create(user=staff_user_w2, name="North Staff", phone="9876500099", ward=ward2, role="STAFF")
+        staff_w2 = Staff.objects.create(user=staff_user_w2, phone="9876500099", designation="STAFF", date_of_joining="2024-01-01")
+
+        # Complaint is in Ward 1
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Central Ward Market",
+            description="Market garbage",
+            priority="LOW",
+            status="NEW"
+        )
+
+        # Admin assigns Staff from Ward 2 to Complaint in Ward 1
+        response = self.client.post(
+            "/api/waste/admin/complaints/assign/",
+            {"complaint_id": complaint.id, "staff_id": staff_w2.staff_id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, "ASSIGNED")
+        self.assertEqual(complaint.assigned_staff_id, staff_w2.staff_id)
+
+    def test_all_staff_list_endpoint(self):
+        response = self.client.get("/api/waste/staff/all/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        staff_ids = [s["staff_id"] for s in response.data]
+        self.assertIn(self.staff1.staff_id, staff_ids)
+        self.assertIn(self.staff2.staff_id, staff_ids)
+
+    def test_user_complaints_isolation(self):
+        c1 = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Loc 1",
+            description="Desc 1",
+            priority="LOW",
+            status="NEW"
+        )
+        c2 = WasteComplaint.objects.create(
+            user=self.citizen2,
+            location_name="Loc 2",
+            description="Desc 2",
+            priority="LOW",
+            status="NEW"
+        )
+
+        self.client.force_authenticate(user=self.citizen1)
+        response = self.client.get("/api/waste/complaints/my/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [c["id"] for c in response.data.get("complaints", [])]
+        self.assertIn(c1.id, ids)
+        self.assertNotIn(c2.id, ids)
+
+    def test_user_complaint_detail_security_owner_access(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Civil Station Road",
+            description="Market plastic waste",
+            priority="HIGH",
+            status="NEW",
+            latitude=9.6823,
+            longitude=76.8421
+        )
+
+        self.client.force_authenticate(user=self.citizen1)
+        response = self.client.get(f"/api/waste/complaints/{complaint.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("success"))
+        c_data = response.data.get("complaint")
+        self.assertEqual(c_data["id"], complaint.id)
+        self.assertEqual(c_data["location_name"], "Civil Station Road")
+        self.assertEqual(c_data["priority"], "HIGH")
+        self.assertEqual(c_data["status"], "NEW")
+        self.assertEqual(float(c_data["latitude"]), 9.6823)
+        self.assertEqual(float(c_data["longitude"]), 76.8421)
+
+    def test_user_complaint_detail_security_cross_user_denied(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Private Lane",
+            description="Private waste",
+            priority="LOW",
+            status="NEW"
+        )
+
+        # Citizen 2 attempts to access Citizen 1's complaint detail
+        self.client.force_authenticate(user=self.citizen2)
+        response = self.client.get(f"/api/waste/complaints/{complaint.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(response.data.get("success"))
+
+    def test_user_complaint_detail_includes_proof_image_and_dates(self):
+        complaint = WasteComplaint.objects.create(
+            user=self.citizen1,
+            location_name="Hospital Junction",
+            description="Cleared waste area",
+            priority="HIGH",
+            status="RESOLVED",
+            proof_image=create_test_image(),
+            resolved_at=timezone.now()
+        )
+
+        self.client.force_authenticate(user=self.citizen1)
+        response = self.client.get(f"/api/waste/complaints/{complaint.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        c_data = response.data.get("complaint")
+        self.assertEqual(c_data["status"], "RESOLVED")
+        self.assertIsNotNone(c_data.get("proof_image_url"))
+        self.assertIsNotNone(c_data.get("resolved_at"))
+        self.assertIsNotNone(c_data.get("resolved_at_formatted"))
+
+
+
 
 
 

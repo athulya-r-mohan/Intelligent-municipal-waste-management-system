@@ -1,0 +1,453 @@
+/* ============================================================
+   EcoPulse — Admin Complaints Management Styles
+   Theme: Forest Green, Mint, White, and High/Medium/Low Priority Badges
+============================================================ */
+
+.ac-page {
+  width: 100%;
+  min-height: 100vh;
+  background: #f6fbf8;
+  color: #1b2a22;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.ac-header {
+  width: 100%;
+  height: 84px;
+  background: #ffffff;
+  border-bottom: 1px solid #dceee3;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ac-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #eaf7ef;
+  border: 1px solid #dceee3;
+  color: #1e6b4e;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ac-back-btn:hover {
+  background: #d4f0df;
+  border-color: #3fa96b;
+}
+
+.ac-main {
+  flex: 1;
+  padding: 28px 32px 48px;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.ac-heading-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ac-heading-wrap h1 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e6b4e;
+  margin: 0 0 6px;
+}
+
+.ac-heading-wrap p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #6c8479;
+}
+
+/* Priority & Status Tab Filters */
+.ac-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.ac-tab {
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #dceee3;
+  background: #ffffff;
+  color: #446152;
+  transition: all 0.15s ease;
+}
+
+.ac-tab:hover {
+  border-color: #3fa96b;
+}
+
+.ac-tab.active {
+  background: #1e6b4e;
+  color: #ffffff;
+  border-color: #1e6b4e;
+}
+
+/* Priority Badges */
+.ac-badge-priority-high {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  font-weight: 700;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ac-badge-priority-medium {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fcd34d;
+  font-weight: 700;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ac-badge-priority-low {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #86efac;
+  font-weight: 700;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Status Badges */
+.ac-badge-status-new {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.ac-badge-status-assigned {
+  background: #fdf4ff;
+  color: #9333ea;
+  border: 1px solid #f0abfc;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.ac-badge-status-in_progress {
+  background: #fefce8;
+  color: #ca8a04;
+  border: 1px solid #fef08a;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.ac-badge-status-resolved {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+/* Table Container */
+.ac-table-card {
+  background: #ffffff;
+  border: 1px solid #dceee3;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(30, 107, 78, 0.04);
+}
+
+.ac-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.ac-table thead tr {
+  background: #eaf7ef;
+  border-bottom: 1px solid #dceee3;
+}
+
+.ac-table th {
+  padding: 14px 16px;
+  color: #1e6b4e;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.ac-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f7f2;
+  vertical-align: middle;
+}
+
+.ac-table tbody tr:hover {
+  background: #fbfdfc;
+}
+
+.ac-thumb-box {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #dceee3;
+  background: #f6fbf8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.ac-thumb-box:hover {
+  transform: scale(1.06);
+  border-color: #3fa96b;
+}
+
+.ac-thumb-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ac-assign-btn {
+  background: #1e6b4e;
+  color: #ffffff;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ac-assign-btn:hover {
+  background: #137a41;
+}
+
+.ac-assigned-info {
+  font-size: 12px;
+  color: #1e6b4e;
+  font-weight: 600;
+  background: #eaf7ef;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid #dceee3;
+  display: inline-block;
+}
+
+/* Modal Overlay */
+.ac-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 36, 26, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ac-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: ac-modal-in 0.2s ease-out;
+}
+
+@keyframes ac-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ac-modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid #dceee3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f6fbf8;
+}
+
+.ac-modal-header h2 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e6b4e;
+  margin: 0;
+}
+
+.ac-modal-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: #6c8479;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ac-modal-body {
+  padding: 20px 24px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.ac-modal-field {
+  margin-bottom: 16px;
+}
+
+.ac-modal-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6c8479;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ac-modal-field .value-box {
+  background: #f6fbf8;
+  border: 1px solid #dceee3;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: #1b2a22;
+}
+
+.ac-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #dceee3;
+  background: #ffffff;
+  font-size: 13.5px;
+  color: #1b2a22;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+}
+
+.ac-select:focus {
+  border-color: #1e6b4e;
+  box-shadow: 0 0 0 2px rgba(30, 107, 78, 0.15);
+}
+
+.ac-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #dceee3;
+  background: #f6fbf8;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.ac-btn-cancel {
+  background: #ffffff;
+  border: 1px solid #dceee3;
+  color: #6c8479;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ac-btn-primary {
+  background: #1e6b4e;
+  border: none;
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ac-btn-primary:hover {
+  background: #137a41;
+}
+
+/* Toast */
+.ac-toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: #1e6b4e;
+  color: #ffffff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  font-size: 13.5px;
+  font-weight: 500;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: ac-toast-in 0.25s ease-out;
+}
+
+@keyframes ac-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

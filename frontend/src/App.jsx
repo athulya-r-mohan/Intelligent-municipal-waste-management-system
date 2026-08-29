@@ -14,7 +14,8 @@ import Wastecomplaintform from "./pages/Wastecomplaintform";
 import Addstaffform from "./pages/Addstaffform";
 import Addrecycler from "./pages/Addrecycler";
 import Residentdirectory from "./pages/Residentdirectory";
-import PickupAssignment from "./pages/Pickupassignment"
+import PickupAssignment from "./pages/Pickupassignment";
+import Admincomplaints from "./pages/Admincomplaints";
 
 
 export default function App() {
@@ -25,6 +26,8 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/user" element={<Userpage />} />
       <Route path="/admin" element={<Adminpage />} />
+      <Route path="/admincomplaints" element={<Admincomplaints />} />
+      <Route path="/complaints" element={<Admincomplaints />} />
       <Route path="/staff" element={<Staffpage />} />
       <Route path="/stafftask" element={<StaffTaskpage />} />
       <Route path="/taskupdate/:id" element={<Taskstatusupdate />} />

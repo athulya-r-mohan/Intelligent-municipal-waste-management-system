@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import WastePickupRequest, WastePickupImage, WasteCollection
+from .models import WastePickupRequest, WastePickupImage, WasteCollection, WasteComplaint
 from accounts.models import UserProfile
 
 
@@ -516,4 +516,180 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
                 }
         except Exception:
             pass
-        return None
+        return None
+
+
+# ============================================================
+# WASTE COMPLAINT SERIALIZER
+# ============================================================
+
+class WasteComplaintSerializer(serializers.ModelSerializer):
+    complaint_id = serializers.IntegerField(
+        source="id",
+        read_only=True
+    )
+
+    user_id = serializers.IntegerField(
+        source="user.id",
+        read_only=True
+    )
+
+    user_name = serializers.SerializerMethodField()
+    email = serializers.EmailField(
+        source="user.email",
+        read_only=True
+    )
+    phone = serializers.SerializerMethodField()
+    ward = serializers.SerializerMethodField()
+    ward_id = serializers.SerializerMethodField()
+
+    image_url = serializers.SerializerMethodField()
+    proof_image_url = serializers.SerializerMethodField()
+
+    assigned_staff_name = serializers.SerializerMethodField()
+    assigned_staff_id = serializers.IntegerField(
+        source="assigned_staff.staff_id",
+        read_only=True,
+        allow_null=True
+    )
+    assigned_staff_designation = serializers.CharField(
+        source="assigned_staff.designation",
+        read_only=True,
+        allow_null=True
+    )
+
+    created_at_formatted = serializers.DateTimeField(
+        source="created_at",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True
+    )
+
+    resolved_at_formatted = serializers.DateTimeField(
+        source="resolved_at",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True,
+        allow_null=True
+    )
+
+    class Meta:
+        model = WasteComplaint
+        fields = [
+            "id",
+            "complaint_id",
+            "user",
+            "user_id",
+            "user_name",
+            "email",
+            "phone",
+            "ward",
+            "ward_id",
+            "image",
+            "image_url",
+            "proof_image",
+            "proof_image_url",
+            "location_name",
+            "latitude",
+            "longitude",
+            "description",
+            "priority",
+            "status",
+            "assigned_staff",
+            "assigned_staff_id",
+            "assigned_staff_name",
+            "assigned_staff_designation",
+            "created_at",
+            "created_at_formatted",
+            "resolved_at",
+            "resolved_at_formatted",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "complaint_id",
+            "user",
+            "user_id",
+            "priority",
+            "created_at",
+            "created_at_formatted",
+            "resolved_at_formatted",
+            "updated_at",
+        ]
+
+    def get_user_name(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.name:
+                return profile.name
+            return (
+                obj.user.get_full_name() or
+                obj.user.username or
+                obj.user.email
+            )
+        except Exception:
+            return ""
+
+    def get_phone(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.phone:
+                return profile.phone
+        except Exception:
+            pass
+        return ""
+
+    def get_ward(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.ward:
+                return profile.ward.ward_name
+        except Exception:
+            pass
+        return ""
+
+    def get_ward_id(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.ward:
+                return profile.ward.ward_id
+        except Exception:
+            pass
+        return None
+
+    def get_image_url(self, obj):
+        try:
+            if obj.image:
+                request = self.context.get("request")
+                if request:
+                    return request.build_absolute_uri(obj.image.url)
+                return obj.image.url
+        except Exception:
+            pass
+        return None
+
+    def get_proof_image_url(self, obj):
+        try:
+            if obj.proof_image:
+                request = self.context.get("request")
+                if request:
+                    return request.build_absolute_uri(obj.proof_image.url)
+                return obj.proof_image.url
+        except Exception:
+            pass
+        return None
+
+    def get_assigned_staff_name(self, obj):
+        try:
+            if obj.assigned_staff:
+                profile = getattr(obj.assigned_staff.user, "userprofile", None)
+                if profile and profile.name:
+                    return profile.name
+                return (
+                    obj.assigned_staff.user.get_full_name() or
+                    obj.assigned_staff.user.username or
+                    obj.assigned_staff.user.email
+                )
+        except Exception:
+            pass
+        return None
+
+

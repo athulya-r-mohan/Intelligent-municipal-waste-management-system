@@ -1,4 +1,6 @@
 import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import "../components/wastecomplaintform.css";
 
 import {
@@ -12,6 +14,8 @@ import {
   Send,
   Inbox,
   CheckCircle2,
+  AlertCircle,
+  ShieldAlert,
 } from "lucide-react";
 
 import "leaflet/dist/leaflet.css";
@@ -59,11 +63,35 @@ function MapClickHandler({ onLocationSelect }) {
 }
 
 
+// ============================================================
+// API BASE URL & AUTH HELPER
+// ============================================================
+const API_BASE_URL = "http://127.0.0.1:8000";
+
+const getAccessToken = () => {
+  return (
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token") ||
+    ""
+  );
+};
+
 // ---------------------------------------------------------
 // Complaint Form
 // ---------------------------------------------------------
 
-export default function ComplaintForm({ onBack = () => {} }) {
+export default function ComplaintForm({ onBack }) {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (typeof onBack === "function") {
+      onBack();
+    } else {
+      navigate("/user");
+    }
+  };
 
   const [complaintText, setComplaintText] = useState("");
 
@@ -79,8 +107,12 @@ export default function ComplaintForm({ onBack = () => {} }) {
 
   const [geoError, setGeoError] = useState("");
 
+  const [formError, setFormError] = useState("");
+
   const [status, setStatus] = useState("idle");
   // idle | submitting | success
+
+  const [createdComplaint, setCreatedComplaint] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -114,6 +146,11 @@ export default function ComplaintForm({ onBack = () => {} }) {
       const address = data.address || {};
 
       const parts = [
+        address.amenity,
+        address.hospital,
+        address.school,
+        address.college,
+        address.university,
         address.road,
         address.neighbourhood,
         address.suburb,
@@ -122,7 +159,6 @@ export default function ComplaintForm({ onBack = () => {} }) {
         address.city,
         address.district,
         address.state,
-        address.country,
       ].filter(Boolean);
 
       const uniqueParts = [...new Set(parts)];
@@ -158,6 +194,7 @@ export default function ComplaintForm({ onBack = () => {} }) {
     setSelectedPosition(position);
 
     setGeoError("");
+    setFormError("");
 
     await getLocationName(lat, lng);
   };
@@ -189,6 +226,7 @@ export default function ComplaintForm({ onBack = () => {} }) {
     setLocationMode("current");
 
     setGeoError("");
+    setFormError("");
 
     if (!navigator.geolocation) {
 
@@ -244,6 +282,7 @@ export default function ComplaintForm({ onBack = () => {} }) {
     setLocationMode("pick");
 
     setGeoError("");
+    setFormError("");
 
     setLocationText("");
 
@@ -269,6 +308,8 @@ export default function ComplaintForm({ onBack = () => {} }) {
       url: URL.createObjectURL(file),
 
       name: file.name,
+
+      file: file,
     }));
 
     setImages((prev) => [
@@ -294,25 +335,68 @@ export default function ComplaintForm({ onBack = () => {} }) {
   // Submit
   // -------------------------------------------------------
 
-  const hasLocation = Boolean(selectedPosition);
+  const hasLocation = Boolean(selectedPosition || locationText.trim());
 
   const canSubmit =
     complaintText.trim().length > 0 &&
-    hasLocation &&
+    (Boolean(selectedPosition) || locationText.trim().length > 0) &&
     status === "idle";
 
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
 
     if (!canSubmit) return;
 
     setStatus("submitting");
+    setFormError("");
 
-    window.setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("description", complaintText.trim());
+      formData.append("location_name", locationText.trim() || "Selected Location");
 
+      if (selectedPosition) {
+        formData.append("latitude", selectedPosition.lat);
+        formData.append("longitude", selectedPosition.lng);
+      }
+
+      if (images.length > 0 && images[0].file) {
+        formData.append("image", images[0].file);
+      }
+
+      const token = getAccessToken();
+      const config = {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      };
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/waste/complaints/`,
+        formData,
+        config
+      );
+
+      console.log("Complaint submitted successfully:", response.data);
+
+      setCreatedComplaint(response.data?.complaint || null);
       setStatus("success");
 
-    }, 3400);
+    } catch (err) {
+      console.error("Failed to submit complaint:", err);
+      setStatus("idle");
+
+      const errMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        "Failed to submit complaint. Please verify your connection and login.";
+
+      setFormError(errMessage);
+    }
   };
 
 
@@ -332,7 +416,11 @@ export default function ComplaintForm({ onBack = () => {} }) {
 
     setGeoError("");
 
+    setFormError("");
+
     setLocationText("");
+
+    setCreatedComplaint(null);
 
     setStatus("idle");
   };
@@ -346,6 +434,7 @@ export default function ComplaintForm({ onBack = () => {} }) {
     9.5916,
     76.5222,
   ];
+
 
 
   // -------------------------------------------------------
@@ -381,7 +470,7 @@ export default function ComplaintForm({ onBack = () => {} }) {
 
         <button
           className="cf-back-btn"
-          onClick={onBack}
+          onClick={handleBack}
           aria-label="Go back"
         >
 
@@ -755,6 +844,27 @@ export default function ComplaintForm({ onBack = () => {} }) {
           </div>
 
 
+          {/* FORM ERROR */}
+          {formError && (
+            <div
+              style={{
+                marginTop: "12px",
+                padding: "10px 14px",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "8px",
+                color: "#b91c1c",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <AlertCircle size={16} />
+              <span>{formError}</span>
+            </div>
+          )}
+
           <div className="cf-spacer" />
 
 
@@ -805,7 +915,7 @@ export default function ComplaintForm({ onBack = () => {} }) {
 
               <p className="cf-send-caption">
 
-                Sending your complaint…
+                Analyzing location and submitting complaint…
 
               </p>
 
@@ -826,11 +936,68 @@ export default function ComplaintForm({ onBack = () => {} }) {
               />
 
               <h3>
-                Complaint registered!
+                Complaint Registered!
               </h3>
 
-              <p>
-                Our team will look into it shortly.
+              {createdComplaint && (
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "10px",
+                    padding: "12px 16px",
+                    margin: "12px 0 16px",
+                    textAlign: "center",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ fontSize: "13px", color: "#166534", marginBottom: "6px" }}>
+                    Complaint <strong>#{createdComplaint.complaint_id || createdComplaint.id}</strong>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "12px", color: "#374151" }}>Assigned Priority:</span>
+                    <span
+                      style={{
+                        padding: "3px 10px",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        background:
+                          createdComplaint.priority === "HIGH"
+                            ? "#fee2e2"
+                            : createdComplaint.priority === "MEDIUM"
+                            ? "#fef3c7"
+                            : "#dcfce7",
+                        color:
+                          createdComplaint.priority === "HIGH"
+                            ? "#b91c1c"
+                            : createdComplaint.priority === "MEDIUM"
+                            ? "#b45309"
+                            : "#15803d",
+                        border: `1px solid ${
+                          createdComplaint.priority === "HIGH"
+                            ? "#fca5a5"
+                            : createdComplaint.priority === "MEDIUM"
+                            ? "#fcd34d"
+                            : "#86efac"
+                        }`,
+                      }}
+                    >
+                      {createdComplaint.priority} Priority
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: "12px", color: "#4b5563" }}>
+                    Location: <em>{createdComplaint.location_name}</em>
+                  </div>
+                </div>
+              )}
+
+              <p style={{ margin: "0 0 16px" }}>
+                Our municipal team will review and assign staff to resolve it shortly.
               </p>
 
 
@@ -853,4 +1020,4 @@ export default function ComplaintForm({ onBack = () => {} }) {
 
     </div>
   );
-}
+}

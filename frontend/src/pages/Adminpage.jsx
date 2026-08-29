@@ -139,6 +139,7 @@ export default function EcoPulseAdmin() {
     completed_count: 0,
     assigned_count: 0,
     total_requests: 0,
+    complaints_count: 0,
   });
 
   const goHome = () => setPage("dashboard");
@@ -151,10 +152,20 @@ export default function EcoPulseAdmin() {
       try {
         const response = await axios.get(`${API_BASE_URL}/api/waste/dashboard-stats/`);
         if (isMounted && response.data?.stats) {
-          setStats(response.data.stats);
+          setStats((prev) => ({ ...prev, ...response.data.stats }));
         }
       } catch (err) {
         console.error("Failed to fetch dashboard stats:", err);
+      }
+
+      try {
+        const compRes = await axios.get(`${API_BASE_URL}/api/waste/admin/complaints/`);
+        if (isMounted) {
+          const compCount = compRes.data?.count ?? (Array.isArray(compRes.data) ? compRes.data.length : (compRes.data?.complaints?.length || 0));
+          setStats((prev) => ({ ...prev, complaints_count: compCount }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch complaints count:", err);
       }
     };
     fetchStats();
@@ -174,6 +185,7 @@ export default function EcoPulseAdmin() {
     if (key === "completed") return stats.completed_count;
     if (key === "assigned") return stats.assigned_count;
     if (key === "pickup") return stats.total_requests;
+    if (key === "complaints") return stats.complaints_count;
     return null;
   };
 
@@ -249,6 +261,8 @@ export default function EcoPulseAdmin() {
                 onClick={() => {
                   if (c.key === "pickup") {
                     navigate("/assign");
+                  } else if (c.key === "complaints") {
+                    navigate("/admincomplaints");
                   } else if (c.key === "rescheduled") {
                     navigate("/assign?status=STAFF_PENDING");
                   } else if (c.key === "completed") {
