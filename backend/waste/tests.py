@@ -1023,6 +1023,120 @@ class WasteComplaintWorkflowTests(TestCase):
         self.assertEqual(float(task_data["latitude"]), 9.6850)
         self.assertEqual(float(task_data["longitude"]), 76.8450)
 
+    def test_assign_pickup_with_manual_waste_type_fallback(self):
+        req = WastePickupRequest.objects.create(
+            user=self.citizen1,
+            location_name="St. George Junction",
+            latitude=9.6820,
+            longitude=76.8420,
+            status="PENDING"
+        )
+        img = WastePickupImage.objects.create(
+            pickup_request=req,
+            image=create_test_image(),
+            waste_type="Unknown",
+            confidence=0.0
+        )
+
+        response = self.client.post(
+            "/api/waste/assign-pickup/",
+            {
+                "request_id": req.id,
+                "staff_id": self.staff1.staff_id,
+                "waste_type": "Plastic"
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("success"))
+
+        img.refresh_from_db()
+        self.assertEqual(img.waste_type, "Plastic")
+
+        pickup_data = response.data.get("pickup_request", {})
+        self.assertEqual(pickup_data.get("waste_type"), "Plastic")
+        self.assertEqual(pickup_data.get("status"), "ASSIGNED")
+
+    def test_assign_pickup_without_manual_waste_type_keeps_existing(self):
+        req = WastePickupRequest.objects.create(
+            user=self.citizen1,
+            location_name="College Road",
+            latitude=9.6830,
+            longitude=76.8440,
+            status="PENDING"
+        )
+        img = WastePickupImage.objects.create(
+            pickup_request=req,
+            image=create_test_image(),
+            waste_type="Paper",
+            confidence=0.95
+        )
+
+        response = self.client.post(
+            "/api/waste/assign-pickup/",
+            {
+                "request_id": req.id,
+                "staff_id": self.staff1.staff_id
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        img.refresh_from_db()
+        self.assertEqual(img.waste_type, "Paper")
+        pickup_data = response.data.get("pickup_request", {})
+        self.assertEqual(pickup_data.get("waste_type"), "Paper")
+
+    def test_create_pickup_request_with_empty_detections_succeeds(self):
+        self.client.force_authenticate(user=self.citizen1)
+        test_img = create_test_image()
+
+        response = self.client.post(
+            "/api/waste/create-pickup/",
+            {
+                "user_id": self.citizen1.id,
+                "location_name": "Kottayam Road Market",
+                "latitude": 9.6820,
+                "longitude": 76.8420,
+                "detections": "[]",
+                "images": [test_img]
+            },
+            format="multipart"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        res_data = response.json()
+        self.assertTrue(res_data.get("success"))
+
+        pickup_id = res_data["pickup_request"]["id"]
+        created_req = WastePickupRequest.objects.get(id=pickup_id)
+        self.assertEqual(created_req.status, "PENDING")
+        self.assertEqual(created_req.location_name, "Kottayam Road Market")
+
+        # Verify waste_images has "Unknown" fallback
+        images = created_req.waste_images.all()
+        self.assertEqual(images.count(), 1)
+        self.assertEqual(images.first().waste_type, "Unknown")
+        self.assertEqual(images.first().confidence, 0.0)
+
+        # Now test admin assigning a manual waste type
+        assign_resp = self.client.post(
+            "/api/waste/assign-pickup/",
+            {
+                "request_id": created_req.id,
+                "staff_id": self.staff1.staff_id,
+                "waste_type": "Organic"
+            },
+            format="json"
+        )
+        self.assertEqual(assign_resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(assign_resp.data.get("success"))
+
+        created_req.refresh_from_db()
+        self.assertEqual(created_req.status, "ASSIGNED")
+        self.assertEqual(created_req.assigned_staff, self.staff1)
+        self.assertEqual(created_req.waste_images.first().waste_type, "Organic")
+
+
+
 
 
 

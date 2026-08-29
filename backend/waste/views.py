@@ -1123,6 +1123,12 @@ class AssignPickupView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Update manual waste type if provided (e.g. when AI detection failed)
+        manual_waste_type = data.get("waste_type")
+        if manual_waste_type and str(manual_waste_type).strip():
+            clean_waste_type = str(manual_waste_type).strip()
+            pickup_request.waste_images.all().update(waste_type=clean_waste_type)
+
         # Save assignment and update status
         pickup_request.assigned_staff = staff
         pickup_request.status = "ASSIGNED"

@@ -608,27 +608,10 @@ export default function EcoPulseWastePickup({
           );
         }
 
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              data?.detail ||
-              `AI server error (${response.status}).`
-          );
+        let detections = [];
+        if (response.ok && data?.success && Array.isArray(data.detections)) {
+          detections = data.detections;
         }
-
-        if (!data?.success) {
-          throw new Error(
-            data?.message ||
-              "Waste detection failed for this image."
-          );
-        }
-
-        const detections =
-          Array.isArray(
-            data.detections
-          )
-            ? data.detections
-            : [];
 
         imageResults.push({
           imageName:
@@ -666,16 +649,6 @@ export default function EcoPulseWastePickup({
         allDetections
       );
 
-      if (
-        allDetections.length === 0
-      ) {
-        setAiError(
-          "No waste was detected in the uploaded images."
-        );
-
-        return;
-      }
-
       setAiResult({
         success: true,
 
@@ -697,10 +670,19 @@ export default function EcoPulseWastePickup({
         error
       );
 
-      setAiError(
-        error?.message ||
-          "Unable to connect to the AI detection service."
-      );
+      // If AI detection endpoint encounters an error, do NOT block the user request.
+      // Set empty detection result so user can still submit pickup request.
+      setAiResult({
+        success: true,
+        detections: [],
+        imageResults: images.map((img, idx) => ({
+          imageName: img.file.name,
+          imageIndex: idx + 1,
+          detections: [],
+        })),
+        totalImages: images.length,
+        totalDetections: 0,
+      });
     } finally {
       setAiLoading(false);
     }
@@ -769,12 +751,6 @@ export default function EcoPulseWastePickup({
       )
         ? aiResult.detections
         : [];
-
-    if (detections.length === 0) {
-      throw new Error(
-        "No waste was detected in the uploaded images."
-      );
-    }
 
     // ==================================================
     // DETECTION PAYLOAD
@@ -1799,38 +1775,21 @@ export default function EcoPulseWastePickup({
                   )}
 
                 </div>
-
               ) : (
-
-                <p className="pickup-ai-message">
-
-                  No waste was detected in the
-                  uploaded images.
-
+                <p className="pickup-ai-message" style={{ color: "#4c7a2e", fontSize: "13.5px", marginTop: "8px" }}>
+                  No specific waste category was automatically detected from the photo(s). Don't worry — you can still submit your request, and our municipal team will review and categorize it.
                 </p>
-
               )}
 
               <button
                 type="button"
                 className="pickup-ai-button"
-                onClick={
-                  aiResult.totalDetections > 0
-                    ? handleAiOk
-                    : () =>
-                        setAiResult(null)
-                }
+                onClick={handleAiOk}
                 disabled={aiLoading}
               >
-
-                {aiResult.totalDetections > 0
-                  ? "OK"
-                  : "Try Again"}
-
+                Submit Pickup Request
               </button>
-
             </div>
-
           </div>
         )}
 

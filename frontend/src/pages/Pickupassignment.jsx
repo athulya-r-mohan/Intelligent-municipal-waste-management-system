@@ -231,6 +231,19 @@ function CompletedDetailsModal({
 }
 
 // ============================================================
+// YOLO WASTE CATEGORIES (Matches backend AI model)
+// ============================================================
+const WASTE_CATEGORIES = [
+  "Plastic",
+  "Paper",
+  "Organic",
+  "Glass",
+  "Metal",
+  "Electronics",
+  "Miscellaneous",
+];
+
+// ============================================================
 // ASSIGN MODAL
 // ============================================================
 function AssignModal({
@@ -247,6 +260,27 @@ function AssignModal({
   const [staffList, setStaffList] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
+
+  // Determine if AI successfully detected a valid waste type
+  const validDetectedImages = (request?.imageResults || []).filter(
+    (image) =>
+      image?.waste_type &&
+      image.waste_type !== "Unknown" &&
+      image.waste_type !== "No detection" &&
+      image.waste_type !== "Not Detected" &&
+      String(image.waste_type).trim() !== ""
+  );
+
+  const hasValidAiDetection =
+    validDetectedImages.length > 0 ||
+    (request?.wasteType &&
+      request.wasteType !== "No detection" &&
+      request.wasteType !== "Unknown" &&
+      request.wasteType !== "Not Detected" &&
+      String(request.wasteType).trim() !== "");
+
+  const [manualWasteType, setManualWasteType] = useState("");
+  const [wasteTypeError, setWasteTypeError] = useState("");
 
   // ==========================================================
   // FETCH STAFF BY WARD
@@ -462,6 +496,11 @@ function AssignModal({
   // CONFIRM ASSIGN
   // ==========================================================
   const handleConfirm = () => {
+    if (!hasValidAiDetection && !manualWasteType) {
+      setWasteTypeError("Please select the waste type before assigning staff.");
+      return;
+    }
+
     if (!staff) {
       return;
     }
@@ -488,7 +527,8 @@ function AssignModal({
     onConfirm(
       request.requestId,
       staffName,
-      staffId
+      staffId,
+      hasValidAiDetection ? null : manualWasteType
     );
   };
 
@@ -541,69 +581,136 @@ function AssignModal({
             </div>
           </div>
 
-          {/* WASTE */}
-          <div className="modal-field">
-            <label>
-              Waste Type
-            </label>
+          {/* WASTE TYPE: AI SUCCESS VS AI FAILURE FALLBACK */}
+          {hasValidAiDetection ? (
+            <div className="modal-field">
+              <label>
+                AI Detected Waste Type
+              </label>
 
-            <div className="modal-value">
-              {request.imageResults?.length > 0 ? (
-                request.imageResults.map(
-                  (image, index) => (
-                    <div
-                      key={
-                        image.id ||
-                        image.image_index ||
-                        index
-                      }
-                      style={{
-                        marginBottom:
-                          "8px",
-                      }}
-                    >
-                      <strong>
-                        Image {index + 1}
-                      </strong>
+              <div className="modal-value">
+                {request.imageResults?.length > 0 ? (
+                  request.imageResults.map(
+                    (image, index) => (
+                      <div
+                        key={
+                          image.id ||
+                          image.image_index ||
+                          index
+                        }
+                        style={{
+                          marginBottom:
+                            "8px",
+                        }}
+                      >
+                        {request.imageResults.length > 1 && (
+                          <strong>
+                            Image {index + 1}:{" "}
+                          </strong>
+                        )}
 
-                      <br />
+                        {image.waste_type &&
+                        image.waste_type !==
+                          "Unknown" ? (
+                          <span style={{ fontWeight: 600, color: "#1f6b4e" }}>
+                            {image.waste_type}
 
-                      {image.waste_type &&
-                      image.waste_type !==
-                        "Unknown" ? (
-                        <>
-                          {image.waste_type}
-
-                          {Number(
-                            image.confidence
-                          ) > 0 && (
-                            <>
-                              {" "}
-                              -
-                              {" "}
-                              {(
-                                Number(
-                                  image.confidence
-                                ) * 100
-                              ).toFixed(2)}
-                              %
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <span>
-                          No detection
-                        </span>
-                      )}
-                    </div>
+                            {Number(
+                              image.confidence
+                            ) > 0 && (
+                              <span style={{ fontSize: "12.5px", color: "#5f8a45", fontWeight: 500 }}>
+                                {" "}
+                                ({(
+                                  Number(
+                                    image.confidence
+                                  ) * 100
+                                ).toFixed(2)}%)
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span>
+                            {request.wasteType || "Detected"}
+                          </span>
+                        )}
+                      </div>
+                    )
                   )
-                )
-              ) : (
-                request.wasteType ||
-                "Unknown"
+                ) : (
+                  <span style={{ fontWeight: 600, color: "#1f6b4e" }}>
+                    {request.wasteType || "Plastic"}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="modal-field">
+              <div
+                style={{
+                  background: "#fff2f0",
+                  border: "1px solid #ffccc7",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  marginBottom: "12px",
+                  color: "#cf1322",
+                  fontSize: "12.5px",
+                  lineHeight: "1.4",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                  ⚠️ AI Detection Failed
+                </div>
+                <div>
+                  No waste type was automatically detected. Please enter or select the waste type manually before assigning staff.
+                </div>
+              </div>
+
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>
+                Waste Type <span style={{ color: "#cf1322" }}>*</span>
+              </label>
+
+              <select
+                value={manualWasteType}
+                onChange={(e) => {
+                  setManualWasteType(e.target.value);
+                  if (wasteTypeError) setWasteTypeError("");
+                }}
+                style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  border: wasteTypeError ? "1.5px solid #cf1322" : "1px solid #cfe7bb",
+                  background: "#ffffff",
+                  color: manualWasteType ? "#243515" : "#6c8479",
+                  fontSize: "13.5px",
+                  fontWeight: 500,
+                  outline: "none",
+                }}
+              >
+                <option value="" disabled>
+                  -- Select Waste Type ▼ --
+                </option>
+                {WASTE_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+
+              {wasteTypeError && (
+                <div
+                  style={{
+                    color: "#cf1322",
+                    fontSize: "12px",
+                    marginTop: 5,
+                    fontWeight: 600,
+                  }}
+                >
+                  {wasteTypeError}
+                </div>
               )}
             </div>
-          </div>
+          )}
 
           {/* WARD */}
           <div className="modal-field">
@@ -699,7 +806,8 @@ function AssignModal({
             disabled={
               !staff ||
               staffLoading ||
-              staffList.length === 0
+              staffList.length === 0 ||
+              (!hasValidAiDetection && !manualWasteType)
             }
             onClick={handleConfirm}
           >
@@ -1267,15 +1375,22 @@ export default function PickupRequests() {
   const handleAssign = async (
     requestId,
     staffName,
-    staffId
+    staffId,
+    manualWasteType
   ) => {
     try {
+      const payload = {
+        request_id: requestId,
+        staff_id: staffId,
+      };
+
+      if (manualWasteType) {
+        payload.waste_type = manualWasteType;
+      }
+
       const response = await axios.post(
         `${API_BASE_URL}/api/waste/assign-pickup/`,
-        {
-          request_id: requestId,
-          staff_id: staffId,
-        }
+        payload
       );
 
       console.log("Assignment API success:", response.data);
@@ -1288,6 +1403,15 @@ export default function PickupRequests() {
                 assignedStaff: staffName,
                 assignedStaffId: staffId,
                 status: "ASSIGNED",
+                ...(manualWasteType
+                  ? {
+                      wasteType: manualWasteType,
+                      imageResults: (request.imageResults || []).map((img) => ({
+                        ...img,
+                        waste_type: manualWasteType,
+                      })),
+                    }
+                  : {}),
               }
             : request
         )
@@ -1296,7 +1420,8 @@ export default function PickupRequests() {
       setModalRequest(null);
 
       setToast(
-        `Request #${requestId} successfully assigned to ${staffName}`
+        `Request #${requestId} successfully assigned to ${staffName}` +
+          (manualWasteType ? ` (Waste Type: ${manualWasteType})` : "")
       );
 
       setTimeout(() => {
