@@ -15,13 +15,14 @@ import {
   ChevronRight,
   Activity,
 } from "lucide-react";
+import NotificationBell from "../components/NotificationBell";
  
 // Fill these in with the real URL / route for each page you've already
 // designed. Anything left as "#" will just do nothing when clicked.
 const LINKS = {
-  dashboard: "#",
+  dashboard: "/staff",
   myTasks: "/StaffTask",
-  notifications: "#",
+  notifications: "/notifications",
   profile: "#",
   municipal: "#",
   logout: "#",
@@ -260,27 +261,30 @@ function TopBar() {
       >
         Dashboard
       </h1>
-      <a
-        href={LINKS.calendar}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "9px 16px",
-          borderRadius: 10,
-          border: `1px solid ${COLORS.border}`,
-          background: COLORS.surface,
-          color: COLORS.text,
-          fontFamily: "'Inter', sans-serif",
-          fontWeight: 500,
-          fontSize: 13.5,
-          cursor: "pointer",
-          textDecoration: "none",
-        }}
-      >
-        <CalendarDays size={16} />
-        Calendar
-      </a>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <NotificationBell />
+        <a
+          href={LINKS.calendar}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 16px",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.border}`,
+            background: COLORS.surface,
+            color: COLORS.text,
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 500,
+            fontSize: 13.5,
+            cursor: "pointer",
+            textDecoration: "none",
+          }}
+        >
+          <CalendarDays size={16} />
+          Calendar
+        </a>
+      </div>
     </div>
   );
 }

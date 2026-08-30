@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import { NotificationProvider } from "./context/NotificationContext";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -16,28 +17,32 @@ import Addrecycler from "./pages/Addrecycler";
 import Residentdirectory from "./pages/Residentdirectory";
 import PickupAssignment from "./pages/Pickupassignment";
 import Admincomplaints from "./pages/Admincomplaints";
+import NotificationsPage from "./pages/NotificationsPage";
 
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/user" element={<Userpage />} />
-      <Route path="/admin" element={<Adminpage />} />
-      <Route path="/admincomplaints" element={<Admincomplaints />} />
-      <Route path="/complaints" element={<Admincomplaints />} />
-      <Route path="/staff" element={<Staffpage />} />
-      <Route path="/stafftask" element={<StaffTaskpage />} />
-      <Route path="/taskupdate/:id" element={<Taskstatusupdate />} />
-      <Route path="/recycler" element={<Recyclerpage />} />
-      <Route path="/pickupform" element={<Pickuprequestform />} />
-      <Route path="/complaintform" element={<Wastecomplaintform />} />
-      <Route path="/addstaff" element={<Addstaffform />} />
-      <Route path="/addrecycler" element={<Addrecycler />} />
-      <Route path="/resident" element={<Residentdirectory />} />
-      <Route path="/assign" element={<PickupAssignment />} />
-    </Routes>
+    <NotificationProvider>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/user" element={<Userpage />} />
+        <Route path="/admin" element={<Adminpage />} />
+        <Route path="/admincomplaints" element={<Admincomplaints />} />
+        <Route path="/complaints" element={<Admincomplaints />} />
+        <Route path="/staff" element={<Staffpage />} />
+        <Route path="/stafftask" element={<StaffTaskpage />} />
+        <Route path="/taskupdate/:id" element={<Taskstatusupdate />} />
+        <Route path="/recycler" element={<Recyclerpage />} />
+        <Route path="/pickupform" element={<Pickuprequestform />} />
+        <Route path="/complaintform" element={<Wastecomplaintform />} />
+        <Route path="/addstaff" element={<Addstaffform />} />
+        <Route path="/addrecycler" element={<Addrecycler />} />
+        <Route path="/resident" element={<Residentdirectory />} />
+        <Route path="/assign" element={<PickupAssignment />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+      </Routes>
+    </NotificationProvider>
   );
 }

@@ -9,6 +9,7 @@ import {
   Recycle,
   Truck,
 } from "lucide-react";
+import NotificationBell from "../components/NotificationBell";
 
 // ============================================================
 // API BASE URL
@@ -1455,6 +1456,8 @@ export default function MyTaskDashboard() {
             >
               Dashboard
             </button>
+
+            <NotificationBell />
 
             <div
               style={{

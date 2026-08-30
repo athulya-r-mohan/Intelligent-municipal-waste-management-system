@@ -13,6 +13,7 @@ import {
   Eye,
 } from "lucide-react";
 import "../components/pickupassign.css";
+import NotificationBell from "../components/NotificationBell";
 
 // ============================================================
 // API BASE URL
@@ -1477,8 +1478,11 @@ export default function PickupRequests() {
           <EcoPulseLogo />
         </div>
 
-        <div className="header-title">
-          Pickup Requests
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <NotificationBell />
+          <div className="header-title">
+            Pickup Requests
+          </div>
         </div>
 
       </header>

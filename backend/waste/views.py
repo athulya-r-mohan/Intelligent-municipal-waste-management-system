@@ -37,6 +37,7 @@ from .models import (
 )
 
 from .priority_detector import determine_complaint_priority
+from notifications.services import create_notification, notify_admins
 
 
 # ============================================================
@@ -842,8 +843,25 @@ def create_pickup_request(request):
             len(saved_images)
         )
 
-        print("==========================================")
-
+        # Trigger Notifications
+        try:
+            create_notification(
+                recipient=request.user,
+                title="Pickup Request Submitted",
+                message=f"Your waste pickup request #{pickup_request.id} for {location_name} has been submitted successfully.",
+                notification_type="PICKUP_CREATED",
+                related_pickup=pickup_request,
+                action_url="/user",
+            )
+            notify_admins(
+                title="New Waste Pickup Request",
+                message=f"Resident {name or request.user.username} submitted pickup request #{pickup_request.id} at {location_name}.",
+                notification_type="PICKUP_CREATED",
+                related_pickup=pickup_request,
+                action_url="/assign",
+            )
+        except Exception as notif_err:
+            print("Notification trigger error:", notif_err)
 
         return JsonResponse(
             {
@@ -1135,6 +1153,28 @@ class AssignPickupView(APIView):
         pickup_request.save(update_fields=["assigned_staff", "status", "updated_at"])
 
         staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
+        
+        # Trigger Notifications
+        try:
+            create_notification(
+                recipient=staff.user,
+                title="New Pickup Task Assigned",
+                message=f"You have been assigned pickup request #{pickup_request.id} at {pickup_request.location_name}.",
+                notification_type="TASK_ASSIGNED",
+                related_pickup=pickup_request,
+                action_url="/stafftask",
+            )
+            create_notification(
+                recipient=pickup_request.user,
+                title="Staff Assigned to Your Pickup",
+                message=f"Field staff {staff_name} has been assigned to your waste pickup request #{pickup_request.id}.",
+                notification_type="TASK_ASSIGNED",
+                related_pickup=pickup_request,
+                action_url="/user",
+            )
+        except Exception as notif_err:
+            print("Notification trigger error:", notif_err)
+
         serializer = WastePickupRequestSerializer(pickup_request, context={"request": request})
 
         return Response(
@@ -1309,6 +1349,26 @@ class StaffTaskUpdateView(APIView):
             task.staff_marked_pending = True
             task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
 
+            # Trigger Notifications
+            try:
+                create_notification(
+                    recipient=task.user,
+                    title="Pickup Task Rescheduled / Pending",
+                    message=f"Your waste pickup request #{task.id} has been marked as pending by field staff {staff.user.username}.",
+                    notification_type="TASK_PENDING",
+                    related_pickup=task,
+                    action_url="/user",
+                )
+                notify_admins(
+                    title="Task Marked Pending",
+                    message=f"Staff {staff.user.username} marked pickup request #{task.id} as PENDING.",
+                    notification_type="TASK_PENDING",
+                    related_pickup=task,
+                    action_url="/assign?status=STAFF_PENDING",
+                )
+            except Exception as notif_err:
+                print("Notification trigger error:", notif_err)
+
             serializer = WastePickupRequestSerializer(task, context={"request": request})
             return Response(
                 {
@@ -1393,6 +1453,26 @@ class StaffTaskUpdateView(APIView):
             task.status = "COMPLETED"
             task.staff_marked_pending = False
             task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
+
+            # Trigger Notifications
+            try:
+                create_notification(
+                    recipient=task.user,
+                    title="Waste Pickup Completed",
+                    message=f"Your waste pickup request #{task.id} was completed by {staff.user.username}. Estimated weight: {weight_val} kg.",
+                    notification_type="TASK_COMPLETED",
+                    related_pickup=task,
+                    action_url="/user",
+                )
+                notify_admins(
+                    title="Pickup Task Completed",
+                    message=f"Staff {staff.user.username} completed pickup request #{task.id} ({weight_val} kg collected).",
+                    notification_type="TASK_COMPLETED",
+                    related_pickup=task,
+                    action_url="/assign?status=COMPLETED",
+                )
+            except Exception as notif_err:
+                print("Notification trigger error:", notif_err)
 
             # Reload with updated relationships
             task.refresh_from_db()
@@ -1618,6 +1698,26 @@ class WasteComplaintCreateView(APIView):
             priority=priority,
             status="NEW",
         )
+
+        # Trigger Notifications
+        try:
+            create_notification(
+                recipient=user,
+                title="Complaint Registered",
+                message=f"Your waste complaint #{complaint.id} for {complaint.location_name} has been registered with {priority} priority.",
+                notification_type="COMPLAINT_CREATED",
+                related_complaint=complaint,
+                action_url="/user",
+            )
+            notify_admins(
+                title=f"New [{priority}] Waste Complaint",
+                message=f"New waste complaint #{complaint.id} registered at {complaint.location_name} with {priority} priority.",
+                notification_type="COMPLAINT_CREATED",
+                related_complaint=complaint,
+                action_url="/admincomplaints",
+            )
+        except Exception as notif_err:
+            print("Notification trigger error:", notif_err)
 
         serializer = WasteComplaintSerializer(complaint, context={"request": request})
 
@@ -1859,6 +1959,28 @@ class AdminAssignComplaintView(APIView):
 
         staff_user_profile = getattr(staff.user, "userprofile", None)
         staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
+        
+        # Trigger Notifications
+        try:
+            create_notification(
+                recipient=staff.user,
+                title="New Complaint Assigned",
+                message=f"You have been assigned to resolve waste complaint #{complaint.id} at {complaint.location_name}.",
+                notification_type="COMPLAINT_ASSIGNED",
+                related_complaint=complaint,
+                action_url="/stafftask",
+            )
+            create_notification(
+                recipient=complaint.user,
+                title="Complaint Assigned to Staff",
+                message=f"Your waste complaint #{complaint.id} has been assigned to field staff {staff_name}.",
+                notification_type="COMPLAINT_ASSIGNED",
+                related_complaint=complaint,
+                action_url="/user",
+            )
+        except Exception as notif_err:
+            print("Notification trigger error:", notif_err)
+
         serializer = WasteComplaintSerializer(complaint, context={"request": request})
 
         return Response(
@@ -2013,6 +2135,36 @@ class StaffComplaintUpdateView(APIView):
 
         complaint.status = status_input
         complaint.save(update_fields=update_fields)
+
+        # Trigger Notifications
+        try:
+            if status_input == "RESOLVED":
+                create_notification(
+                    recipient=complaint.user,
+                    title="Waste Complaint Resolved",
+                    message=f"Your waste complaint #{complaint.id} at {complaint.location_name} has been resolved by field staff.",
+                    notification_type="COMPLAINT_RESOLVED",
+                    related_complaint=complaint,
+                    action_url="/user",
+                )
+                notify_admins(
+                    title="Complaint Resolved",
+                    message=f"Complaint #{complaint.id} at {complaint.location_name} was marked as RESOLVED by staff {staff.user.username}.",
+                    notification_type="COMPLAINT_RESOLVED",
+                    related_complaint=complaint,
+                    action_url="/admincomplaints",
+                )
+            elif status_input == "IN_PROGRESS":
+                create_notification(
+                    recipient=complaint.user,
+                    title="Complaint In Progress",
+                    message=f"Field staff is actively addressing your complaint #{complaint.id} at {complaint.location_name}.",
+                    notification_type="COMPLAINT_IN_PROGRESS",
+                    related_complaint=complaint,
+                    action_url="/user",
+                )
+        except Exception as notif_err:
+            print("Notification trigger error:", notif_err)
 
         serializer = WasteComplaintSerializer(complaint, context={"request": request})
         return Response(

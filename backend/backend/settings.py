@@ -42,6 +42,7 @@ INSTALLED_APPS = [
 
     'accounts',
     'waste',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -139,3 +140,24 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+
+# ============================================================
+# WEB PUSH & VAPID CONFIGURATION
+# ============================================================
+import os
+
+VAPID_PUBLIC_KEY = os.environ.get(
+    "VAPID_PUBLIC_KEY",
+    "BJVkU4gqEyntUrK1QBYAzJuw73er_N7Uzv6-i5T6dRcHVl-FC80MBlLrc_cxo_goRdccZLP-IwiUhfbmH_E-FxU"
+)
+
+VAPID_PRIVATE_KEY = os.environ.get(
+    "VAPID_PRIVATE_KEY",
+    "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgQ05ycscohc21wUAf\nSaYfCYZDtRVh/VeVRNnVmZ2O34ChRANCAASVZFOIKhMp7VKytUAWAMybsO93q/ze\n1M7+vouU+nUXB1ZfhQvNDAZS63P3MaP4KEXXHGSz/iMIlIX25h/xPhcV\n-----END PRIVATE KEY-----"
+)
+
+VAPID_ADMIN_EMAIL = os.environ.get(
+    "VAPID_ADMIN_EMAIL",
+    "mailto:admin@ecopulse.local"
+)
+

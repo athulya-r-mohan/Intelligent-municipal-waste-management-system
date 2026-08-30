@@ -25,6 +25,8 @@ urlpatterns = [
     path("api/", include("accounts.urls")),
 
     path("api/waste/", include("waste.urls")),
+
+    path("api/notifications/", include("notifications.urls")),
 ]
 
 if settings.DEBUG:

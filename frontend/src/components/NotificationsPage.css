@@ -1,0 +1,472 @@
+/* ============================================================
+   EcoPulse Notifications Page Styles
+   ============================================================ */
+
+.ep-page-root {
+  min-height: 100vh;
+  background: #f2fbf5;
+  color: #0f241a;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  padding-bottom: 60px;
+}
+
+.ep-page-header {
+  background: #ffffff;
+  border-bottom: 1px solid #dcefe2;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.ep-page-header-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ep-page-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #eaf7ef;
+  border: 1px solid #d2edd9;
+  color: #1e6b4e;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.ep-page-back-btn:hover {
+  background: #d3eee0;
+  transform: translateX(-2px);
+}
+
+.ep-page-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f241a;
+}
+
+.ep-page-brand-accent {
+  color: #1fa35a;
+}
+
+.ep-page-brand-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #1fa35a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.ep-page-main {
+  max-width: 1080px;
+  margin: 32px auto 0;
+  padding: 0 24px;
+}
+
+/* Hero Section */
+.ep-page-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.ep-page-hero-text h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f241a;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.ep-page-hero-text p {
+  font-size: 15px;
+  color: #5c7c6d;
+  margin: 0;
+}
+
+.ep-page-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ep-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.ep-page-btn-ghost {
+  background: #ffffff;
+  border-color: #dcefe2;
+  color: #1e6b4e;
+}
+
+.ep-page-btn-ghost:hover {
+  background: #eaf7ef;
+  border-color: #3fa96b;
+}
+
+.ep-page-btn-danger {
+  background: #ffffff;
+  border-color: #fee2e2;
+  color: #ef4444;
+}
+
+.ep-page-btn-danger:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Settings Banner */
+.ep-settings-card {
+  background: #ffffff;
+  border: 1px solid #dcefe2;
+  border-radius: 18px;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(31, 163, 90, 0.04);
+}
+
+.ep-settings-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ep-settings-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #eaf7ef;
+  color: #1fa35a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ep-settings-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f241a;
+}
+
+.ep-settings-desc {
+  font-size: 12.5px;
+  color: #5c7c6d;
+  margin-top: 2px;
+}
+
+.ep-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ep-push-toggle-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: none;
+}
+
+.ep-push-toggle-btn.subscribed {
+  background: #eaf7ef;
+  color: #1e6b4e;
+  border: 1px solid #3fa96b;
+}
+
+.ep-push-toggle-btn.unsubscribed {
+  background: #1fa35a;
+  color: #ffffff;
+}
+
+.ep-push-toggle-btn.unsubscribed:hover {
+  background: #137a41;
+}
+
+/* Filter Bar */
+.ep-filter-bar {
+  background: #ffffff;
+  border: 1px solid #dcefe2;
+  border-radius: 16px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.ep-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
+
+.ep-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8fa79b;
+}
+
+.ep-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border-radius: 10px;
+  border: 1px solid #dcefe2;
+  background: #f6fbf8;
+  font-size: 13.5px;
+  color: #0f241a;
+  outline: none;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.ep-search-input:focus {
+  background: #ffffff;
+  border-color: #1fa35a;
+  box-shadow: 0 0 0 3px rgba(31, 163, 90, 0.12);
+}
+
+.ep-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ep-filter-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #5c7c6d;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ep-filter-pill:hover {
+  background: #f2fbf5;
+  color: #1b2a22;
+}
+
+.ep-filter-pill.active {
+  background: #1fa35a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Cards List */
+.ep-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ep-card-item {
+  background: #ffffff;
+  border: 1px solid #dcefe2;
+  border-radius: 16px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.ep-card-item:hover {
+  border-color: #3fa96b;
+  box-shadow: 0 4px 16px rgba(31, 163, 90, 0.08);
+}
+
+.ep-card-item.unread {
+  background: #f8fdfa;
+  border-left: 4px solid #1fa35a;
+}
+
+.ep-card-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eaf7ef;
+  color: #1e6b4e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ep-card-item.unread .ep-card-icon-box {
+  background: #1fa35a;
+  color: #ffffff;
+}
+
+.ep-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ep-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.ep-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f241a;
+}
+
+.ep-card-time {
+  font-size: 12px;
+  color: #8fa79b;
+  font-weight: 500;
+}
+
+.ep-card-desc {
+  font-size: 13.5px;
+  color: #4a6356;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.ep-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ep-card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eaf7ef;
+  border: 1px solid #d2edd9;
+  color: #1e6b4e;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ep-card-action-btn:hover {
+  background: #1fa35a;
+  color: #ffffff;
+  border-color: #1fa35a;
+}
+
+.ep-card-mark-btn {
+  background: transparent;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5c7c6d;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.ep-card-mark-btn:hover {
+  background: #f2fbf5;
+  color: #1e6b4e;
+}
+
+.ep-card-del-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.ep-card-del-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+/* Empty State */
+.ep-page-empty {
+  background: #ffffff;
+  border: 1px solid #dcefe2;
+  border-radius: 20px;
+  padding: 60px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.ep-page-empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #eaf7ef;
+  color: #1fa35a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ep-page-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f241a;
+}
+
+.ep-page-empty-desc {
+  font-size: 14px;
+  color: #5c7c6d;
+  max-width: 420px;
+  margin: 0;
+}

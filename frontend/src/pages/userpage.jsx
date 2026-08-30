@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import "../components/userpage.css";
+import NotificationBell from "../components/NotificationBell";
  
 const WARD_DATA = [
   { name: "Rosewood", code: "W1" },
@@ -418,6 +419,9 @@ export default function EcoPulseStaff() {
       openComplaintsQueue();
     } else if (key === "tracking") {
       openTracking();
+    } else if (key === "notifications") {
+      setDrawerOpen(false);
+      navigate("/notifications");
     }
   };
 
@@ -882,6 +886,7 @@ export default function EcoPulseStaff() {
           </div>
         </div>
         <div className="staff-header-right">
+          <NotificationBell />
           <button
             className="staff-btn staff-btn-ghost"
             onClick={openTracking}

@@ -18,6 +18,7 @@ import {
   Filter,
 } from "lucide-react";
 import "../components/admincomplaints.css";
+import NotificationBell from "../components/NotificationBell";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -363,8 +364,11 @@ export default function Admincomplaints() {
           </button>
           <AdminLogo onClick={() => navigate("/admin")} />
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#1e6b4e", fontFamily: "'Poppins', sans-serif" }}>
-          Public Waste Complaints
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <NotificationBell />
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1e6b4e", fontFamily: "'Poppins', sans-serif" }}>
+            Public Waste Complaints
+          </div>
         </div>
       </header>
 

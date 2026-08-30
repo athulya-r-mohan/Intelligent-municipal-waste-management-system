@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import axios from "axios";
 import "../components/Adminpage.css";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "../components/NotificationBell";
 import {
   LayoutDashboard,
   Building2,
@@ -205,6 +206,7 @@ export default function EcoPulseAdmin() {
                 onClick={() => {
                   if (item.key === "municipality") setPage("municipality");
                   else if (item.key === "dashboard") setPage("dashboard");
+                  else if (item.key === "notifications") navigate("/notifications");
                 }}
               >
                 <Icon size={17} strokeWidth={2} />
@@ -232,7 +234,10 @@ export default function EcoPulseAdmin() {
             <ArrowLeft size={15} strokeWidth={2.3} />
             Back
           </button>
-          <DateBadge />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <NotificationBell />
+            <DateBadge />
+          </div>
         </div>
 
         <svg className="admin-pulse-divider" viewBox="0 0 800 22" preserveAspectRatio="none">

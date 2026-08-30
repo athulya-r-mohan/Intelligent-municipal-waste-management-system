@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import "../components/Recyclerpage.css"
+import { useNavigate } from "react-router-dom";
+import "../components/Recyclerpage.css";
+import NotificationBell from "../components/NotificationBell";
 import {
   ArrowLeft,
   LayoutDashboard,
@@ -122,10 +124,12 @@ function Card({ title, value, hint, icon: Icon }) {
 }
 
 export default function EcoPulseRecyclerDashboard() {
+  const navigate = useNavigate();
   const [active, setActive] = useState("dashboard");
 
   const handleBack = () => {
     if (window.history.length > 1) window.history.back();
+    else navigate("/");
   };
 
   const handleHome = () => {
@@ -146,7 +150,10 @@ export default function EcoPulseRecyclerDashboard() {
           </button>
           <Logo onClick={handleHome} />
         </div>
-        <LiveCalendar />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <NotificationBell />
+          <LiveCalendar />
+        </div>
       </header>
 
       <div className="recycler-layout">
@@ -156,7 +163,13 @@ export default function EcoPulseRecyclerDashboard() {
               <button
                 key={key}
                 className={`recycler-nav-item${active === key ? " active" : ""}`}
-                onClick={() => setActive(key)}
+                onClick={() => {
+                  if (key === "notifications") {
+                    navigate("/notifications");
+                  } else {
+                    setActive(key);
+                  }
+                }}
               >
                 <Icon size={17} strokeWidth={2} />
                 {label}
