@@ -18,6 +18,9 @@ import Residentdirectory from "./pages/Residentdirectory";
 import PickupAssignment from "./pages/Pickupassignment";
 import Admincomplaints from "./pages/Admincomplaints";
 import NotificationsPage from "./pages/NotificationsPage";
+import StaffMCFCollection from "./pages/StaffMCFCollection";
+import AdminMCFList from "./pages/AdminMCFList";
+import AdminMCFDetails from "./pages/AdminMCFDetails";
 
 
 export default function App() {
@@ -42,6 +45,9 @@ export default function App() {
         <Route path="/resident" element={<Residentdirectory />} />
         <Route path="/assign" element={<PickupAssignment />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/staff/mcf" element={<StaffMCFCollection />} />
+        <Route path="/admin/mcf" element={<AdminMCFList />} />
+        <Route path="/admin/mcf/details" element={<AdminMCFDetails />} />
       </Routes>
     </NotificationProvider>
   );

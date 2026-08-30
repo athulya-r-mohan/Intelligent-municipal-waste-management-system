@@ -18,6 +18,12 @@ from .views import (
     AdminAssignComplaintView,
     StaffAssignedComplaintsView,
     StaffComplaintUpdateView,
+    StaffMCFTodayView,
+    StaffMCFCollectionSubmitView,
+    AdminMCFDailyListView,
+    AdminMCFDateDetailsView,
+    AdminMCFAssignRecyclerView,
+    ExistingRecyclerListView,
 )
 
 urlpatterns = [
@@ -149,5 +155,39 @@ urlpatterns = [
         "staff/complaints/<int:pk>/update/",
         StaffComplaintUpdateView.as_view(),
         name="staff-complaint-update"
+    ),
+
+    # ============================================================
+    # MCF (MATERIAL COLLECTION FACILITY) DAILY COLLECTION & RECYCLER
+    # ============================================================
+    path(
+        "mcf/today/",
+        StaffMCFTodayView.as_view(),
+        name="staff-mcf-today"
+    ),
+    path(
+        "mcf/submit/",
+        StaffMCFCollectionSubmitView.as_view(),
+        name="staff-mcf-submit"
+    ),
+    path(
+        "mcf/admin/daily-totals/",
+        AdminMCFDailyListView.as_view(),
+        name="admin-mcf-daily-totals"
+    ),
+    path(
+        "mcf/admin/daily-details/",
+        AdminMCFDateDetailsView.as_view(),
+        name="admin-mcf-daily-details"
+    ),
+    path(
+        "mcf/admin/assign-recycler/",
+        AdminMCFAssignRecyclerView.as_view(),
+        name="admin-mcf-assign-recycler"
+    ),
+    path(
+        "mcf/recyclers/",
+        ExistingRecyclerListView.as_view(),
+        name="mcf-recyclers"
     ),
 ]

@@ -274,6 +274,8 @@ export default function EcoPulseAdmin() {
                     navigate("/assign?status=COMPLETED");
                   } else if (c.key === "assigned") {
                     navigate("/assign?status=ASSIGNED");
+                  } else if (c.key === "mcf") {
+                    navigate("/admin/mcf");
                   }
                 }}
               />

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class WastePickupRequest(models.Model):
@@ -216,5 +217,129 @@ class WasteComplaint(models.Model):
 
     def __str__(self):
         return f"Complaint #{self.id} - {self.priority} ({self.status})"
+
+
+class StaffMCFCollection(models.Model):
+    staff = models.ForeignKey(
+        "accounts.Staff",
+        on_delete=models.CASCADE,
+        related_name="mcf_collections",
+        db_index=True
+    )
+    date = models.DateField(
+        default=timezone.now,
+        db_index=True
+    )
+    paper = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    plastic = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    glass = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    metal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    organic = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    electronics = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    miscellaneous = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+    total_quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0.00
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+        unique_together = ("staff", "date")
+        ordering = ["-date", "-updated_at"]
+        verbose_name = "Staff MCF Daily Collection"
+        verbose_name_plural = "Staff MCF Daily Collections"
+
+    def save(self, *args, **kwargs):
+        self.total_quantity = (
+            (self.paper or 0) +
+            (self.plastic or 0) +
+            (self.glass or 0) +
+            (self.metal or 0) +
+            (self.organic or 0) +
+            (self.electronics or 0) +
+            (self.miscellaneous or 0)
+        )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        staff_name = self.staff.user.username if self.staff and self.staff.user else f"Staff #{self.staff_id}"
+        return f"MCF Collection: {staff_name} on {self.date} ({self.total_quantity} kg)"
+
+
+class MCFRecyclerAssignment(models.Model):
+    date = models.DateField(
+        db_index=True
+    )
+    waste_type = models.CharField(
+        max_length=50,
+        db_index=True
+    )
+    total_quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0.00
+    )
+    recycler = models.ForeignKey(
+        "accounts.Recycler",
+        on_delete=models.CASCADE,
+        related_name="mcf_assignments"
+    )
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mcf_assignments_made"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+        unique_together = ("date", "waste_type")
+        ordering = ["-date", "waste_type"]
+        verbose_name = "MCF Recycler Assignment"
+        verbose_name_plural = "MCF Recycler Assignments"
+
+    def __str__(self):
+        return f"MCF Assignment: {self.waste_type} ({self.total_quantity}kg) -> {self.recycler.organization} on {self.date}"
+
 
 

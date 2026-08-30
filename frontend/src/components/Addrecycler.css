@@ -1,29 +1,10 @@
 /* =========================
-   RESET
-========================= */
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-
-/* =========================
    PAGE
 ========================= */
 
 .add-recycler-page {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-height: 100vh;
 
   background: #ffffff;
 
@@ -31,9 +12,8 @@ body,
   justify-content: center;
   align-items: flex-start;
 
-  padding: 3px 0 0 0;
-
-  overflow: hidden;
+  padding: 20px 16px;
+  overflow-y: auto;
 }
 
 
@@ -42,8 +22,9 @@ body,
 ========================= */
 
 .recycler-card {
-  width: 640px;
-  height: calc(100vh - 3px);
+  width: 100%;
+  max-width: 640px;
+  min-height: auto;
 
   background: #ffffff;
 

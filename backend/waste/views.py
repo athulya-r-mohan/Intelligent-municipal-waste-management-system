@@ -20,13 +20,18 @@ from rest_framework.authentication import BasicAuthentication, SessionAuthentica
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from datetime import datetime, date
+
 from .serializers import (
     WastePickupRequestSerializer,
     WasteComplaintSerializer,
+    StaffMCFCollectionSerializer,
+    MCFRecyclerAssignmentSerializer,
+    RecyclerOptionSerializer,
 )
 
 from ultralytics import YOLO
-from accounts.models import UserProfile, Staff
+from accounts.models import UserProfile, Staff, Recycler
 
 
 from .models import (
@@ -34,6 +39,8 @@ from .models import (
     WastePickupImage,
     WasteCollection,
     WasteComplaint,
+    StaffMCFCollection,
+    MCFRecyclerAssignment,
 )
 
 from .priority_detector import determine_complaint_priority
@@ -2175,6 +2182,382 @@ class StaffComplaintUpdateView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+# ============================================================
+# STAFF MCF DAILY WASTE COLLECTION VIEWS
+# ============================================================
+
+class StaffMCFTodayView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "No staff profile associated with current user."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        date_str = request.query_params.get("date")
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"success": False, "error": "Invalid date format. Expected YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            target_date = timezone.now().date()
+
+        collection = StaffMCFCollection.objects.filter(staff=staff, date=target_date).first()
+
+        if collection:
+            serializer = StaffMCFCollectionSerializer(collection)
+            return Response({
+                "success": True,
+                "exists": True,
+                "date": str(target_date),
+                "collection": serializer.data,
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                "success": True,
+                "exists": False,
+                "date": str(target_date),
+                "collection": {
+                    "date": str(target_date),
+                    "paper": "0.00",
+                    "plastic": "0.00",
+                    "glass": "0.00",
+                    "metal": "0.00",
+                    "organic": "0.00",
+                    "electronics": "0.00",
+                    "miscellaneous": "0.00",
+                    "total_quantity": "0.00",
+                }
+            }, status=status.HTTP_200_OK)
+
+
+class StaffMCFCollectionSubmitView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "No staff profile associated with current user."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        data = request.data
+        date_str = data.get("date")
+        if date_str:
+            try:
+                target_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"success": False, "error": "Invalid date format. Expected YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            target_date = timezone.now().date()
+
+        # Parse and validate quantities
+        categories = ["paper", "plastic", "glass", "metal", "organic", "electronics", "miscellaneous"]
+        parsed_quantities = {}
+
+        for cat in categories:
+            val = data.get(cat, 0)
+            if val is None or str(val).strip() == "":
+                val = 0
+            try:
+                num = float(val)
+                if num < 0:
+                    return Response(
+                        {"success": False, "error": f"{cat.capitalize()} quantity cannot be negative."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                parsed_quantities[cat] = round(num, 2)
+            except (ValueError, TypeError):
+                return Response(
+                    {"success": False, "error": f"Invalid number format for {cat} quantity."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Upsert StaffMCFCollection (prevents duplicate records for same staff and date)
+        collection, created = StaffMCFCollection.objects.update_or_create(
+            staff=staff,
+            date=target_date,
+            defaults={
+                "paper": parsed_quantities["paper"],
+                "plastic": parsed_quantities["plastic"],
+                "glass": parsed_quantities["glass"],
+                "metal": parsed_quantities["metal"],
+                "organic": parsed_quantities["organic"],
+                "electronics": parsed_quantities["electronics"],
+                "miscellaneous": parsed_quantities["miscellaneous"],
+            }
+        )
+
+        serializer = StaffMCFCollectionSerializer(collection)
+        action_verb = "submitted" if created else "updated"
+
+        return Response({
+            "success": True,
+            "message": f"MCF daily collection successfully {action_verb} for {target_date}.",
+            "created": created,
+            "collection": serializer.data,
+        }, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
+
+
+# ============================================================
+# ADMIN MCF DAILY AGGREGATION & DETAILS VIEWS
+# ============================================================
+
+class AdminMCFDailyListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        daily_groups = (
+            StaffMCFCollection.objects
+            .values("date")
+            .annotate(
+                total_paper=models.Sum("paper"),
+                total_plastic=models.Sum("plastic"),
+                total_glass=models.Sum("glass"),
+                total_metal=models.Sum("metal"),
+                total_organic=models.Sum("organic"),
+                total_electronics=models.Sum("electronics"),
+                total_miscellaneous=models.Sum("miscellaneous"),
+                grand_total=models.Sum("total_quantity"),
+                staff_count=models.Count("staff", distinct=True),
+            )
+            .order_by("-date")
+        )
+
+        results = []
+        for g in daily_groups:
+            d = g["date"]
+            assignments_count = MCFRecyclerAssignment.objects.filter(date=d).count()
+            formatted_date = d.strftime("%d %b %Y")
+            
+            results.append({
+                "date": str(d),
+                "date_formatted": formatted_date,
+                "grand_total": float(g["grand_total"] or 0),
+                "staff_count": g["staff_count"],
+                "total_paper": float(g["total_paper"] or 0),
+                "total_plastic": float(g["total_plastic"] or 0),
+                "total_glass": float(g["total_glass"] or 0),
+                "total_metal": float(g["total_metal"] or 0),
+                "total_organic": float(g["total_organic"] or 0),
+                "total_electronics": float(g["total_electronics"] or 0),
+                "total_miscellaneous": float(g["total_miscellaneous"] or 0),
+                "assignments_count": assignments_count,
+            })
+
+        return Response({
+            "success": True,
+            "count": len(results),
+            "daily_totals": results,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminMCFDateDetailsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        date_str = request.query_params.get("date")
+        if not date_str:
+            target_date = timezone.now().date()
+        else:
+            try:
+                target_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"success": False, "error": "Invalid date format. Expected YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        totals = (
+            StaffMCFCollection.objects
+            .filter(date=target_date)
+            .aggregate(
+                total_paper=models.Sum("paper"),
+                total_plastic=models.Sum("plastic"),
+                total_glass=models.Sum("glass"),
+                total_metal=models.Sum("metal"),
+                total_organic=models.Sum("organic"),
+                total_electronics=models.Sum("electronics"),
+                total_miscellaneous=models.Sum("miscellaneous"),
+                grand_total=models.Sum("total_quantity"),
+                staff_count=models.Count("staff", distinct=True),
+            )
+        )
+
+        grand_total = float(totals["grand_total"] or 0)
+        staff_count = totals["staff_count"] or 0
+
+        # Existing assignments for this date
+        assignments = {
+            a.waste_type: MCFRecyclerAssignmentSerializer(a).data
+            for a in MCFRecyclerAssignment.objects.filter(date=target_date).select_related("recycler", "recycler__user", "assigned_by")
+        }
+
+        categories_config = [
+            {"key": "Paper", "total": float(totals["total_paper"] or 0)},
+            {"key": "Plastic", "total": float(totals["total_plastic"] or 0)},
+            {"key": "Glass", "total": float(totals["total_glass"] or 0)},
+            {"key": "Metal", "total": float(totals["total_metal"] or 0)},
+            {"key": "Organic", "total": float(totals["total_organic"] or 0)},
+            {"key": "Electronics", "total": float(totals["total_electronics"] or 0)},
+            {"key": "Miscellaneous", "total": float(totals["total_miscellaneous"] or 0)},
+        ]
+
+        categories_data = []
+        for cat in categories_config:
+            w_type = cat["key"]
+            qty = cat["total"]
+            assignment_info = assignments.get(w_type, None)
+            
+            categories_data.append({
+                "waste_type": w_type,
+                "total_quantity": qty,
+                "is_assigned": bool(assignment_info),
+                "assignment": assignment_info,
+            })
+
+        # List of staff submissions for this date
+        staff_records = (
+            StaffMCFCollection.objects
+            .filter(date=target_date)
+            .select_related("staff", "staff__user", "staff__user__userprofile")
+        )
+        staff_serializer = StaffMCFCollectionSerializer(staff_records, many=True)
+
+        return Response({
+            "success": True,
+            "date": str(target_date),
+            "date_formatted": target_date.strftime("%d %B %Y"),
+            "grand_total": grand_total,
+            "staff_count": staff_count,
+            "categories": categories_data,
+            "staff_submissions": staff_serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminMCFAssignRecyclerView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        data = request.data
+        date_str = data.get("date")
+        waste_type = data.get("waste_type")
+        recycler_id = data.get("recycler_id")
+
+        if not date_str:
+            return Response(
+                {"success": False, "error": "date is required (YYYY-MM-DD)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not waste_type:
+            return Response(
+                {"success": False, "error": "waste_type is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not recycler_id:
+            return Response(
+                {"success": False, "error": "recycler_id is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            target_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+        except ValueError:
+            return Response(
+                {"success": False, "error": "Invalid date format. Expected YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            recycler = Recycler.objects.select_related("user", "user__userprofile").get(recycler_id=recycler_id)
+        except Recycler.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Recycler #{recycler_id} not found in database."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        field_map = {
+            "Paper": "paper",
+            "Plastic": "plastic",
+            "Glass": "glass",
+            "Metal": "metal",
+            "Organic": "organic",
+            "Electronics": "electronics",
+            "Miscellaneous": "miscellaneous",
+        }
+        db_field = field_map.get(waste_type.capitalize(), "plastic")
+        
+        sum_result = StaffMCFCollection.objects.filter(date=target_date).aggregate(
+            total=models.Sum(db_field)
+        )
+        total_qty = float(sum_result["total"] or 0)
+
+        assigned_user = request.user if request.user and request.user.is_authenticated else None
+        
+        assignment, created = MCFRecyclerAssignment.objects.update_or_create(
+            date=target_date,
+            waste_type=waste_type,
+            defaults={
+                "recycler": recycler,
+                "total_quantity": total_qty,
+                "assigned_by": assigned_user,
+            }
+        )
+
+        try:
+            create_notification(
+                recipient=recycler.user,
+                title=f"New {waste_type} Waste Assigned",
+                message=f"You have been assigned {total_qty} kg of {waste_type} collected from MCF on {target_date.strftime('%d %b %Y')}.",
+                notification_type="RECYCLER_ALERT",
+                action_url="/recycler",
+            )
+        except Exception as notif_err:
+            print("Notification trigger error for recycler assignment:", notif_err)
+
+        serializer = MCFRecyclerAssignmentSerializer(assignment)
+        action_verb = "assigned" if created else "reassigned"
+
+        return Response({
+            "success": True,
+            "message": f"Successfully {action_verb} {recycler.organization} to {waste_type} for {target_date}.",
+            "assignment": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+class ExistingRecyclerListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        waste_type = request.query_params.get("waste_type")
+        qs = Recycler.objects.select_related("user", "user__userprofile").all()
+        if waste_type:
+            qs = qs.filter(waste_type__icontains=waste_type.strip())
+
+        serializer = RecyclerOptionSerializer(qs, many=True)
+        return Response({
+            "success": True,
+            "count": qs.count(),
+            "recyclers": serializer.data,
+        }, status=status.HTTP_200_OK)
+
 
 
 

@@ -17,6 +17,11 @@ body,
   min-height: 100vh;
 }
 
+html {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 /* Body */
 
 body {
@@ -25,6 +30,7 @@ body {
   background: #ffffff;
   color: #222;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Root */

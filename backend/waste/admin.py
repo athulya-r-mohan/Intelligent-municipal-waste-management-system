@@ -5,6 +5,8 @@ from .models import (
     WastePickupImage,
     WasteCollection,
     WasteComplaint,
+    StaffMCFCollection,
+    MCFRecyclerAssignment,
 )
 
 
@@ -297,4 +299,72 @@ class WasteComplaintAdmin(admin.ModelAdmin):
         return obj.user.username
 
     get_name.short_description = "Name"
+
+
+# ============================================================
+# STAFF MCF DAILY COLLECTION ADMIN
+# ============================================================
+
+@admin.register(StaffMCFCollection)
+class StaffMCFCollectionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "date",
+        "staff",
+        "total_quantity",
+        "paper",
+        "plastic",
+        "glass",
+        "metal",
+        "organic",
+        "electronics",
+        "miscellaneous",
+        "updated_at",
+    )
+    list_filter = (
+        "date",
+        "created_at",
+    )
+    search_fields = (
+        "staff__user__username",
+        "staff__user__email",
+        "staff__user__userprofile__name",
+    )
+    readonly_fields = (
+        "total_quantity",
+        "created_at",
+        "updated_at",
+    )
+
+
+# ============================================================
+# MCF RECYCLER ASSIGNMENT ADMIN
+# ============================================================
+
+@admin.register(MCFRecyclerAssignment)
+class MCFRecyclerAssignmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "date",
+        "waste_type",
+        "total_quantity",
+        "recycler",
+        "assigned_by",
+        "updated_at",
+    )
+    list_filter = (
+        "waste_type",
+        "date",
+        "created_at",
+    )
+    search_fields = (
+        "waste_type",
+        "recycler__organization",
+        "recycler__user__email",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
 

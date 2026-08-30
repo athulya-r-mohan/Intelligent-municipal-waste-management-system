@@ -1,6 +1,13 @@
 from rest_framework import serializers
-from .models import WastePickupRequest, WastePickupImage, WasteCollection, WasteComplaint
-from accounts.models import UserProfile
+from .models import (
+    WastePickupRequest,
+    WastePickupImage,
+    WasteCollection,
+    WasteComplaint,
+    StaffMCFCollection,
+    MCFRecyclerAssignment,
+)
+from accounts.models import UserProfile, Recycler
 
 
 # ============================================================
@@ -694,5 +701,142 @@ class WasteComplaintSerializer(serializers.ModelSerializer):
         except Exception:
             pass
         return None
+
+
+# ============================================================
+# STAFF MCF COLLECTION SERIALIZER
+# ============================================================
+
+class StaffMCFCollectionSerializer(serializers.ModelSerializer):
+    staff_id = serializers.IntegerField(source="staff.staff_id", read_only=True)
+    staff_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StaffMCFCollection
+        fields = [
+            "id",
+            "staff",
+            "staff_id",
+            "staff_name",
+            "date",
+            "paper",
+            "plastic",
+            "glass",
+            "metal",
+            "organic",
+            "electronics",
+            "miscellaneous",
+            "total_quantity",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "staff", "staff_id", "staff_name", "total_quantity", "created_at", "updated_at"]
+
+    def get_staff_name(self, obj):
+        try:
+            if obj.staff and obj.staff.user:
+                profile = getattr(obj.staff.user, "userprofile", None)
+                if profile and profile.name:
+                    return profile.name
+                return obj.staff.user.get_full_name() or obj.staff.user.username
+        except Exception:
+            pass
+        return f"Staff #{obj.staff_id}"
+
+
+# ============================================================
+# RECYCLER OPTION SERIALIZER (For Dropdown Selection)
+# ============================================================
+
+class RecyclerOptionSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source="user.email", read_only=True)
+    phone = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Recycler
+        fields = [
+            "recycler_id",
+            "organization",
+            "waste_type",
+            "email",
+            "phone",
+            "address",
+            "date_of_registration",
+        ]
+
+    def get_phone(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.phone:
+                return profile.phone
+        except Exception:
+            pass
+        return ""
+
+
+# ============================================================
+# MCF RECYCLER ASSIGNMENT SERIALIZER
+# ============================================================
+
+class MCFRecyclerAssignmentSerializer(serializers.ModelSerializer):
+    recycler_id = serializers.IntegerField(source="recycler.recycler_id", read_only=True)
+    recycler_organization = serializers.CharField(source="recycler.organization", read_only=True)
+    recycler_waste_type = serializers.CharField(source="recycler.waste_type", read_only=True)
+    recycler_email = serializers.EmailField(source="recycler.user.email", read_only=True)
+    recycler_phone = serializers.SerializerMethodField()
+    assigned_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MCFRecyclerAssignment
+        fields = [
+            "id",
+            "date",
+            "waste_type",
+            "total_quantity",
+            "recycler",
+            "recycler_id",
+            "recycler_organization",
+            "recycler_waste_type",
+            "recycler_email",
+            "recycler_phone",
+            "assigned_by",
+            "assigned_by_name",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "total_quantity",
+            "recycler_id",
+            "recycler_organization",
+            "recycler_waste_type",
+            "recycler_email",
+            "recycler_phone",
+            "assigned_by",
+            "assigned_by_name",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_recycler_phone(self, obj):
+        try:
+            profile = getattr(obj.recycler.user, "userprofile", None)
+            if profile and profile.phone:
+                return profile.phone
+        except Exception:
+            pass
+        return ""
+
+    def get_assigned_by_name(self, obj):
+        try:
+            if obj.assigned_by:
+                profile = getattr(obj.assigned_by, "userprofile", None)
+                if profile and profile.name:
+                    return profile.name
+                return obj.assigned_by.get_full_name() or obj.assigned_by.username
+        except Exception:
+            pass
+        return None
+
 
 

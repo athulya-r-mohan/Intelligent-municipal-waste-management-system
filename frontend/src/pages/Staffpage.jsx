@@ -28,7 +28,7 @@ const LINKS = {
   logout: "#",
   calendar: "#",
   scheduled: "#",
-  mcf: "#",
+  mcf: "/staff/mcf",
   completed: "#",
 };
  

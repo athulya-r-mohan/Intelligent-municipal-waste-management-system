@@ -180,31 +180,12 @@ export default function AddStaffForm() {
       <style>{`
 
         /* =========================
-           RESET
-        ========================= */
-
-        * {
-          box-sizing: border-box;
-        }
-
-        html,
-        body,
-        #root {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-        }
-
-
-        /* =========================
            PAGE
         ========================= */
 
         .add-staff-page {
-          width: 100vw;
-          height: 100vh;
+          width: 100%;
+          min-height: 100vh;
 
           background: #ffffff;
 
@@ -212,9 +193,9 @@ export default function AddStaffForm() {
           justify-content: center;
           align-items: flex-start;
 
-          padding: 3px 0 0 0;
+          padding: 20px 16px;
 
-          overflow: hidden;
+          overflow-y: auto;
         }
 
 
@@ -223,21 +204,20 @@ export default function AddStaffForm() {
         ========================= */
 
         .staff-card {
-          width: 640px;
-          height: calc(100vh - 3px);
+          width: 100%;
+          max-width: 640px;
+          min-height: auto;
 
           background: #ffffff;
 
           border: 1px solid #d1fae5;
 
-          border-radius: 18px 18px 0 0;
+          border-radius: 18px;
 
           box-shadow:
             0 4px 15px rgba(16, 185, 129, 0.08);
 
           padding: 25px 40px 18px 40px;
-
-          overflow: hidden;
         }
 
 
