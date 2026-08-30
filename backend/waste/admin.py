@@ -7,6 +7,7 @@ from .models import (
     WasteComplaint,
     StaffMCFCollection,
     MCFRecyclerAssignment,
+    Payment,
 )
 
 
@@ -366,5 +367,44 @@ class MCFRecyclerAssignmentAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+
+
+# ============================================================
+# PICKUP PAYMENT ADMIN
+# ============================================================
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "payment_id",
+        "pickup_request",
+        "user",
+        "amount",
+        "payment_status",
+        "transaction_id",
+        "payment_date",
+        "created_at",
+    )
+    list_filter = (
+        "payment_status",
+        "payment_date",
+        "created_at",
+    )
+    search_fields = (
+        "payment_id",
+        "transaction_id",
+        "user__username",
+        "user__email",
+        "user__userprofile__name",
+        "pickup_request__id",
+    )
+    readonly_fields = (
+        "amount",
+        "payment_id",
+        "created_at",
+        "updated_at",
+    )
+
 
 

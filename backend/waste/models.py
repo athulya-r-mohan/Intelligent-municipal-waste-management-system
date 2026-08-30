@@ -342,4 +342,79 @@ class MCFRecyclerAssignment(models.Model):
         return f"MCF Assignment: {self.waste_type} ({self.total_quantity}kg) -> {self.recycler.organization} on {self.date}"
 
 
+class Payment(models.Model):
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("COMPLETED", "Completed"),
+        ("FAILED", "Failed"),
+    ]
+
+    pickup_request = models.OneToOneField(
+        WastePickupRequest,
+        on_delete=models.CASCADE,
+        related_name="payment"
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+    amount = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=50.00
+    )
+    payment_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="PENDING",
+        db_index=True
+    )
+    payment_id = models.CharField(
+        max_length=100,
+        unique=True,
+        db_index=True
+    )
+    transaction_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    order_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+    payment_method = models.CharField(
+        max_length=50,
+        default="UPI / Online"
+    )
+    payment_date = models.DateTimeField(
+        blank=True,
+        null=True
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Pickup Payment"
+        verbose_name_plural = "Pickup Payments"
+
+    def save(self, *args, **kwargs):
+        self.amount = 50.00
+        if not self.payment_id:
+            import uuid
+            self.payment_id = f"PAY-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Payment #{self.payment_id} for Pickup #{self.pickup_request_id} - ₹{self.amount} ({self.payment_status})"
+
+
+
 

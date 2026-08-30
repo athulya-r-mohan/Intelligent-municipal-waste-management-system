@@ -45,7 +45,7 @@ const DASH_CARDS = [
   { key: "rescheduled", title: "Rescheduled", sub: "Pending field tasks", icon: CalendarClock },
   { key: "completed", title: "Completed Tasks", sub: "Closed out this month", icon: CheckCircle2 },
   { key: "assigned", title: "Task Assigned", sub: "Currently with staff", icon: ClipboardList },
-  { key: "payment", title: "Payment History", sub: "Recent transactions", icon: CreditCard },
+  { key: "payment", title: "Collection Payment", sub: "Fixed ₹50 fee management", icon: CreditCard },
   { key: "mcf", title: "MCF Collection", sub: "Material collection facility", icon: Factory },
   { key: "recycled", title: "Recycled Waste", sub: "Tonnage processed", icon: Recycle },
 ];
@@ -276,6 +276,8 @@ export default function EcoPulseAdmin() {
                     navigate("/assign?status=ASSIGNED");
                   } else if (c.key === "mcf") {
                     navigate("/admin/mcf");
+                  } else if (c.key === "payment") {
+                    navigate("/admin/payments");
                   }
                 }}
               />

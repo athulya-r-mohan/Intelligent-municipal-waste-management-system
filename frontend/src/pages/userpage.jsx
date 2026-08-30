@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import "../components/userpage.css";
 import NotificationBell from "../components/NotificationBell";
+import PaymentReceiptModal from "../components/PaymentReceiptModal";
+import { Receipt } from "lucide-react";
  
 const WARD_DATA = [
   { name: "Rosewood", code: "W1" },
@@ -141,6 +143,7 @@ export default function EcoPulseStaff() {
   const [loadingComplaints, setLoadingComplaints] = useState(false);
   const [complaintsError, setComplaintsError] = useState("");
   const [selectedComplaintDetail, setSelectedComplaintDetail] = useState(null);
+  const [receiptPayment, setReceiptPayment] = useState(null);
 
   // User info
   const userName = localStorage.getItem("name") || "Citizen User";
@@ -1254,6 +1257,62 @@ export default function EcoPulseStaff() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Payment Status Summary */}
+                      {(latestPickup.status === "COMPLETED" || latestPickup.has_paid) && (
+                        <div className="ep-track-field" style={{ gridColumn: "1 / -1", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 16px", borderRadius: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontSize: 20 }}>💳</span>
+                            <div>
+                              <div className="ep-track-label" style={{ color: "#065f46" }}>Collection Payment Fee</div>
+                              <div style={{ fontWeight: 700, color: "#0f241a", fontSize: 13.5 }}>
+                                Amount: <strong>₹50</strong> &bull; Status:{" "}
+                                {latestPickup.has_paid || latestPickup.payment_status === "COMPLETED" ? (
+                                  <span style={{ color: "#16a34a" }}>Completed</span>
+                                ) : (
+                                  <span style={{ color: "#d97706" }}>Pending</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {latestPickup.has_paid || latestPickup.payment_status === "COMPLETED" ? (
+                            <button
+                              type="button"
+                              className="staff-btn staff-btn-ghost"
+                              style={{ fontSize: 12, padding: "5px 12px", background: "#ffffff", borderColor: "#86efac", color: "#15803d" }}
+                              onClick={() => setReceiptPayment({
+                                pickup_id: latestPickup.request_id || latestPickup.id,
+                                pickup_request: latestPickup.request_id || latestPickup.id,
+                                user_name: user?.name || user?.username,
+                                user_phone: user?.phone,
+                                ward: latestPickup.ward,
+                                pickup_location: latestPickup.pickup_location,
+                                waste_type: latestPickup.waste_type,
+                                completed_weight: latestPickup.estimated_weight,
+                                assigned_staff_name: latestPickup.assigned_staff,
+                                amount: 50.0,
+                                payment_status: "COMPLETED",
+                                payment_id: latestPickup.payment_id,
+                                transaction_id: latestPickup.transaction_id,
+                                payment_date: latestPickup.payment_date,
+                              })}
+                            >
+                              <Receipt size={14} />
+                              View Receipt
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="staff-btn staff-btn-solid"
+                              style={{ fontSize: 12, padding: "6px 14px", background: "#10b981" }}
+                              onClick={() => navigate(`/payment/${latestPickup.request_id || latestPickup.id}`)}
+                            >
+                              Pay ₹50 →
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Uploaded waste image thumbnail or completion proof */}
@@ -1494,35 +1553,85 @@ export default function EcoPulseStaff() {
                                   </div>
                                 </div>
                               )}
+
+                              <div className="ep-detail-item">
+                                <span className="ep-detail-icon">💳</span>
+                                <div>
+                                  <b>Payment:</b>{" "}
+                                  {item.has_paid || item.payment_status === "COMPLETED" ? (
+                                    <span style={{ color: "#16a34a", fontWeight: 700 }}>
+                                      Completed (₹50)
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: "#d97706", fontWeight: 700 }}>
+                                      Pending (₹50)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="ep-card-media">
-                              {item.completion_image ? (
-                                <button
-                                  type="button"
-                                  className="ep-image-thumb-btn"
-                                  onClick={() => setPreviewImage(item.completion_image)}
-                                  title="Click to view completion photo proof"
-                                >
-                                  <img
-                                    src={item.completion_image}
-                                    alt={`Pickup #${item.request_id} completion proof`}
-                                    className="ep-thumb-img"
-                                  />
-                                  <span>View Completion Proof</span>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                                    <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                </button>
-                              ) : (
-                                <span style={{ fontSize: 12, color: "var(--muted)" }}>No completion image uploaded</span>
-                              )}
+                            <div className="ep-card-media" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                {item.completion_image ? (
+                                  <button
+                                    type="button"
+                                    className="ep-image-thumb-btn"
+                                    onClick={() => setPreviewImage(item.completion_image)}
+                                    title="Click to view completion photo proof"
+                                  >
+                                    <img
+                                      src={item.completion_image}
+                                      alt={`Pickup #${item.request_id} completion proof`}
+                                      className="ep-thumb-img"
+                                    />
+                                    <span>View Completion Proof</span>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                      <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: "var(--muted)" }}>No completion image</span>
+                                )}
+                              </div>
 
-                              {item.payment_qr_data && (
-                                <div style={{ fontSize: 12, color: "var(--green-deep)", fontWeight: 600, background: "var(--panel)", padding: "4px 10px", borderRadius: 8, border: "1px solid var(--mint-3)" }}>
-                                  ₹{item.payment_qr_data.amount} Processed
-                                </div>
-                              )}
+                              <div>
+                                {item.has_paid || item.payment_status === "COMPLETED" ? (
+                                  <button
+                                    type="button"
+                                    className="staff-btn staff-btn-ghost"
+                                    style={{ fontSize: 12, padding: "6px 12px", borderColor: "#86efac", color: "#15803d", background: "#f0fdf4", display: "inline-flex", alignItems: "center", gap: 5 }}
+                                    onClick={() => setReceiptPayment({
+                                      pickup_id: item.request_id,
+                                      pickup_request: item.request_id,
+                                      user_name: user?.name || user?.username,
+                                      user_phone: user?.phone,
+                                      ward: item.ward,
+                                      pickup_location: item.pickup_location,
+                                      waste_type: item.waste_type,
+                                      completed_weight: item.estimated_weight,
+                                      assigned_staff_name: item.assigned_staff,
+                                      amount: 50.0,
+                                      payment_status: "COMPLETED",
+                                      payment_id: item.payment_id,
+                                      transaction_id: item.transaction_id,
+                                      payment_date: item.payment_date,
+                                    })}
+                                  >
+                                    <Receipt size={13} />
+                                    View Receipt
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="staff-btn staff-btn-solid"
+                                    style={{ fontSize: 12, padding: "6px 16px", background: "#10b981" }}
+                                    onClick={() => navigate(`/payment/${item.request_id}`)}
+                                  >
+                                    Pay ₹50 →
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -2088,7 +2197,6 @@ export default function EcoPulseStaff() {
         </div>
       )}
 
-
       {/* ============================================================ */}
       {/* COMPLETION IMAGE LIGHTBOX */}
       {/* ============================================================ */}
@@ -2108,6 +2216,16 @@ export default function EcoPulseStaff() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* RECEIPT MODAL */}
+      {/* ============================================================ */}
+      {receiptPayment && (
+        <PaymentReceiptModal
+          payment={receiptPayment}
+          onClose={() => setReceiptPayment(null)}
+        />
       )}
     </div>
   );

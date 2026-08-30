@@ -24,6 +24,12 @@ from .views import (
     AdminMCFDateDetailsView,
     AdminMCFAssignRecyclerView,
     ExistingRecyclerListView,
+    PaymentDetailByPickupView,
+    PaymentCreateOrderView,
+    PaymentVerifyView,
+    AdminPaymentListView,
+    AdminRequestPaymentReminderView,
+    UserPaymentsListView,
 )
 
 urlpatterns = [
@@ -189,5 +195,44 @@ urlpatterns = [
         "mcf/recyclers/",
         ExistingRecyclerListView.as_view(),
         name="mcf-recyclers"
+    ),
+
+    # ============================================================
+    # FIXED ₹50 PICKUP PAYMENT SYSTEM
+    # ============================================================
+    path(
+        "payments/my/",
+        UserPaymentsListView.as_view(),
+        name="user-payments-list"
+    ),
+    path(
+        "payments/pickup/<int:pickup_id>/",
+        PaymentDetailByPickupView.as_view(),
+        name="payment-detail-by-pickup"
+    ),
+    path(
+        "payments/create-order/",
+        PaymentCreateOrderView.as_view(),
+        name="payment-create-order"
+    ),
+    path(
+        "payments/verify/",
+        PaymentVerifyView.as_view(),
+        name="payment-verify"
+    ),
+    path(
+        "payments/admin/",
+        AdminPaymentListView.as_view(),
+        name="admin-payments-list"
+    ),
+    path(
+        "payments/<int:pk>/request-payment/",
+        AdminRequestPaymentReminderView.as_view(),
+        name="admin-request-payment-reminder-pk"
+    ),
+    path(
+        "payments/request-payment/",
+        AdminRequestPaymentReminderView.as_view(),
+        name="admin-request-payment-reminder"
     ),
 ]

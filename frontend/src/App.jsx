@@ -21,6 +21,8 @@ import NotificationsPage from "./pages/NotificationsPage";
 import StaffMCFCollection from "./pages/StaffMCFCollection";
 import AdminMCFList from "./pages/AdminMCFList";
 import AdminMCFDetails from "./pages/AdminMCFDetails";
+import PaymentPage from "./pages/PaymentPage";
+import AdminPayments from "./pages/AdminPayments";
 
 
 export default function App() {
@@ -48,6 +50,8 @@ export default function App() {
         <Route path="/staff/mcf" element={<StaffMCFCollection />} />
         <Route path="/admin/mcf" element={<AdminMCFList />} />
         <Route path="/admin/mcf/details" element={<AdminMCFDetails />} />
+        <Route path="/payment/:pickupId" element={<PaymentPage />} />
+        <Route path="/admin/payments" element={<AdminPayments />} />
       </Routes>
     </NotificationProvider>
   );

@@ -28,6 +28,7 @@ from .serializers import (
     StaffMCFCollectionSerializer,
     MCFRecyclerAssignmentSerializer,
     RecyclerOptionSerializer,
+    PaymentSerializer,
 )
 
 from ultralytics import YOLO
@@ -41,6 +42,7 @@ from .models import (
     WasteComplaint,
     StaffMCFCollection,
     MCFRecyclerAssignment,
+    Payment,
 )
 
 from .priority_detector import determine_complaint_priority
@@ -2557,6 +2559,302 @@ class ExistingRecyclerListView(APIView):
             "count": qs.count(),
             "recyclers": serializer.data,
         }, status=status.HTTP_200_OK)
+
+
+# ============================================================
+# FIXED ₹50 PICKUP PAYMENT SYSTEM VIEWS
+# ============================================================
+
+class PaymentDetailByPickupView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pickup_id):
+        try:
+            pickup = WastePickupRequest.objects.select_related(
+                "user", "user__userprofile", "assigned_staff", "assigned_staff__user", "collection"
+            ).get(id=pickup_id)
+        except WastePickupRequest.DoesNotExist:
+            return Response({"success": False, "error": f"Pickup #{pickup_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        if user and user.is_authenticated:
+            is_owner = (pickup.user_id == user.id)
+            is_admin = (user.is_staff or user.is_superuser)
+            if not (is_owner or is_admin):
+                return Response({"success": False, "error": "Access denied for this pickup payment."}, status=status.HTTP_403_FORBIDDEN)
+
+        payment, _ = Payment.objects.get_or_create(
+            pickup_request=pickup,
+            defaults={
+                "user": pickup.user,
+                "amount": 50.00,
+                "payment_status": "PENDING",
+            }
+        )
+
+        serializer = PaymentSerializer(payment, context={"request": request})
+        return Response({
+            "success": True,
+            "payment": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+class PaymentCreateOrderView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        pickup_id = request.data.get("pickup_id")
+        if not pickup_id:
+            return Response({"success": False, "error": "pickup_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            pickup = WastePickupRequest.objects.select_related("user").get(id=pickup_id)
+        except WastePickupRequest.DoesNotExist:
+            return Response({"success": False, "error": f"Pickup #{pickup_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        payment, _ = Payment.objects.get_or_create(
+            pickup_request=pickup,
+            defaults={
+                "user": pickup.user,
+                "amount": 50.00,
+                "payment_status": "PENDING",
+            }
+        )
+
+        if payment.payment_status == "COMPLETED":
+            return Response({
+                "success": True,
+                "already_paid": True,
+                "message": "Payment for this pickup has already been completed.",
+                "payment": PaymentSerializer(payment, context={"request": request}).data,
+            }, status=status.HTTP_200_OK)
+
+        import uuid
+        order_id = f"order_ecopulse_{uuid.uuid4().hex[:12]}"
+        payment.order_id = order_id
+        payment.save(update_fields=["order_id"])
+
+        return Response({
+            "success": True,
+            "order_id": order_id,
+            "amount": 50.00,
+            "currency": "INR",
+            "pickup_id": pickup.id,
+            "payment_id": payment.payment_id,
+            "payment": PaymentSerializer(payment, context={"request": request}).data,
+        }, status=status.HTTP_200_OK)
+
+
+class PaymentVerifyView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        pickup_id = request.data.get("pickup_id")
+        transaction_id = request.data.get("transaction_id")
+        payment_method = request.data.get("payment_method", "UPI / Online")
+
+        if not pickup_id:
+            return Response({"success": False, "error": "pickup_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            pickup = WastePickupRequest.objects.select_related("user", "user__userprofile").get(id=pickup_id)
+        except WastePickupRequest.DoesNotExist:
+            return Response({"success": False, "error": f"Pickup #{pickup_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        payment, _ = Payment.objects.get_or_create(
+            pickup_request=pickup,
+            defaults={
+                "user": pickup.user,
+                "amount": 50.00,
+                "payment_status": "PENDING",
+            }
+        )
+
+        if payment.payment_status == "COMPLETED":
+            serializer = PaymentSerializer(payment, context={"request": request})
+            return Response({
+                "success": True,
+                "message": "Payment was already completed.",
+                "payment": serializer.data,
+            }, status=status.HTTP_200_OK)
+
+        import uuid
+        tx_id = transaction_id or f"TXN-{uuid.uuid4().hex[:10].upper()}"
+        payment.payment_status = "COMPLETED"
+        payment.amount = 50.00
+        payment.transaction_id = tx_id
+        payment.payment_method = payment_method
+        payment.payment_date = timezone.now()
+        payment.save()
+
+        # Send User Notification
+        try:
+            create_notification(
+                recipient=payment.user,
+                title="Payment Successful",
+                message=f"Your ₹50 payment for Pickup #{pickup.id} has been successfully completed. Transaction ID: {tx_id}",
+                notification_type="PAYMENT_UPDATE",
+                related_pickup=pickup,
+                action_url="/user",
+            )
+        except Exception as e:
+            print("User payment notification error:", e)
+
+        # Send Admin Notification
+        try:
+            user_display = payment.user.get_full_name() or payment.user.username
+            notify_admins(
+                title="Pickup Payment Received",
+                message=f"Payment received for Pickup #{pickup.id}.\nUser: {user_display}\nAmount: ₹50\nPayment ID: {payment.payment_id}\nDate: {payment.payment_date.strftime('%d %b %Y')}",
+                notification_type="PAYMENT_UPDATE",
+                related_pickup=pickup,
+                action_url="/admin/payments",
+            )
+        except Exception as e:
+            print("Admin payment notification error:", e)
+
+        serializer = PaymentSerializer(payment, context={"request": request})
+        return Response({
+            "success": True,
+            "message": "Payment verified and recorded successfully.",
+            "payment": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminPaymentListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        date_str = request.query_params.get("date")
+        status_filter = request.query_params.get("status")
+
+        # Sync any completed pickups that don't yet have a Payment record
+        completed_pickups = WastePickupRequest.objects.filter(status="COMPLETED")
+        for p in completed_pickups:
+            Payment.objects.get_or_create(
+                pickup_request=p,
+                defaults={
+                    "user": p.user,
+                    "amount": 50.00,
+                    "payment_status": "PENDING",
+                }
+            )
+
+        qs = Payment.objects.select_related(
+            "pickup_request",
+            "pickup_request__assigned_staff",
+            "pickup_request__assigned_staff__user",
+            "pickup_request__collection",
+            "user",
+            "user__userprofile",
+            "user__userprofile__ward",
+        ).all().order_by("-created_at", "-id")
+
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                qs = qs.filter(
+                    models.Q(payment_date__date=target_date) |
+                    models.Q(pickup_request__date=target_date) |
+                    models.Q(created_at__date=target_date)
+                )
+            except ValueError:
+                pass
+
+        total_payments_count = qs.count()
+        completed_count = qs.filter(payment_status="COMPLETED").count()
+        pending_count = qs.filter(payment_status="PENDING").count()
+        total_amount_collected = completed_count * 50.0
+        pending_amount = pending_count * 50.0
+
+        if status_filter and status_filter.upper() in ["PENDING", "COMPLETED"]:
+            qs = qs.filter(payment_status=status_filter.upper())
+
+        serializer = PaymentSerializer(qs, many=True, context={"request": request})
+
+        return Response({
+            "success": True,
+            "date": date_str,
+            "status_filter": status_filter,
+            "totals": {
+                "total_payments": total_payments_count,
+                "completed_payments": completed_count,
+                "pending_payments": pending_count,
+                "total_amount_collected": total_amount_collected,
+                "pending_amount": pending_amount,
+            },
+            "payments": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminRequestPaymentReminderView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk=None):
+        payment_id = pk or request.data.get("payment_id") or request.data.get("pickup_id")
+        if not payment_id:
+            return Response({"success": False, "error": "Payment or Pickup ID required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        payment = None
+        if pk or request.data.get("payment_id"):
+            payment = Payment.objects.filter(models.Q(id=payment_id) | models.Q(payment_id=str(payment_id))).first()
+        if not payment and request.data.get("pickup_id"):
+            payment = Payment.objects.filter(pickup_request_id=request.data.get("pickup_id")).first()
+
+        if not payment:
+            return Response({"success": False, "error": "Payment record not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if payment.payment_status == "COMPLETED":
+            return Response({"success": False, "error": "Payment is already completed. No reminder needed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            create_notification(
+                recipient=payment.user,
+                title="Payment Reminder",
+                message=f"Your payment of ₹50 for Pickup #{payment.pickup_request.id} is still pending. Please complete the payment.",
+                notification_type="PAYMENT_UPDATE",
+                related_pickup=payment.pickup_request,
+                action_url=f"/payment/{payment.pickup_request.id}",
+            )
+        except Exception as notif_err:
+            print("Payment reminder notification error:", notif_err)
+
+        return Response({
+            "success": True,
+            "message": f"Payment reminder notification successfully sent to {payment.user.username}.",
+        }, status=status.HTTP_200_OK)
+
+
+class UserPaymentsListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = request.user
+        if not (user and user.is_authenticated):
+            user_id = request.query_params.get("user_id")
+            if user_id:
+                qs = Payment.objects.filter(user_id=user_id)
+            else:
+                qs = Payment.objects.all()
+        else:
+            qs = Payment.objects.filter(user=user)
+
+        qs = qs.select_related(
+            "pickup_request",
+            "pickup_request__assigned_staff",
+            "pickup_request__collection",
+            "user",
+            "user__userprofile",
+            "user__userprofile__ward",
+        ).order_by("-created_at")
+
+        serializer = PaymentSerializer(qs, many=True, context={"request": request})
+        return Response({
+            "success": True,
+            "count": qs.count(),
+            "payments": serializer.data,
+        }, status=status.HTTP_200_OK)
+
 
 
 

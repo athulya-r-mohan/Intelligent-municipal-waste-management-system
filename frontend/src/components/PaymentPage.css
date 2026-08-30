@@ -1,0 +1,313 @@
+/* Payment Page Styles */
+.ep-payment-page {
+  min-height: 100vh;
+  background-color: #f2fbf5;
+  color: #0f241a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.ep-payment-topbar {
+  background: #ffffff;
+  border-bottom: 1px solid #dcefe2;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.ep-payment-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ep-payment-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #effbf2;
+  border: 1px solid #dcefe2;
+  color: #137a41;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ep-payment-back-btn:hover {
+  background: #e4f7ea;
+  border-color: #1fa35a;
+}
+
+.ep-payment-brand {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f241a;
+}
+
+.ep-payment-brand span {
+  color: #1fa35a;
+}
+
+.ep-payment-container {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ep-payment-card {
+  background: #ffffff;
+  border: 1px solid #dcefe2;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 24px rgba(19, 122, 65, 0.05);
+  margin-bottom: 24px;
+}
+
+.ep-payment-card-header {
+  border-bottom: 1px solid #eef7f1;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ep-payment-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f241a;
+  margin: 0 0 6px;
+}
+
+.ep-payment-subtitle {
+  font-size: 13.5px;
+  color: #5c7c6d;
+  margin: 0;
+}
+
+.ep-pickup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #effbf2;
+  color: #137a41;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  border: 1px solid #dcefe2;
+}
+
+/* Pickup Summary Grid */
+.ep-pickup-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+  background: #f9fdfa;
+  border: 1px solid #e6f4ec;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.ep-pickup-field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #718d7f;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.ep-pickup-field-val {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #0f241a;
+}
+
+/* Fixed Fee Amount Callout */
+.ep-fee-box {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 16px;
+  padding: 24px 28px;
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+}
+
+.ep-fee-title {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ep-fee-desc {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.ep-fee-amount {
+  font-family: 'Poppins', sans-serif;
+  font-size: 36px;
+  font-weight: 800;
+}
+
+/* Payment Method Options */
+.ep-method-section-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f241a;
+  margin-bottom: 14px;
+}
+
+.ep-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.ep-method-card {
+  border: 1.5px solid #dcefe2;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ep-method-card.active {
+  border-color: #1fa35a;
+  background: #effbf2;
+  box-shadow: 0 4px 14px rgba(31, 163, 90, 0.15);
+}
+
+.ep-method-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ep-method-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f241a;
+}
+
+.ep-method-desc {
+  font-size: 11.5px;
+  color: #718d7f;
+}
+
+/* Action Button */
+.ep-pay-submit-btn {
+  width: 100%;
+  background: #1fa35a;
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  padding: 16px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+  box-shadow: 0 6px 20px rgba(31, 163, 90, 0.3);
+}
+
+.ep-pay-submit-btn:hover:not(:disabled) {
+  background: #137a41;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(19, 122, 65, 0.38);
+}
+
+.ep-pay-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Success Card */
+.ep-payment-success-card {
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.ep-success-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  border: 2px solid #a7f3d0;
+}
+
+.ep-success-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #064e3b;
+  margin-bottom: 8px;
+}
+
+.ep-success-desc {
+  font-size: 14px;
+  color: #5c7c6d;
+  max-width: 440px;
+  margin: 0 auto 24px;
+}
+
+.ep-success-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .ep-payment-topbar {
+    padding: 12px 16px;
+  }
+  .ep-payment-container {
+    padding: 20px 16px 48px;
+  }
+  .ep-payment-card {
+    padding: 20px 16px;
+  }
+  .ep-fee-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

@@ -6,6 +6,7 @@ from .models import (
     WasteComplaint,
     StaffMCFCollection,
     MCFRecyclerAssignment,
+    Payment,
 )
 from accounts.models import UserProfile, Recycler
 
@@ -237,6 +238,12 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
     completed_time = serializers.SerializerMethodField()
     ai_confidence = serializers.SerializerMethodField()
     payment_qr_data = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+    payment_amount = serializers.SerializerMethodField()
+    payment_id = serializers.SerializerMethodField()
+    payment_date = serializers.SerializerMethodField()
+    transaction_id = serializers.SerializerMethodField()
+    has_paid = serializers.SerializerMethodField()
 
     # ========================================================
     # META
@@ -280,6 +287,12 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             "completed_date",
             "completed_time",
             "payment_qr_data",
+            "payment_status",
+            "payment_amount",
+            "payment_id",
+            "payment_date",
+            "transaction_id",
+            "has_paid",
         ]
 
     # ========================================================
@@ -513,20 +526,64 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             # Payment QR is ONLY available after completion
             if obj.status == "COMPLETED" and hasattr(obj, "collection") and obj.collection:
                 weight = float(obj.collection.estimated_weight)
-                # Calculate demo rate e.g., ₹15 per kg or minimum ₹50
-                amount = max(50.0, round(weight * 15.0, 2))
+                amount = 50.0
                 return {
                     "upi_id": "ecopulse@upi",
                     "payee_name": "EcoPulse Municipal Waste Management",
-                    "amount": amount,
+                    "amount": 50.0,
                     "currency": "INR",
                     "request_id": obj.id,
                     "weight_kg": weight,
-                    "qr_string": f"upi://pay?pa=ecopulse@upi&pn=EcoPulse%20Waste%20Management&am={amount}&cu=INR&tn=Waste%20Pickup%20Request%20%23{obj.id}",
+                    "qr_string": f"upi://pay?pa=ecopulse@upi&pn=EcoPulse%20Waste%20Management&am=50&cu=INR&tn=Waste%20Pickup%20Request%20%23{obj.id}",
                 }
         except Exception:
             pass
         return None
+
+    def get_payment_status(self, obj):
+        try:
+            if hasattr(obj, "payment") and obj.payment:
+                return obj.payment.payment_status
+            if obj.status == "COMPLETED":
+                return "PENDING"
+        except Exception:
+            pass
+        return "N/A"
+
+    def get_payment_amount(self, obj):
+        return 50.00
+
+    def get_payment_id(self, obj):
+        try:
+            if hasattr(obj, "payment") and obj.payment:
+                return obj.payment.payment_id
+        except Exception:
+            pass
+        return None
+
+    def get_payment_date(self, obj):
+        try:
+            if hasattr(obj, "payment") and obj.payment and obj.payment.payment_date:
+                return obj.payment.payment_date.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+        return None
+
+    def get_transaction_id(self, obj):
+        try:
+            if hasattr(obj, "payment") and obj.payment:
+                return obj.payment.transaction_id
+        except Exception:
+            pass
+        return None
+
+    def get_has_paid(self, obj):
+        try:
+            if hasattr(obj, "payment") and obj.payment:
+                return obj.payment.payment_status == "COMPLETED"
+        except Exception:
+            pass
+        return False
 
 
 # ============================================================
@@ -837,6 +894,152 @@ class MCFRecyclerAssignmentSerializer(serializers.ModelSerializer):
         except Exception:
             pass
         return None
+
+
+# ============================================================
+# PAYMENT SERIALIZER
+# ============================================================
+
+class PaymentSerializer(serializers.ModelSerializer):
+    pickup_id = serializers.IntegerField(source="pickup_request.id", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    user_name = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_phone = serializers.SerializerMethodField()
+    ward = serializers.SerializerMethodField()
+    ward_id = serializers.SerializerMethodField()
+    waste_type = serializers.SerializerMethodField()
+    pickup_location = serializers.CharField(source="pickup_request.location_name", read_only=True)
+    pickup_date = serializers.DateTimeField(source="pickup_request.created_at", format="%Y-%m-%d", read_only=True)
+    completed_date = serializers.SerializerMethodField()
+    completed_weight = serializers.SerializerMethodField()
+    assigned_staff_name = serializers.SerializerMethodField()
+    completion_image = serializers.SerializerMethodField()
+    payment_date_formatted = serializers.DateTimeField(source="payment_date", format="%Y-%m-%d %H:%M:%S", read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = [
+            "id",
+            "pickup_request",
+            "pickup_id",
+            "user",
+            "user_id",
+            "user_name",
+            "user_email",
+            "user_phone",
+            "ward",
+            "ward_id",
+            "waste_type",
+            "pickup_location",
+            "pickup_date",
+            "completed_date",
+            "completed_weight",
+            "assigned_staff_name",
+            "completion_image",
+            "amount",
+            "payment_status",
+            "payment_id",
+            "transaction_id",
+            "order_id",
+            "payment_method",
+            "payment_date",
+            "payment_date_formatted",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "amount",
+            "payment_id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_user_name(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.name:
+                return profile.name
+            return obj.user.get_full_name() or obj.user.username
+        except Exception:
+            return ""
+
+    def get_user_phone(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.phone:
+                return profile.phone
+        except Exception:
+            pass
+        return ""
+
+    def get_ward(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.ward:
+                return profile.ward.ward_name
+        except Exception:
+            pass
+        return ""
+
+    def get_ward_id(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.ward:
+                return profile.ward.ward_id
+        except Exception:
+            pass
+        return None
+
+    def get_waste_type(self, obj):
+        try:
+            img = obj.pickup_request.waste_images.first()
+            if img and img.waste_type:
+                return img.waste_type
+        except Exception:
+            pass
+        return "Waste"
+
+    def get_completed_date(self, obj):
+        try:
+            if hasattr(obj.pickup_request, "collection") and obj.pickup_request.collection and obj.pickup_request.collection.completed_at:
+                return obj.pickup_request.collection.completed_at.strftime("%B %d, %Y %I:%M %p")
+        except Exception:
+            pass
+        return None
+
+    def get_completed_weight(self, obj):
+        try:
+            if hasattr(obj.pickup_request, "collection") and obj.pickup_request.collection:
+                return float(obj.pickup_request.collection.estimated_weight)
+        except Exception:
+            pass
+        return None
+
+    def get_assigned_staff_name(self, obj):
+        try:
+            staff = obj.pickup_request.assigned_staff
+            if staff and staff.user:
+                profile = getattr(staff.user, "userprofile", None)
+                if profile and profile.name:
+                    return profile.name
+                return staff.user.get_full_name() or staff.user.username
+        except Exception:
+            pass
+        return None
+
+    def get_completion_image(self, obj):
+        try:
+            if hasattr(obj.pickup_request, "collection") and obj.pickup_request.collection and obj.pickup_request.collection.completion_image:
+                request = self.context.get("request")
+                if request:
+                    return request.build_absolute_uri(obj.pickup_request.collection.completion_image.url)
+                return obj.pickup_request.collection.completion_image.url
+        except Exception:
+            pass
+        return None
+
 
 
 
