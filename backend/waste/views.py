@@ -250,16 +250,18 @@ def detect_waste(request):
         # ====================================================
 
         print(
-            "RUNNING YOLO..."
+            "RUNNING YOLO DETECTION..."
         )
-
+        print(
+            "IMAGE FILE:",
+            uploaded_image.name
+        )
 
         results = model.predict(
             source=temp_file.name,
-            conf=0.50,
+            conf=0.25,
             verbose=False
         )
-
 
         print(
             "YOLO PREDICTION COMPLETED"
@@ -336,6 +338,18 @@ def detect_waste(request):
         print(
             "DETECTIONS:",
             detections
+        )
+        print(
+            "Number of detections:",
+            len(detections)
+        )
+        print(
+            "Detected classes:",
+            [d["class"] for d in detections]
+        )
+        print(
+            "Confidence values:",
+            [d["confidence"] for d in detections]
         )
 
 

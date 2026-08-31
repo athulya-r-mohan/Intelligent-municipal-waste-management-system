@@ -39,6 +39,7 @@ const getAccessToken = () => {
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     localStorage.getItem("accessToken") ||
+    localStorage.getItem("token") ||
     ""
   );
 };
@@ -608,10 +609,15 @@ export default function EcoPulseWastePickup({
           );
         }
 
-        let detections = [];
-        if (response.ok && data?.success && Array.isArray(data.detections)) {
-          detections = data.detections;
+        if (!response.ok || data?.success === false) {
+          throw new Error(
+            data?.message ||
+              data?.detail ||
+              `AI detection failed with status ${response.status}.`
+          );
         }
+
+        const detections = Array.isArray(data?.detections) ? data.detections : [];
 
         imageResults.push({
           imageName:
@@ -670,19 +676,10 @@ export default function EcoPulseWastePickup({
         error
       );
 
-      // If AI detection endpoint encounters an error, do NOT block the user request.
-      // Set empty detection result so user can still submit pickup request.
-      setAiResult({
-        success: true,
-        detections: [],
-        imageResults: images.map((img, idx) => ({
-          imageName: img.file.name,
-          imageIndex: idx + 1,
-          detections: [],
-        })),
-        totalImages: images.length,
-        totalDetections: 0,
-      });
+      setAiError(
+        error?.message ||
+          "Unable to complete AI waste detection. Please try again."
+      );
     } finally {
       setAiLoading(false);
     }
