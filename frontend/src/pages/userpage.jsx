@@ -4,6 +4,8 @@ import API from "../api/api";
 import "../components/userpage.css";
 import NotificationBell from "../components/NotificationBell";
 import PaymentReceiptModal from "../components/PaymentReceiptModal";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import { performLogout } from "../utils/auth";
 import { Receipt } from "lucide-react";
  
 const WARD_DATA = [
@@ -114,6 +116,7 @@ const MENU_ITEMS = [
 export default function EcoPulseStaff() {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [activeWard, setActiveWard] = useState(0);
   const [houses, setHouses] = useState(Array(HOUSE_COUNT).fill("pending"));
   const [collected, setCollected] = useState(0);
@@ -411,8 +414,12 @@ export default function EcoPulseStaff() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
-    navigate("/login");
+    setDrawerOpen(false);
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    performLogout(navigate);
   };
 
   const handleMenuClick = (key) => {
@@ -2227,6 +2234,15 @@ export default function EcoPulseStaff() {
           onClose={() => setReceiptPayment(null)}
         />
       )}
+
+      {/* ============================================================ */}
+      {/* LOGOUT CONFIRMATION MODAL */}
+      {/* ============================================================ */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

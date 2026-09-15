@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { NotificationProvider } from "./context/NotificationContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -29,29 +30,40 @@ export default function App() {
   return (
     <NotificationProvider>
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/user" element={<Userpage />} />
-        <Route path="/admin" element={<Adminpage />} />
-        <Route path="/admincomplaints" element={<Admincomplaints />} />
-        <Route path="/complaints" element={<Admincomplaints />} />
-        <Route path="/staff" element={<Staffpage />} />
-        <Route path="/stafftask" element={<StaffTaskpage />} />
-        <Route path="/taskupdate/:id" element={<Taskstatusupdate />} />
-        <Route path="/recycler" element={<Recyclerpage />} />
-        <Route path="/pickupform" element={<Pickuprequestform />} />
-        <Route path="/complaintform" element={<Wastecomplaintform />} />
-        <Route path="/addstaff" element={<Addstaffform />} />
-        <Route path="/addrecycler" element={<Addrecycler />} />
-        <Route path="/resident" element={<Residentdirectory />} />
-        <Route path="/assign" element={<PickupAssignment />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/staff/mcf" element={<StaffMCFCollection />} />
-        <Route path="/admin/mcf" element={<AdminMCFList />} />
-        <Route path="/admin/mcf/details" element={<AdminMCFDetails />} />
-        <Route path="/payment/:pickupId" element={<PaymentPage />} />
-        <Route path="/admin/payments" element={<AdminPayments />} />
+
+        {/* Citizen Routes */}
+        <Route path="/user" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><Userpage /></ProtectedRoute>} />
+        <Route path="/pickupform" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><Pickuprequestform /></ProtectedRoute>} />
+        <Route path="/complaintform" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><Wastecomplaintform /></ProtectedRoute>} />
+        <Route path="/payment/:pickupId" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><PaymentPage /></ProtectedRoute>} />
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Adminpage /></ProtectedRoute>} />
+        <Route path="/admincomplaints" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Admincomplaints /></ProtectedRoute>} />
+        <Route path="/complaints" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Admincomplaints /></ProtectedRoute>} />
+        <Route path="/addstaff" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Addstaffform /></ProtectedRoute>} />
+        <Route path="/addrecycler" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Addrecycler /></ProtectedRoute>} />
+        <Route path="/resident" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Residentdirectory /></ProtectedRoute>} />
+        <Route path="/assign" element={<ProtectedRoute allowedRoles={["ADMIN"]}><PickupAssignment /></ProtectedRoute>} />
+        <Route path="/admin/mcf" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminMCFList /></ProtectedRoute>} />
+        <Route path="/admin/mcf/details" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminMCFDetails /></ProtectedRoute>} />
+        <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminPayments /></ProtectedRoute>} />
+
+        {/* Staff Routes */}
+        <Route path="/staff" element={<ProtectedRoute allowedRoles={["STAFF"]}><Staffpage /></ProtectedRoute>} />
+        <Route path="/stafftask" element={<ProtectedRoute allowedRoles={["STAFF"]}><StaffTaskpage /></ProtectedRoute>} />
+        <Route path="/taskupdate/:id" element={<ProtectedRoute allowedRoles={["STAFF"]}><Taskstatusupdate /></ProtectedRoute>} />
+        <Route path="/staff/mcf" element={<ProtectedRoute allowedRoles={["STAFF"]}><StaffMCFCollection /></ProtectedRoute>} />
+
+        {/* Recycler Routes */}
+        <Route path="/recycler" element={<ProtectedRoute allowedRoles={["RECYCLER"]}><Recyclerpage /></ProtectedRoute>} />
+
+        {/* Common Authenticated Routes */}
+        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
       </Routes>
     </NotificationProvider>
   );

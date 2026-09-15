@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
 import PaymentReceiptModal from "../components/PaymentReceiptModal";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminPayments.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -51,10 +53,20 @@ export default function AdminPayments() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [remindingId, setRemindingId] = useState(null);
   const [toastMessage, setToastMessage] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedPickupDetail, setSelectedPickupDetail] = useState(null);
+
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: null });
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
 
   useEffect(() => {
     fetchPayments();
@@ -88,6 +100,27 @@ export default function AdminPayments() {
       setLoading(false);
     }
   };
+
+  const filteredPayments = payments.filter((p) => {
+    if (statusFilter !== "ALL" && p.payment_status !== statusFilter) {
+      return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = (p.user_name || "").toLowerCase().includes(q);
+      const matchId = String(p.pickup_id || p.pickup_request || "").includes(q);
+      const matchPayId = (p.payment_id || "").toLowerCase().includes(q);
+      const matchWard = (p.ward || "").toLowerCase().includes(q);
+      const matchLoc = (p.pickup_location || "").toLowerCase().includes(q);
+      return matchName || matchId || matchPayId || matchWard || matchLoc;
+    }
+    return true;
+  });
+
+  const sortedPayments = sortTableData(filteredPayments, sortConfig.key, sortConfig.dir, {
+    pickup_id: (p) => p.pickup_id || p.pickup_request || 0,
+    amount: (p) => Number(p.amount) || 50,
+  });
 
   const handleRequestReminder = async (payment) => {
     try {
@@ -272,33 +305,51 @@ export default function AdminPayments() {
             <table className="ep-admin-pay-table">
               <thead>
                 <tr>
-                  <th>Payment ID</th>
-                  <th>Pickup</th>
-                  <th>Resident / Contact</th>
-                  <th>Ward & Location</th>
-                  <th>Waste Type</th>
-                  <th>Fixed Fee</th>
-                  <th>Status</th>
-                  <th>Payment Date / Txn</th>
-                  <th>Actions</th>
+                  <SortableTh columnKey="payment_id" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Payment ID
+                  </SortableTh>
+                  <SortableTh columnKey="pickup_id" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Pickup
+                  </SortableTh>
+                  <SortableTh columnKey="user_name" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Resident / Contact
+                  </SortableTh>
+                  <SortableTh columnKey="ward" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Ward & Location
+                  </SortableTh>
+                  <SortableTh columnKey="waste_type" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Waste Type
+                  </SortableTh>
+                  <SortableTh columnKey="amount" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Fixed Fee
+                  </SortableTh>
+                  <SortableTh columnKey="payment_status" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Status
+                  </SortableTh>
+                  <SortableTh columnKey="payment_date" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Payment Date / Txn
+                  </SortableTh>
+                  <SortableTh disabled>
+                    Actions
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {loading && payments.length === 0 ? (
+                {loading && sortedPayments.length === 0 ? (
                   <tr>
                     <td colSpan={9} style={{ textAlign: "center", padding: "48px 20px" }}>
                       <div style={{ width: 32, height: 32, border: "3px solid #d1fae5", borderTopColor: "#10b981", borderRadius: "50%", margin: "0 auto 12px", animation: "staffSpin 1s linear infinite" }} />
                       <div style={{ fontSize: 14, fontWeight: 600, color: "#064e3b" }}>Loading payment records...</div>
                     </td>
                   </tr>
-                ) : payments.length === 0 ? (
+                ) : sortedPayments.length === 0 ? (
                   <tr>
                     <td colSpan={9} style={{ textAlign: "center", padding: "48px 20px", color: "#64748b" }}>
                       No payment records found for the selected criteria.
                     </td>
                   </tr>
                 ) : (
-                  payments.map((p) => (
+                  sortedPayments.map((p) => (
                     <tr key={p.id}>
                       <td>
                         <strong style={{ color: "#059669", fontSize: 13 }}>

@@ -8,8 +8,9 @@ import {
   AlertTriangle,
   Truck,
 } from "lucide-react";
-import axios from "axios";
 import "../components/Residentdirectory.css";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 
 const WARDS = [
   "All Wards",
@@ -204,6 +205,15 @@ export default function ResidentDirectory({ onBack }) {
 
   const [activeResident, setActiveResident] = useState(null);
 
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: null });
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
   // Residents fetched from Django UserProfile
   const [residents, setResidents] = useState([]);
 
@@ -254,6 +264,10 @@ export default function ResidentDirectory({ onBack }) {
       return wardOk && qOk;
     });
   }, [residents, appliedWard, appliedQuery]);
+
+  const sortedResidents = useMemo(() => {
+    return sortTableData(filtered, sortConfig.key, sortConfig.dir);
+  }, [filtered, sortConfig]);
 
   // ---------------------------------------------------------
   // Search
@@ -447,13 +461,27 @@ export default function ResidentDirectory({ onBack }) {
 
             <thead>
               <tr>
-                <th>No</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Address</th>
-                <th>Ward</th>
-                <th>History</th>
+                <SortableTh columnKey="id" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  No
+                </SortableTh>
+                <SortableTh columnKey="name" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Name
+                </SortableTh>
+                <SortableTh columnKey="email" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Email
+                </SortableTh>
+                <SortableTh columnKey="phone" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Phone
+                </SortableTh>
+                <SortableTh columnKey="address" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Address
+                </SortableTh>
+                <SortableTh columnKey="ward" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Ward
+                </SortableTh>
+                <SortableTh disabled>
+                  History
+                </SortableTh>
               </tr>
             </thead>
 
@@ -475,7 +503,7 @@ export default function ResidentDirectory({ onBack }) {
 
               ) : (
 
-                filtered.map((r, i) => (
+                sortedResidents.map((r, i) => (
 
                   <tr key={r.id}>
 

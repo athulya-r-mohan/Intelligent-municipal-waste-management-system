@@ -19,6 +19,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminMCFDetails.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -43,6 +45,23 @@ export default function AdminMCFDetails() {
   const [recyclers, setRecyclers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [catSortConfig, setCatSortConfig] = useState({ key: null, dir: null });
+  const [staffSortConfig, setStaffSortConfig] = useState({ key: null, dir: null });
+
+  const handleCatSort = (key) => {
+    setCatSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
+  const handleStaffSort = (key) => {
+    setStaffSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
   const [successToast, setSuccessToast] = useState("");
 
   // Assign Modal State
@@ -242,14 +261,25 @@ export default function AdminMCFDetails() {
             <table className="mcf-category-table">
               <thead>
                 <tr>
-                  <th>Waste Type</th>
-                  <th>Total Quantity</th>
-                  <th>Assigned Recycler</th>
-                  <th style={{ textAlign: "right" }}>Action</th>
+                  <SortableTh columnKey="waste_type" currentSortKey={catSortConfig.key} currentSortDir={catSortConfig.dir} onSort={handleCatSort}>
+                    Waste Type
+                  </SortableTh>
+                  <SortableTh columnKey="total_quantity" currentSortKey={catSortConfig.key} currentSortDir={catSortConfig.dir} onSort={handleCatSort}>
+                    Total Quantity
+                  </SortableTh>
+                  <SortableTh columnKey="assigned_recycler" currentSortKey={catSortConfig.key} currentSortDir={catSortConfig.dir} onSort={handleCatSort}>
+                    Assigned Recycler
+                  </SortableTh>
+                  <SortableTh disabled align="right">
+                    Action
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {dateData?.categories?.map((cat) => {
+                {sortTableData(dateData?.categories || [], catSortConfig.key, catSortConfig.dir, {
+                  total_quantity: (c) => Number(c.total_quantity) || 0,
+                  assigned_recycler: (c) => c.assignment?.recycler_organization || "ZZZ",
+                }).map((cat) => {
                   const icon = CATEGORY_ICONS[cat.waste_type] || "📦";
                   const isAssigned = cat.is_assigned && cat.assignment;
                   const assign = cat.assignment;
@@ -333,19 +363,47 @@ export default function AdminMCFDetails() {
             <table className="mcf-category-table">
               <thead>
                 <tr>
-                  <th>Staff Member</th>
-                  <th>Paper</th>
-                  <th>Plastic</th>
-                  <th>Glass</th>
-                  <th>Metal</th>
-                  <th>Organic</th>
-                  <th>Electronics</th>
-                  <th>Misc</th>
-                  <th style={{ textAlign: "right" }}>Staff Total</th>
+                  <SortableTh columnKey="staff_name" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Staff Member
+                  </SortableTh>
+                  <SortableTh columnKey="paper" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Paper
+                  </SortableTh>
+                  <SortableTh columnKey="plastic" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Plastic
+                  </SortableTh>
+                  <SortableTh columnKey="glass" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Glass
+                  </SortableTh>
+                  <SortableTh columnKey="metal" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Metal
+                  </SortableTh>
+                  <SortableTh columnKey="organic" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Organic
+                  </SortableTh>
+                  <SortableTh columnKey="electronics" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Electronics
+                  </SortableTh>
+                  <SortableTh columnKey="miscellaneous" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort}>
+                    Misc
+                  </SortableTh>
+                  <SortableTh columnKey="total_quantity" currentSortKey={staffSortConfig.key} currentSortDir={staffSortConfig.dir} onSort={handleStaffSort} align="right">
+                    Staff Total
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {dateData?.staff_submissions?.map((sub) => (
+                {sortTableData(dateData?.staff_submissions || [], staffSortConfig.key, staffSortConfig.dir, {
+                  staff_name: (s) => s.staff_name || `Staff #${s.staff_id}`,
+                  paper: (s) => Number(s.paper) || 0,
+                  plastic: (s) => Number(s.plastic) || 0,
+                  glass: (s) => Number(s.glass) || 0,
+                  metal: (s) => Number(s.metal) || 0,
+                  organic: (s) => Number(s.organic) || 0,
+                  electronics: (s) => Number(s.electronics) || 0,
+                  miscellaneous: (s) => Number(s.miscellaneous) || 0,
+                  total_quantity: (s) => Number(s.total_quantity) || 0,
+                }).map((sub) => (
                   <tr key={sub.id}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }}>

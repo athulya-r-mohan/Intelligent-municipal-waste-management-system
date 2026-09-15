@@ -3,6 +3,8 @@ import axios from "axios";
 import "../components/Adminpage.css";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../components/NotificationBell";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import { performLogout } from "../utils/auth";
 import {
   LayoutDashboard,
   Building2,
@@ -135,6 +137,7 @@ function Card({ title, sub, count, icon: Icon, onClick }) {
 
 export default function EcoPulseAdmin() {
   const [page, setPage] = useState("dashboard");
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [stats, setStats] = useState({
     pending_count: 0,
     completed_count: 0,
@@ -218,10 +221,7 @@ export default function EcoPulseAdmin() {
         <div className="admin-sidebar-spacer" />
         <button
           className="admin-logout"
-          onClick={() => {
-            localStorage.clear();
-            navigate("/login");
-          }}
+          onClick={() => setShowLogoutModal(true)}
         >
           <LogOut size={17} strokeWidth={2} />
           <span>Logout</span>
@@ -309,6 +309,12 @@ export default function EcoPulseAdmin() {
           </div>
         )}
       </main>
+
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={() => performLogout(navigate)}
+      />
     </div>
   );
 }

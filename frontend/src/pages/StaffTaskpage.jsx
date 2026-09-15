@@ -8,8 +8,14 @@ import {
   Trash2,
   Recycle,
   Truck,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 
 // ============================================================
 // API BASE URL
@@ -156,9 +162,228 @@ function MiniCalendar() {
 }
  
 // ---------------------------------------------------------------------------
+// Staff Filter Bar Component
+// ---------------------------------------------------------------------------
+function StaffFilterBar({
+  search,
+  onSearchChange,
+  wasteType,
+  onWasteTypeChange,
+  priority,
+  onPriorityChange,
+  date,
+  onDateChange,
+  status,
+  onStatusChange,
+  statusOptions = [],
+  onClear,
+  placeholder = "Search...",
+  totalCount = 0,
+  filteredCount = 0,
+}) {
+  const hasActiveFilters = Boolean(
+    search || wasteType || priority || date || status
+  );
+
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid #cfe7bb",
+        borderRadius: 12,
+        padding: "14px 18px",
+        marginBottom: 16,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 12,
+        alignItems: "center",
+        justifyContent: "space-between",
+        boxShadow: "0 1px 3px rgba(76,122,46,0.06)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+          flex: 1,
+          minWidth: 280,
+        }}
+      >
+        {/* Search Input */}
+        <div style={{ position: "relative", minWidth: 200, flex: "1 1 200px" }}>
+          <span
+            style={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: 13,
+              color: "#5f8a45",
+            }}
+          >
+            🔍
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={placeholder}
+            style={{
+              width: "100%",
+              padding: "8px 12px 8px 30px",
+              borderRadius: 8,
+              border: "1.5px solid #cfe7bb",
+              background: "#f9fcf7",
+              fontSize: 13,
+              color: "#2f4a1c",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        {/* Waste Type Filter */}
+        {onWasteTypeChange && (
+          <select
+            value={wasteType || ""}
+            onChange={(e) => onWasteTypeChange(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1.5px solid #cfe7bb",
+              background: "#f9fcf7",
+              fontSize: 13,
+              color: "#2f4a1c",
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">All Waste Types</option>
+            <option value="Plastic">Plastic</option>
+            <option value="Paper">Paper</option>
+            <option value="Glass">Glass</option>
+            <option value="Metal">Metal</option>
+            <option value="Organic">Organic</option>
+            <option value="Electronics">Electronics</option>
+            <option value="Miscellaneous">Miscellaneous</option>
+          </select>
+        )}
+
+        {/* Priority Filter */}
+        {onPriorityChange && (
+          <select
+            value={priority || ""}
+            onChange={(e) => onPriorityChange(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1.5px solid #cfe7bb",
+              background: "#f9fcf7",
+              fontSize: 13,
+              color: "#2f4a1c",
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">All Priorities</option>
+            <option value="HIGH">High Priority</option>
+            <option value="MEDIUM">Medium Priority</option>
+            <option value="LOW">Low Priority</option>
+          </select>
+        )}
+
+        {/* Date Filter */}
+        <input
+          type="date"
+          value={date || ""}
+          onChange={(e) => onDateChange(e.target.value)}
+          title="Filter by Date"
+          style={{
+            padding: "7px 10px",
+            borderRadius: 8,
+            border: "1.5px solid #cfe7bb",
+            background: "#f9fcf7",
+            fontSize: 13,
+            color: "#2f4a1c",
+            outline: "none",
+            cursor: "pointer",
+          }}
+        />
+
+        {/* Status Filter */}
+        {statusOptions && statusOptions.length > 0 && (
+          <select
+            value={status || ""}
+            onChange={(e) => onStatusChange(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1.5px solid #cfe7bb",
+              background: "#f9fcf7",
+              fontSize: 13,
+              color: "#2f4a1c",
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">All Statuses</option>
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Clear Filters Button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={onClear}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 8,
+              border: "1px solid #ef4444",
+              background: "#fef2f2",
+              color: "#b91c1c",
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              transition: "all 0.15s ease",
+            }}
+            title="Reset all filters to default"
+          >
+            <RotateCcw size={13} />
+            Clear Filters
+          </button>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12.5, color: "#5f8a45", fontWeight: 500 }}>
+        Showing <strong>{filteredCount}</strong> of {totalCount} records
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Task table
 // ---------------------------------------------------------------------------
-function TaskTable({ tasks, loading, error, onStatusClick, onOpenRoute }) {
+function TaskTable({
+  tasks,
+  loading,
+  error,
+  onStatusClick,
+  onOpenRoute,
+  sortKey,
+  sortDir,
+  onSort,
+}) {
   return (
     <div
       style={{
@@ -172,27 +397,103 @@ function TaskTable({ tasks, loading, error, onStatusClick, onOpenRoute }) {
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
         <thead>
           <tr style={{ background: "#eaf5e0" }}>
-            {["S.No", "Today's Pickup", "Ward", "Waste Type", "Task Status"].map((h) => (
-              <th
-                key={h}
-                style={{
-                  textAlign: "left",
-                  padding: "12px 16px",
-                  color: "#2f4a1c",
-                  fontWeight: 600,
-                  borderBottom: "1px solid #cfe7bb",
-                }}
-              >
-                {h}
-              </th>
-            ))}
+            <SortableTh
+              columnKey="id"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              S.No / ID
+            </SortableTh>
+            <SortableTh
+              columnKey="pickup"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Today's Pickup / Location
+            </SortableTh>
+            <SortableTh
+              columnKey="ward"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Ward
+            </SortableTh>
+            <SortableTh
+              columnKey="wasteType"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Waste Type
+            </SortableTh>
+            <SortableTh
+              columnKey="date"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Date
+            </SortableTh>
+            <SortableTh
+              columnKey="status"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Task Status
+            </SortableTh>
           </tr>
         </thead>
         <tbody>
           {loading && (
             <tr>
               <td
-                colSpan="5"
+                colSpan="6"
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -208,7 +509,7 @@ function TaskTable({ tasks, loading, error, onStatusClick, onOpenRoute }) {
           {!loading && error && (
             <tr>
               <td
-                colSpan="5"
+                colSpan="6"
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -224,7 +525,7 @@ function TaskTable({ tasks, loading, error, onStatusClick, onOpenRoute }) {
           {!loading && !error && tasks.length === 0 && (
             <tr>
               <td
-                colSpan="5"
+                colSpan="6"
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -301,6 +602,9 @@ function TaskTable({ tasks, loading, error, onStatusClick, onOpenRoute }) {
                 >
                   <Recycle size={13} /> {t.wasteType}
                 </span>
+              </td>
+              <td style={{ padding: "14px 16px", color: "#39511f", fontSize: 12.5 }}>
+                {t.date || "Today"}
               </td>
               <td style={{ padding: "14px 16px" }}>
                 <button
@@ -968,6 +1272,9 @@ function ComplaintTaskTable({
   onOpenRoute,
   onOpenResolveModal,
   onPreviewImage,
+  sortKey,
+  sortDir,
+  onSort,
 }) {
   return (
     <div
@@ -982,37 +1289,154 @@ function ComplaintTaskTable({
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
         <thead>
           <tr style={{ background: "#eaf5e0" }}>
-            {[
-              "ID",
-              "Waste Photo",
-              "Dumped Location",
-              "Priority",
-              "Citizen Info",
-              "Description",
-              "Status",
-              "Route / Nav",
-              "Action",
-            ].map((h) => (
-              <th
-                key={h}
-                style={{
-                  textAlign: "left",
-                  padding: "12px 16px",
-                  color: "#2f4a1c",
-                  fontWeight: 600,
-                  borderBottom: "1px solid #cfe7bb",
-                }}
-              >
-                {h}
-              </th>
-            ))}
+            <SortableTh
+              columnKey="id"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              ID
+            </SortableTh>
+            <SortableTh
+              disabled
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Waste Photo
+            </SortableTh>
+            <SortableTh
+              columnKey="location_name"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Dumped Location
+            </SortableTh>
+            <SortableTh
+              columnKey="priority"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Priority
+            </SortableTh>
+            <SortableTh
+              columnKey="citizen_name"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Citizen Info
+            </SortableTh>
+            <SortableTh
+              columnKey="description"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Description
+            </SortableTh>
+            <SortableTh
+              columnKey="created_at"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Date
+            </SortableTh>
+            <SortableTh
+              columnKey="status"
+              currentSortKey={sortKey}
+              currentSortDir={sortDir}
+              onSort={onSort}
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Status
+            </SortableTh>
+            <SortableTh
+              disabled
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Route / Nav
+            </SortableTh>
+            <SortableTh
+              disabled
+              style={{
+                textAlign: "left",
+                padding: "12px 16px",
+                color: "#2f4a1c",
+                fontWeight: 600,
+                borderBottom: "1px solid #cfe7bb",
+              }}
+            >
+              Action
+            </SortableTh>
           </tr>
         </thead>
         <tbody>
           {loading && (
             <tr>
               <td
-                colSpan="9"
+                colSpan="10"
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -1028,7 +1452,7 @@ function ComplaintTaskTable({
           {!loading && error && (
             <tr>
               <td
-                colSpan="9"
+                colSpan="10"
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -1044,7 +1468,7 @@ function ComplaintTaskTable({
           {!loading && !error && complaints.length === 0 && (
             <tr>
               <td
-                colSpan="9"
+                colSpan="10"
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -1142,6 +1566,11 @@ function ComplaintTaskTable({
               {/* DESCRIPTION */}
               <td style={{ padding: "14px 16px", color: "#446152", fontSize: 12.5, maxWidth: 200 }}>
                 {c.description}
+              </td>
+
+              {/* DATE */}
+              <td style={{ padding: "14px 16px", color: "#39511f", fontSize: 12.5, whiteSpace: "nowrap" }}>
+                {c.created_at_formatted || (c.created_at ? new Date(c.created_at).toLocaleDateString() : (c.date || "-"))}
               </td>
 
               {/* STATUS */}
@@ -1270,7 +1699,8 @@ function ComplaintTaskTable({
 // ---------------------------------------------------------------------------
 export default function MyTaskDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("pickups"); // "pickups" | "complaints"
+  // 4 Tabs: "pending_requests" | "completed_requests" | "pending_complaints" | "completed_complaints"
+  const [activeTab, setActiveTab] = useState("pending_requests");
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1285,6 +1715,174 @@ export default function MyTaskDashboard() {
   const [activeResolveComplaint, setActiveResolveComplaint] = useState(null);
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
 
+  // Filter States for each section
+  const [pendingReqFilter, setPendingReqFilter] = useState({ search: "", wasteType: "", date: "", status: "" });
+  const [completedReqFilter, setCompletedReqFilter] = useState({ search: "", wasteType: "", date: "", status: "" });
+  const [pendingCompFilter, setPendingCompFilter] = useState({ search: "", priority: "", date: "", status: "" });
+  const [completedCompFilter, setCompletedCompFilter] = useState({ search: "", priority: "", date: "", status: "" });
+
+  // Sorting States for each section
+  const [pendingReqSort, setPendingReqSort] = useState({ key: null, dir: null });
+  const [completedReqSort, setCompletedReqSort] = useState({ key: null, dir: null });
+  const [pendingCompSort, setPendingCompSort] = useState({ key: null, dir: null });
+  const [completedCompSort, setCompletedCompSort] = useState({ key: null, dir: null });
+
+  // Categorize raw data into 4 buckets
+  const pendingTasksRaw = useMemo(() => {
+    return tasks.filter((t) => String(t.status || "").toUpperCase() !== "COMPLETED");
+  }, [tasks]);
+
+  const completedTasksRaw = useMemo(() => {
+    return tasks.filter((t) => String(t.status || "").toUpperCase() === "COMPLETED");
+  }, [tasks]);
+
+  const pendingComplaintsRaw = useMemo(() => {
+    return complaints.filter((c) => !["RESOLVED", "COMPLETED", "CLOSED"].includes(String(c.status || "").toUpperCase()));
+  }, [complaints]);
+
+  const completedComplaintsRaw = useMemo(() => {
+    return complaints.filter((c) => ["RESOLVED", "COMPLETED", "CLOSED"].includes(String(c.status || "").toUpperCase()));
+  }, [complaints]);
+
+  // Filtered & Sorted datasets
+  const filteredPendingTasks = useMemo(() => {
+    const list = pendingTasksRaw.filter((t) => {
+      if (pendingReqFilter.search) {
+        const q = pendingReqFilter.search.toLowerCase().trim();
+        const idMatch = String(t.id || "").toLowerCase().includes(q);
+        const nameMatch = String(t.userName || "").toLowerCase().includes(q);
+        const locMatch = String(t.pickup || t.location_name || "").toLowerCase().includes(q);
+        const wardMatch = String(t.ward || "").toLowerCase().includes(q);
+        if (!idMatch && !nameMatch && !locMatch && !wardMatch) return false;
+      }
+      if (pendingReqFilter.wasteType) {
+        if (String(t.wasteType || "").toLowerCase() !== pendingReqFilter.wasteType.toLowerCase()) return false;
+      }
+      if (pendingReqFilter.date) {
+        const d = String(t.date || "").split("T")[0];
+        if (d !== pendingReqFilter.date) return false;
+      }
+      if (pendingReqFilter.status) {
+        if (String(t.status || "").toUpperCase() !== pendingReqFilter.status.toUpperCase()) return false;
+      }
+      return true;
+    });
+    return sortTableData(list, pendingReqSort.key, pendingReqSort.dir, {
+      date: (t) => t.date || t.created_at || "",
+    });
+  }, [pendingTasksRaw, pendingReqFilter, pendingReqSort]);
+
+  const filteredCompletedTasks = useMemo(() => {
+    const list = completedTasksRaw.filter((t) => {
+      if (completedReqFilter.search) {
+        const q = completedReqFilter.search.toLowerCase().trim();
+        const idMatch = String(t.id || "").toLowerCase().includes(q);
+        const nameMatch = String(t.userName || "").toLowerCase().includes(q);
+        const locMatch = String(t.pickup || t.location_name || "").toLowerCase().includes(q);
+        const wardMatch = String(t.ward || "").toLowerCase().includes(q);
+        if (!idMatch && !nameMatch && !locMatch && !wardMatch) return false;
+      }
+      if (completedReqFilter.wasteType) {
+        if (String(t.wasteType || "").toLowerCase() !== completedReqFilter.wasteType.toLowerCase()) return false;
+      }
+      if (completedReqFilter.date) {
+        const d = String(t.date || "").split("T")[0];
+        if (d !== completedReqFilter.date) return false;
+      }
+      if (completedReqFilter.status) {
+        if (String(t.status || "").toUpperCase() !== completedReqFilter.status.toUpperCase()) return false;
+      }
+      return true;
+    });
+    return sortTableData(list, completedReqSort.key, completedReqSort.dir, {
+      date: (t) => t.date || t.completed_at || t.created_at || "",
+    });
+  }, [completedTasksRaw, completedReqFilter, completedReqSort]);
+
+  const filteredPendingComplaints = useMemo(() => {
+    const list = pendingComplaintsRaw.filter((c) => {
+      if (pendingCompFilter.search) {
+        const q = pendingCompFilter.search.toLowerCase().trim();
+        const idMatch = String(c.id || c.complaint_id || "").toLowerCase().includes(q);
+        const userMatch = String(c.citizen_name || c.user_name || "").toLowerCase().includes(q);
+        const locMatch = String(c.location_name || "").toLowerCase().includes(q);
+        const descMatch = String(c.description || "").toLowerCase().includes(q);
+        if (!idMatch && !userMatch && !locMatch && !descMatch) return false;
+      }
+      if (pendingCompFilter.priority) {
+        if (String(c.priority || "").toUpperCase() !== pendingCompFilter.priority.toUpperCase()) return false;
+      }
+      if (pendingCompFilter.date) {
+        const d = String(c.created_at || c.date || "").split("T")[0];
+        if (d !== pendingCompFilter.date) return false;
+      }
+      if (pendingCompFilter.status) {
+        if (String(c.status || "").toUpperCase() !== pendingCompFilter.status.toUpperCase()) return false;
+      }
+      return true;
+    });
+    return sortTableData(list, pendingCompSort.key, pendingCompSort.dir, {
+      citizen_name: (c) => c.citizen_name || c.user_name || "",
+      created_at: (c) => c.created_at || c.date || "",
+    });
+  }, [pendingComplaintsRaw, pendingCompFilter, pendingCompSort]);
+
+  const filteredCompletedComplaints = useMemo(() => {
+    const list = completedComplaintsRaw.filter((c) => {
+      if (completedCompFilter.search) {
+        const q = completedCompFilter.search.toLowerCase().trim();
+        const idMatch = String(c.id || c.complaint_id || "").toLowerCase().includes(q);
+        const userMatch = String(c.citizen_name || c.user_name || "").toLowerCase().includes(q);
+        const locMatch = String(c.location_name || "").toLowerCase().includes(q);
+        const descMatch = String(c.description || "").toLowerCase().includes(q);
+        if (!idMatch && !userMatch && !locMatch && !descMatch) return false;
+      }
+      if (completedCompFilter.priority) {
+        if (String(c.priority || "").toUpperCase() !== completedCompFilter.priority.toUpperCase()) return false;
+      }
+      if (completedCompFilter.date) {
+        const d = String(c.created_at || c.date || "").split("T")[0];
+        if (d !== completedCompFilter.date) return false;
+      }
+      if (completedCompFilter.status) {
+        if (String(c.status || "").toUpperCase() !== completedCompFilter.status.toUpperCase()) return false;
+      }
+      return true;
+    });
+    return sortTableData(list, completedCompSort.key, completedCompSort.dir, {
+      citizen_name: (c) => c.citizen_name || c.user_name || "",
+      created_at: (c) => c.resolved_at || c.created_at || c.date || "",
+    });
+  }, [completedComplaintsRaw, completedCompFilter, completedCompSort]);
+
+  // Generic Sort Handlers
+  const handleSortPendingReq = (key) => {
+    setPendingReqSort((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
+  const handleSortCompletedReq = (key) => {
+    setCompletedReqSort((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
+  const handleSortPendingComp = (key) => {
+    setPendingCompSort((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
+  const handleSortCompletedComp = (key) => {
+    setCompletedCompSort((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
 
   // Fetch Pickup Tasks
   const fetchMyTasks = async () => {
@@ -1476,69 +2074,250 @@ export default function MyTaskDashboard() {
           </div>
 
           <p style={{ margin: "10px 0 14px", fontSize: 13, color: "#5f8a45" }}>
-            View and manage pickup requests and public complaints assigned to you
+            View, filter, sort, and manage pickup requests and public complaints assigned to you
           </p>
 
-          {/* TASK TYPE TABS */}
-          <div style={{ display: "flex", gap: 8 }}>
+          {/* 4 SECTION TABS */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {/* Pending Requests Tab */}
             <button
               type="button"
-              onClick={() => setActiveTab("pickups")}
+              onClick={() => setActiveTab("pending_requests")}
               style={{
-                padding: "7px 16px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
                 borderRadius: 20,
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: activeTab === "pickups" ? "#4c7a2e" : "#cfe7bb",
-                background: activeTab === "pickups" ? "#4c7a2e" : "#ffffff",
-                color: activeTab === "pickups" ? "#ffffff" : "#2f4a1c",
+                borderColor: activeTab === "pending_requests" ? "#4c7a2e" : "#cfe7bb",
+                background: activeTab === "pending_requests" ? "#4c7a2e" : "#ffffff",
+                color: activeTab === "pending_requests" ? "#ffffff" : "#2f4a1c",
+                transition: "all 0.15s ease",
               }}
             >
-              Pickup Tasks ({tasks.length})
+              <Clock size={14} />
+              Pending Requests ({pendingTasksRaw.length})
             </button>
 
+            {/* Completed Requests Tab */}
             <button
               type="button"
-              onClick={() => setActiveTab("complaints")}
+              onClick={() => setActiveTab("completed_requests")}
               style={{
-                padding: "7px 16px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
                 borderRadius: 20,
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
                 border: "1px solid",
-                borderColor: activeTab === "complaints" ? "#4c7a2e" : "#cfe7bb",
-                background: activeTab === "complaints" ? "#4c7a2e" : "#ffffff",
-                color: activeTab === "complaints" ? "#ffffff" : "#2f4a1c",
+                borderColor: activeTab === "completed_requests" ? "#4c7a2e" : "#cfe7bb",
+                background: activeTab === "completed_requests" ? "#4c7a2e" : "#ffffff",
+                color: activeTab === "completed_requests" ? "#ffffff" : "#2f4a1c",
+                transition: "all 0.15s ease",
               }}
             >
-              Complaint Tasks ({complaints.length})
+              <CheckCircle2 size={14} />
+              Completed Requests ({completedTasksRaw.length})
+            </button>
+
+            {/* Pending Complaints Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("pending_complaints")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                borderRadius: 20,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                border: "1px solid",
+                borderColor: activeTab === "pending_complaints" ? "#4c7a2e" : "#cfe7bb",
+                background: activeTab === "pending_complaints" ? "#4c7a2e" : "#ffffff",
+                color: activeTab === "pending_complaints" ? "#ffffff" : "#2f4a1c",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <AlertTriangle size={14} />
+              Pending Complaints ({pendingComplaintsRaw.length})
+            </button>
+
+            {/* Completed Complaints Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("completed_complaints")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                borderRadius: 20,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                border: "1px solid",
+                borderColor: activeTab === "completed_complaints" ? "#4c7a2e" : "#cfe7bb",
+                background: activeTab === "completed_complaints" ? "#4c7a2e" : "#ffffff",
+                color: activeTab === "completed_complaints" ? "#ffffff" : "#2f4a1c",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <CheckCircle2 size={14} />
+              Completed Complaints ({completedComplaintsRaw.length})
             </button>
           </div>
         </div>
         <MiniCalendar />
       </div>
 
-      {activeTab === "pickups" ? (
-        <TaskTable
-          tasks={tasks}
-          loading={loading}
-          error={error}
-          onStatusClick={handleStatusClick}
-          onOpenRoute={(task) => setActiveRoutePickup(task)}
-        />
-      ) : (
-        <ComplaintTaskTable
-          complaints={complaints}
-          loading={loadingComplaints}
-          error={complaintError}
-          onStatusUpdate={handleComplaintStatusUpdate}
-          onOpenRoute={(c) => setActiveRouteComplaint(c)}
-          onOpenResolveModal={(c) => setActiveResolveComplaint(c)}
-          onPreviewImage={(url) => setPreviewImageUrl(url)}
-        />
+      {/* SECTION 1: PENDING REQUESTS */}
+      {activeTab === "pending_requests" && (
+        <div>
+          <StaffFilterBar
+            search={pendingReqFilter.search}
+            onSearchChange={(search) => setPendingReqFilter((p) => ({ ...p, search }))}
+            wasteType={pendingReqFilter.wasteType}
+            onWasteTypeChange={(wasteType) => setPendingReqFilter((p) => ({ ...p, wasteType }))}
+            date={pendingReqFilter.date}
+            onDateChange={(date) => setPendingReqFilter((p) => ({ ...p, date }))}
+            status={pendingReqFilter.status}
+            onStatusChange={(status) => setPendingReqFilter((p) => ({ ...p, status }))}
+            statusOptions={[
+              { value: "ASSIGNED", label: "Assigned" },
+              { value: "IN_PROGRESS", label: "In Progress" },
+              { value: "PENDING", label: "Pending" },
+            ]}
+            onClear={() => setPendingReqFilter({ search: "", wasteType: "", date: "", status: "" })}
+            placeholder="Search by User, ID, Location, Ward..."
+            totalCount={pendingTasksRaw.length}
+            filteredCount={filteredPendingTasks.length}
+          />
+          <TaskTable
+            tasks={filteredPendingTasks}
+            loading={loading}
+            error={error}
+            onStatusClick={handleStatusClick}
+            onOpenRoute={(task) => setActiveRoutePickup(task)}
+            sortKey={pendingReqSort.key}
+            sortDir={pendingReqSort.dir}
+            onSort={handleSortPendingReq}
+          />
+        </div>
+      )}
+
+      {/* SECTION 2: COMPLETED REQUESTS */}
+      {activeTab === "completed_requests" && (
+        <div>
+          <StaffFilterBar
+            search={completedReqFilter.search}
+            onSearchChange={(search) => setCompletedReqFilter((p) => ({ ...p, search }))}
+            wasteType={completedReqFilter.wasteType}
+            onWasteTypeChange={(wasteType) => setCompletedReqFilter((p) => ({ ...p, wasteType }))}
+            date={completedReqFilter.date}
+            onDateChange={(date) => setCompletedReqFilter((p) => ({ ...p, date }))}
+            status={completedReqFilter.status}
+            onStatusChange={(status) => setCompletedReqFilter((p) => ({ ...p, status }))}
+            statusOptions={[
+              { value: "COMPLETED", label: "Completed" },
+            ]}
+            onClear={() => setCompletedReqFilter({ search: "", wasteType: "", date: "", status: "" })}
+            placeholder="Search by User, ID, Location, Ward..."
+            totalCount={completedTasksRaw.length}
+            filteredCount={filteredCompletedTasks.length}
+          />
+          <TaskTable
+            tasks={filteredCompletedTasks}
+            loading={loading}
+            error={error}
+            onStatusClick={handleStatusClick}
+            onOpenRoute={(task) => setActiveRoutePickup(task)}
+            sortKey={completedReqSort.key}
+            sortDir={completedReqSort.dir}
+            onSort={handleSortCompletedReq}
+          />
+        </div>
+      )}
+
+      {/* SECTION 3: PENDING COMPLAINTS */}
+      {activeTab === "pending_complaints" && (
+        <div>
+          <StaffFilterBar
+            search={pendingCompFilter.search}
+            onSearchChange={(search) => setPendingCompFilter((p) => ({ ...p, search }))}
+            priority={pendingCompFilter.priority}
+            onPriorityChange={(priority) => setPendingCompFilter((p) => ({ ...p, priority }))}
+            date={pendingCompFilter.date}
+            onDateChange={(date) => setPendingCompFilter((p) => ({ ...p, date }))}
+            status={pendingCompFilter.status}
+            onStatusChange={(status) => setPendingCompFilter((p) => ({ ...p, status }))}
+            statusOptions={[
+              { value: "ASSIGNED", label: "Assigned" },
+              { value: "IN_PROGRESS", label: "In Progress" },
+              { value: "PENDING", label: "Pending" },
+            ]}
+            onClear={() => setPendingCompFilter({ search: "", priority: "", date: "", status: "" })}
+            placeholder="Search by Complaint ID, User, Location, Description..."
+            totalCount={pendingComplaintsRaw.length}
+            filteredCount={filteredPendingComplaints.length}
+          />
+          <ComplaintTaskTable
+            complaints={filteredPendingComplaints}
+            loading={loadingComplaints}
+            error={complaintError}
+            onStatusUpdate={handleComplaintStatusUpdate}
+            onOpenRoute={(c) => setActiveRouteComplaint(c)}
+            onOpenResolveModal={(c) => setActiveResolveComplaint(c)}
+            onPreviewImage={(url) => setPreviewImageUrl(url)}
+            sortKey={pendingCompSort.key}
+            sortDir={pendingCompSort.dir}
+            onSort={handleSortPendingComp}
+          />
+        </div>
+      )}
+
+      {/* SECTION 4: COMPLETED COMPLAINTS */}
+      {activeTab === "completed_complaints" && (
+        <div>
+          <StaffFilterBar
+            search={completedCompFilter.search}
+            onSearchChange={(search) => setCompletedCompFilter((p) => ({ ...p, search }))}
+            priority={completedCompFilter.priority}
+            onPriorityChange={(priority) => setCompletedCompFilter((p) => ({ ...p, priority }))}
+            date={completedCompFilter.date}
+            onDateChange={(date) => setCompletedCompFilter((p) => ({ ...p, date }))}
+            status={completedCompFilter.status}
+            onStatusChange={(status) => setCompletedCompFilter((p) => ({ ...p, status }))}
+            statusOptions={[
+              { value: "RESOLVED", label: "Resolved" },
+              { value: "COMPLETED", label: "Completed" },
+            ]}
+            onClear={() => setCompletedCompFilter({ search: "", priority: "", date: "", status: "" })}
+            placeholder="Search by Complaint ID, User, Location, Description..."
+            totalCount={completedComplaintsRaw.length}
+            filteredCount={filteredCompletedComplaints.length}
+          />
+          <ComplaintTaskTable
+            complaints={filteredCompletedComplaints}
+            loading={loadingComplaints}
+            error={complaintError}
+            onStatusUpdate={handleComplaintStatusUpdate}
+            onOpenRoute={(c) => setActiveRouteComplaint(c)}
+            onOpenResolveModal={(c) => setActiveResolveComplaint(c)}
+            onPreviewImage={(url) => setPreviewImageUrl(url)}
+            sortKey={completedCompSort.key}
+            sortDir={completedCompSort.dir}
+            onSort={handleSortCompletedComp}
+          />
+        </div>
       )}
 
       {/* PICKUP ROUTE MODAL */}

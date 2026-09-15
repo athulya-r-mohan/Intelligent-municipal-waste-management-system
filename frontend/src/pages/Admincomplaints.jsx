@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import "../components/admincomplaints.css";
 import NotificationBell from "../components/NotificationBell";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -282,6 +284,15 @@ export default function Admincomplaints() {
   const [filterPriority, setFilterPriority] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: null });
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
   const [activeModalComplaint, setActiveModalComplaint] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [toastMessage, setToastMessage] = useState("");
@@ -337,6 +348,13 @@ export default function Admincomplaints() {
       return true;
     });
   }, [complaints, filterPriority, filterStatus]);
+
+  const sortedComplaints = useMemo(() => {
+    return sortTableData(filteredComplaints, sortConfig.key, sortConfig.dir, {
+      citizen_name: (c) => c.citizen_name || c.user_name || "",
+      assigned_staff_name: (c) => c.assigned_staff_name || c.staff_name || "",
+    });
+  }, [filteredComplaints, sortConfig]);
 
   // Counts for tabs
   const counts = useMemo(() => {
@@ -415,16 +433,36 @@ export default function Admincomplaints() {
           <table className="ac-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Original Waste Photo</th>
-                <th>Cleared Proof</th>
-                <th>Location & Coordinates</th>
-                <th>Priority</th>
-                <th>Citizen Details</th>
-                <th>Complaint Description</th>
-                <th>Status</th>
-                <th>Assigned Staff</th>
-                <th>Timeline / Dates</th>
+                <SortableTh columnKey="id" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  ID
+                </SortableTh>
+                <SortableTh disabled>
+                  Original Waste Photo
+                </SortableTh>
+                <SortableTh disabled>
+                  Cleared Proof
+                </SortableTh>
+                <SortableTh columnKey="location_name" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Location & Coordinates
+                </SortableTh>
+                <SortableTh columnKey="priority" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Priority
+                </SortableTh>
+                <SortableTh columnKey="citizen_name" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Citizen Details
+                </SortableTh>
+                <SortableTh columnKey="description" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Complaint Description
+                </SortableTh>
+                <SortableTh columnKey="status" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Status
+                </SortableTh>
+                <SortableTh columnKey="assigned_staff_name" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Assigned Staff
+                </SortableTh>
+                <SortableTh columnKey="created_at" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  Timeline / Dates
+                </SortableTh>
               </tr>
             </thead>
             <tbody>
@@ -454,7 +492,7 @@ export default function Admincomplaints() {
 
               {!loading &&
                 !error &&
-                filteredComplaints.map((c) => (
+                sortedComplaints.map((c) => (
                   <tr key={c.id || c.complaint_id}>
                     {/* ID */}
                     <td style={{ fontWeight: 700, color: "#1e6b4e" }}>

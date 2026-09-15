@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../components/Recyclerpage.css";
 import NotificationBell from "../components/NotificationBell";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import { performLogout } from "../utils/auth";
 import {
   ArrowLeft,
   LayoutDashboard,
@@ -126,6 +128,7 @@ function Card({ title, value, hint, icon: Icon }) {
 export default function EcoPulseRecyclerDashboard() {
   const navigate = useNavigate();
   const [active, setActive] = useState("dashboard");
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleBack = () => {
     if (window.history.length > 1) window.history.back();
@@ -137,8 +140,7 @@ export default function EcoPulseRecyclerDashboard() {
   };
 
   const handleLogout = () => {
-    // Wire this up to your real sign-out flow.
-    console.log("Logging out…");
+    setShowLogoutModal(true);
   };
 
   return (
@@ -192,6 +194,12 @@ export default function EcoPulseRecyclerDashboard() {
           </div>
         </main>
       </div>
+
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={() => performLogout(navigate)}
+      />
     </div>
   );
 }

@@ -17,6 +17,8 @@ import {
   Factory,
 } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminMCFList.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -28,6 +30,15 @@ export default function AdminMCFList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: null });
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
 
   const fetchDailyTotals = async () => {
     try {
@@ -76,6 +87,14 @@ export default function AdminMCFList() {
         (d.date_formatted && d.date_formatted.toLowerCase().includes(term))
     );
   }, [dailyTotals, searchTerm]);
+
+  const sortedList = useMemo(() => {
+    return sortTableData(filteredList, sortConfig.key, sortConfig.dir, {
+      grand_total: (d) => Number(d.grand_total) || 0,
+      staff_count: (d) => Number(d.staff_count) || 0,
+      assignments_count: (d) => Number(d.assignments_count) || 0,
+    });
+  }, [filteredList, sortConfig]);
 
   return (
     <div className="mcf-admin-page">
@@ -192,15 +211,25 @@ export default function AdminMCFList() {
             <table className="mcf-data-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Total Waste Collection</th>
-                  <th>Staff Contributed</th>
-                  <th>Recycler Assignment</th>
-                  <th style={{ textAlign: "right" }}>Action</th>
+                  <SortableTh columnKey="date" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Date
+                  </SortableTh>
+                  <SortableTh columnKey="grand_total" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Total Waste Collection
+                  </SortableTh>
+                  <SortableTh columnKey="staff_count" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Staff Contributed
+                  </SortableTh>
+                  <SortableTh columnKey="assignments_count" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                    Recycler Assignment
+                  </SortableTh>
+                  <SortableTh disabled align="right">
+                    Action
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filteredList.map((row) => {
+                {sortedList.map((row) => {
                   const assignCount = row.assignments_count || 0;
                   const isAllAssigned = assignCount >= 7;
                   const isPartial = assignCount > 0 && assignCount < 7;

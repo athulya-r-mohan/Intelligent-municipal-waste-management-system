@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import "../components/pickupassign.css";
 import NotificationBell from "../components/NotificationBell";
+import SortableTh from "../components/SortableTh";
+import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 
 // ============================================================
 // API BASE URL
@@ -850,8 +852,16 @@ export default function PickupRequests() {
   const [toast, setToast] = useState("");
 
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
+
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: null });
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
 
   // ==========================================================
   // FETCH PICKUP REQUESTS
@@ -1361,6 +1371,10 @@ export default function PickupRequests() {
     selectedStatus,
   ]);
 
+  const sortedRequests = useMemo(() => {
+    return sortTableData(filteredRequests, sortConfig.key, sortConfig.dir);
+  }, [filteredRequests, sortConfig]);
+
   // ==========================================================
   // CLEAR ALL FILTERS
   // ==========================================================
@@ -1659,59 +1673,49 @@ export default function PickupRequests() {
             {/* TABLE HEADER */}
             <thead>
               <tr>
+                <SortableTh columnKey="requestId" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  REQUEST<br />ID
+                </SortableTh>
 
-                <th>
-                  REQUEST
-                  <br />
-                  ID
-                </th>
+                <SortableTh columnKey="userId" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  USER<br />ID
+                </SortableTh>
 
-                <th>
-                  USER
-                  <br />
-                  ID
-                </th>
+                <SortableTh columnKey="userName" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  USER<br />NAME
+                </SortableTh>
 
-                <th>
-                  USER
-                  <br />
-                  NAME
-                </th>
-
-                <th>
+                <SortableTh columnKey="phone" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
                   PHONE
-                </th>
+                </SortableTh>
 
-                <th>
+                <SortableTh columnKey="email" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
                   MAIL
-                </th>
+                </SortableTh>
 
-                <th>
+                <SortableTh columnKey="ward" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
                   WARD
-                </th>
+                </SortableTh>
 
-                <th>
+                <SortableTh columnKey="pickupLocation" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
                   PICKUP LOCATION
-                </th>
+                </SortableTh>
 
-                <th>
-                  WASTE
-                  <br />
-                  TYPE
-                </th>
+                <SortableTh columnKey="wasteType" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
+                  WASTE<br />TYPE
+                </SortableTh>
 
-                <th>
+                <SortableTh columnKey="status" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
                   STATUS
-                </th>
+                </SortableTh>
 
-                <th>
+                <SortableTh columnKey="date" currentSortKey={sortConfig.key} currentSortDir={sortConfig.dir} onSort={handleSort}>
                   {selectedStatus === "COMPLETED" ? "COMPLETED AT" : "DATE"}
-                </th>
+                </SortableTh>
 
-                <th>
+                <SortableTh disabled>
                   ACTION
-                </th>
-
+                </SortableTh>
               </tr>
             </thead>
 
@@ -1747,7 +1751,7 @@ export default function PickupRequests() {
               {/* DATA */}
               {!loading &&
                 !error &&
-                filteredRequests.map(
+                sortedRequests.map(
                   (request) => (
                     <tr
                       key={

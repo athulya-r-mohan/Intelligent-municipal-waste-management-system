@@ -1,4 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import { performLogout, getUserName } from "../utils/auth";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -98,7 +101,9 @@ const CARDS = [
   },
 ];
  
-function Sidebar() {
+function Sidebar({ onLogout }) {
+  const staffName = getUserName() || "Staff Member";
+  const initial = staffName.charAt(0).toUpperCase() || "S";
   return (
     <aside
       style={{
@@ -159,7 +164,7 @@ function Sidebar() {
             fontSize: 14,
           }}
         >
-          A
+          {initial}
         </div>
         <div>
           <div
@@ -170,7 +175,7 @@ function Sidebar() {
               color: COLORS.text,
             }}
           >
-            Athulya
+            {staffName}
           </div>
           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, color: COLORS.textMuted }}>
             Field staff
@@ -216,8 +221,9 @@ function Sidebar() {
         })}
       </nav>
  
-      <a
-        href={LINKS.logout}
+      <button
+        type="button"
+        onClick={onLogout}
         style={{
           display: "flex",
           alignItems: "center",
@@ -225,17 +231,27 @@ function Sidebar() {
           padding: "10px 12px",
           borderRadius: 9,
           background: "transparent",
+          border: "none",
+          width: "100%",
+          textAlign: "left",
           color: "#C0524A",
           fontFamily: "'Inter', sans-serif",
           fontWeight: 500,
           fontSize: 13.5,
           cursor: "pointer",
           textDecoration: "none",
+          transition: "background 0.15s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "#FCEEEC";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
         }}
       >
         <LogOut size={17} strokeWidth={2} />
         Log out
-      </a>
+      </button>
     </aside>
   );
 }
@@ -470,6 +486,9 @@ function DashboardPage() {
 }
  
 export default function EcoPulseDashboard() {
+  const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
   React.useEffect(() => {
     ensureFonts();
   }, []);
@@ -483,11 +502,17 @@ export default function EcoPulseDashboard() {
         fontFamily: "'Inter', sans-serif",
       }}
     >
-      <Sidebar />
+      <Sidebar onLogout={() => setShowLogoutModal(true)} />
       <main style={{ flex: 1, padding: "26px 32px", boxSizing: "border-box" }}>
         <TopBar />
         <DashboardPage />
       </main>
+
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={() => performLogout(navigate)}
+      />
     </div>
   );
 }
