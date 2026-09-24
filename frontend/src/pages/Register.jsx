@@ -54,6 +54,8 @@ function validate(form) {
     errors.email = "Email address is required.";
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     errors.email = "Enter a valid email address.";
+  } else if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(form.email.trim())) {
+    errors.email = "Please enter a valid Gmail address (@gmail.com).";
   }
 
   if (!form.phone.trim()) {
@@ -101,8 +103,9 @@ function Field({
   touched,
   children,
   wrapClassName = "",
+  isInvalid,
 }) {
-  const showError = touched && error;
+  const showError = isInvalid !== undefined ? isInvalid : (touched && error);
   return (
     <div className="ewf-field">
       <label htmlFor={id} className="ewf-label">
@@ -110,6 +113,7 @@ function Field({
       </label>
       <div
         className={`ewf-input-wrap ${showError ? "ewf-input-wrap--error" : ""} ${wrapClassName}`.trim()}
+        style={showError ? { borderColor: "#C0392B" } : undefined}
       >
         <Icon size={17} className="ewf-input-icon" aria-hidden="true" />
         {children}
@@ -135,9 +139,19 @@ export default function WasteManagementRegister() {
   const errors = validate(form);
   const isValid = Object.keys(errors).length === 0;
 
+  const isValidGmail = (email) => {
+    return /^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email);
+  };
+
+  const isEmailInvalid =
+    (touched.email || form.email.length > 0) && !isValidGmail(form.email);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
+    if (name === "email") {
+      setTouched((t) => ({ ...t, email: true }));
+    }
   };
 
   const handleBlur = (e) => {
@@ -201,9 +215,11 @@ export default function WasteManagementRegister() {
         }
         catch(error){
 
-            console.log(error.response.data);
+            const errorMsg = error.response?.data?.error || "Registration failed";
 
-            alert("Registration failed");
+            console.log("Registration error:", errorMsg);
+
+            alert(errorMsg);
 
         }
 
@@ -219,6 +235,24 @@ export default function WasteManagementRegister() {
 
   return (
     <div className="ewf-page">
+      <style>{`
+        .ewf-input-wrap.ewf-input-wrap--error,
+        .ewf-input-wrap.ewf-input-wrap--error:focus-within {
+          border-color: #C0392B !important;
+          box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15) !important;
+        }
+        input.invalid-gmail,
+        input.error-input {
+          text-decoration: underline !important;
+          text-decoration-color: #C0392B !important;
+          text-decoration-thickness: 2px !important;
+          text-underline-offset: 3px !important;
+        }
+        input.invalid-gmail::placeholder,
+        input.error-input::placeholder {
+          text-decoration: none !important;
+        }
+      `}</style>
       <div className="ewf-card">
         {/* -------------------- Illustration side -------------------- */}
         <div className="ewf-hero">
@@ -338,7 +372,14 @@ export default function WasteManagementRegister() {
                     />
                   </Field>
 
-                  <Field id="email" label="Email address" icon={Mail} error={errors.email} touched={touched.email}>
+                  <Field
+                    id="email"
+                    label="Email address"
+                    icon={Mail}
+                    error={isEmailInvalid ? "Please enter a valid Gmail address (@gmail.com)." : errors.email}
+                    touched={touched.email || form.email.length > 0}
+                    isInvalid={isEmailInvalid}
+                  >
                     <input
                       id="email"
                       name="email"
@@ -347,6 +388,18 @@ export default function WasteManagementRegister() {
                       value={form.email}
                       onChange={handleChange}
                       onBlur={handleBlur}
+                      className={isEmailInvalid ? "error-input invalid-gmail" : ""}
+                      style={
+                        isEmailInvalid
+                          ? {
+                              borderColor: "#C0392B",
+                              textDecoration: "underline",
+                              textDecorationColor: "#C0392B",
+                              textDecorationThickness: "2px",
+                              textUnderlineOffset: "3px",
+                            }
+                          : undefined
+                      }
                     />
                   </Field>
 

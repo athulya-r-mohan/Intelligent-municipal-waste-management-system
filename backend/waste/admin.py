@@ -8,6 +8,7 @@ from .models import (
     StaffMCFCollection,
     MCFRecyclerAssignment,
     Payment,
+    RewardSubmission,
 )
 
 
@@ -407,4 +408,39 @@ class PaymentAdmin(admin.ModelAdmin):
     )
 
 
-
+# ============================================================
+# REWARD SUBMISSION ADMIN
+# ============================================================
+
+@admin.register(RewardSubmission)
+class RewardSubmissionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "date",
+        "bin_location",
+        "waste_type",
+        "estimated_quantity",
+        "reward_amount",
+        "status",
+        "created_at",
+    )
+    list_filter = (
+        "status",
+        "waste_type",
+        "date",
+        "created_at",
+        "reward_assigned_at",
+    )
+    search_fields = (
+        "user__username",
+        "user__email",
+        "user__userprofile__name",
+        "bin_location",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "reward_assigned_at",
+        "reward_assigned_by",
+    )

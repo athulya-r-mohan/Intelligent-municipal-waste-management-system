@@ -301,6 +301,11 @@ class StaffMCFCollection(models.Model):
 
 
 class MCFRecyclerAssignment(models.Model):
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("COMPLETED", "Completed"),
+    ]
+
     date = models.DateField(
         db_index=True
     )
@@ -324,6 +329,33 @@ class MCFRecyclerAssignment(models.Model):
         null=True,
         blank=True,
         related_name="mcf_assignments_made"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="PENDING",
+        db_index=True
+    )
+    recyclable_quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None
+    )
+    note = models.TextField(
+        blank=True,
+        null=True,
+        default=""
+    )
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+    recycling_image = models.ImageField(
+        upload_to="recycling_proofs/",
+        null=True,
+        blank=True
     )
     created_at = models.DateTimeField(
         auto_now_add=True
@@ -416,5 +448,142 @@ class Payment(models.Model):
         return f"Payment #{self.payment_id} for Pickup #{self.pickup_request_id} - ₹{self.amount} ({self.payment_status})"
 
 
+# ============================================================
+# REWARD SUBMISSION MODEL
+# ============================================================
+
+class RewardSubmission(models.Model):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Active", "Active"),
+        ("Reward Assigned", "Reward Assigned"),
+        ("Claimed", "Claimed"),
+        ("Expired", "Expired"),
+        ("Approved", "Approved"),
+        ("Rejected", "Rejected"),
+    ]
+
+    WASTE_TYPE_CHOICES = [
+        ("Paper", "Paper"),
+        ("Plastic", "Plastic"),
+        ("Glass", "Glass"),
+        ("Metal", "Metal"),
+        ("Organic", "Organic"),
+        ("Electronics", "Electronics"),
+        ("Miscellaneous", "Miscellaneous"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="reward_submissions"
+    )
+
+    photo = models.ImageField(
+        upload_to="reward_photos/"
+    )
+
+    date = models.DateField(
+        null=True,
+        blank=True
+    )
+
+    bin_location = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    waste_type = models.CharField(
+        max_length=50,
+        choices=WASTE_TYPE_CHOICES,
+        null=True,
+        blank=True
+    )
+
+    estimated_quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    reward_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    reward_assigned_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    reward_assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_reward_submissions"
+    )
+
+    points = models.PositiveIntegerField(
+        null=True,
+        blank=True
+    )
+
+    valid_from = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    valid_till = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    claimed_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    status = models.CharField(
+        max_length=25,
+        choices=STATUS_CHOICES,
+        default="Pending"
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Reward Submission"
+        verbose_name_plural = "Reward Submissions"
+
+    @property
+    def bottle_count(self):
+        return (self.points // 5) if self.points else 0
+
+    @property
+    def computed_status(self):
+        if self.claimed_at is not None or self.status == "Claimed":
+            return "Claimed"
+        if self.points is not None and self.points > 0:
+            if self.valid_till and timezone.now() >= self.valid_till:
+                return "Expired"
+            return "Active"
+        if self.status == "Reward Assigned":
+            return "Active"
+        return self.status or "Pending"
+
+    def __str__(self):
+        return f"Reward Submission #{self.id} by {self.user.username} ({self.computed_status})"
 
 

@@ -7,6 +7,7 @@ from .models import (
     StaffMCFCollection,
     MCFRecyclerAssignment,
     Payment,
+    RewardSubmission,
 )
 from accounts.models import UserProfile, Recycler
 
@@ -841,7 +842,9 @@ class MCFRecyclerAssignmentSerializer(serializers.ModelSerializer):
     recycler_waste_type = serializers.CharField(source="recycler.waste_type", read_only=True)
     recycler_email = serializers.EmailField(source="recycler.user.email", read_only=True)
     recycler_phone = serializers.SerializerMethodField()
+    recycler_address = serializers.CharField(source="recycler.address", read_only=True)
     assigned_by_name = serializers.SerializerMethodField()
+    recycling_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = MCFRecyclerAssignment
@@ -856,8 +859,15 @@ class MCFRecyclerAssignmentSerializer(serializers.ModelSerializer):
             "recycler_waste_type",
             "recycler_email",
             "recycler_phone",
+            "recycler_address",
             "assigned_by",
             "assigned_by_name",
+            "status",
+            "recyclable_quantity",
+            "note",
+            "recycling_image",
+            "recycling_image_url",
+            "completed_at",
             "created_at",
             "updated_at",
         ]
@@ -869,11 +879,24 @@ class MCFRecyclerAssignmentSerializer(serializers.ModelSerializer):
             "recycler_waste_type",
             "recycler_email",
             "recycler_phone",
+            "recycler_address",
             "assigned_by",
             "assigned_by_name",
+            "recycling_image_url",
             "created_at",
             "updated_at",
         ]
+
+    def get_recycling_image_url(self, obj):
+        try:
+            if obj.recycling_image:
+                request = self.context.get("request")
+                if request:
+                    return request.build_absolute_uri(obj.recycling_image.url)
+                return obj.recycling_image.url
+        except Exception:
+            pass
+        return None
 
     def get_recycler_phone(self, obj):
         try:
@@ -1041,5 +1064,139 @@ class PaymentSerializer(serializers.ModelSerializer):
         return None
 
 
+# ============================================================
+# REWARD SUBMISSION SERIALIZER
+# ============================================================
 
+class RewardSubmissionSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_email = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField()
+    created_at_formatted = serializers.DateTimeField(
+        source="created_at",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True
+    )
+    reward_assigned_at_formatted = serializers.DateTimeField(
+        source="reward_assigned_at",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True
+    )
+    valid_from_formatted = serializers.DateTimeField(
+        source="valid_from",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True
+    )
+    valid_till_formatted = serializers.DateTimeField(
+        source="valid_till",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True
+    )
+    claimed_at_formatted = serializers.DateTimeField(
+        source="claimed_at",
+        format="%Y-%m-%d %H:%M:%S",
+        read_only=True
+    )
+    reward_assigned_by_name = serializers.SerializerMethodField()
+    bottle_count = serializers.IntegerField(read_only=True)
+    computed_status = serializers.CharField(read_only=True)
+    days_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RewardSubmission
+        fields = [
+            "id",
+            "user",
+            "user_name",
+            "user_email",
+            "photo",
+            "photo_url",
+            "date",
+            "bin_location",
+            "waste_type",
+            "estimated_quantity",
+            "reward_amount",
+            "points",
+            "bottle_count",
+            "valid_from",
+            "valid_from_formatted",
+            "valid_till",
+            "valid_till_formatted",
+            "claimed_at",
+            "claimed_at_formatted",
+            "reward_assigned_at",
+            "reward_assigned_at_formatted",
+            "reward_assigned_by",
+            "reward_assigned_by_name",
+            "status",
+            "computed_status",
+            "days_remaining",
+            "created_at",
+            "created_at_formatted",
+        ]
+        read_only_fields = [
+            "id",
+            "user",
+            "status",
+            "points",
+            "bottle_count",
+            "valid_from",
+            "valid_till",
+            "claimed_at",
+            "computed_status",
+            "days_remaining",
+            "created_at",
+            "reward_assigned_at",
+            "reward_assigned_by",
+        ]
+
+    def get_days_remaining(self, obj):
+        if obj.computed_status in ["Claimed", "Pending", "Rejected", "Expired"]:
+            return 0
+        if not obj.valid_till:
+            return 0
+        from django.utils import timezone
+        now = timezone.now()
+        if now >= obj.valid_till:
+            return 0
+        diff = obj.valid_till - now
+        total_secs = diff.total_seconds()
+        days = int(total_secs // 86400)
+        return days + 1 if total_secs % 86400 > 0 else max(0, days)
+
+    def get_user_name(self, obj):
+        try:
+            if obj.user:
+                profile = getattr(obj.user, "userprofile", None)
+                if profile and profile.name:
+                    return profile.name
+                return obj.user.get_full_name() or obj.user.username
+        except Exception:
+            pass
+        return "Citizen"
+
+    def get_user_email(self, obj):
+        return obj.user.email if obj.user else ""
+
+    def get_photo_url(self, obj):
+        try:
+            if obj.photo:
+                request = self.context.get("request")
+                if request:
+                    return request.build_absolute_uri(obj.photo.url)
+                return obj.photo.url
+        except Exception:
+            pass
+        return None
+
+    def get_reward_assigned_by_name(self, obj):
+        try:
+            if obj.reward_assigned_by:
+                profile = getattr(obj.reward_assigned_by, "userprofile", None)
+                if profile and profile.name:
+                    return profile.name
+                return obj.reward_assigned_by.get_full_name() or obj.reward_assigned_by.username
+        except Exception:
+            pass
+        return None
 

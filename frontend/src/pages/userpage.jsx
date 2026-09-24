@@ -5,8 +5,8 @@ import "../components/userpage.css";
 import NotificationBell from "../components/NotificationBell";
 import PaymentReceiptModal from "../components/PaymentReceiptModal";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
-import { performLogout } from "../utils/auth";
-import { Receipt } from "lucide-react";
+import { performLogout, getAccessToken } from "../utils/auth";
+import { Receipt, Award, CheckCircle2, Clock } from "lucide-react";
  
 const WARD_DATA = [
   { name: "Rosewood", code: "W1" },
@@ -69,6 +69,16 @@ const TruckSVG = ({ spinning }) => (
 );
  
 const MENU_ITEMS = [
+  {
+    key: "rewards",
+    label: "My Rewards",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+        <circle cx="12" cy="8" r="6" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M15.5 13.5L18 21l-6-3-6 3 2.5-7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
   {
     key: "history",
     label: "Route history",
@@ -147,6 +157,26 @@ export default function EcoPulseStaff() {
   const [complaintsError, setComplaintsError] = useState("");
   const [selectedComplaintDetail, setSelectedComplaintDetail] = useState(null);
   const [receiptPayment, setReceiptPayment] = useState(null);
+  const [showRewardRulesModal, setShowRewardRulesModal] = useState(false);
+
+  // User Rewards & Points State
+  const [rewardsOpen, setRewardsOpen] = useState(false);
+  const [userRewards, setUserRewards] = useState([]);
+  const [rewardsSummary, setRewardsSummary] = useState({
+    total_earned_points: 0,
+    total_bottles: 0,
+    active_points: 0,
+    claimed_points: 0,
+    expired_points: 0,
+    active_bottles: 0,
+    claimed_bottles: 0,
+    expired_bottles: 0,
+  });
+  const [loadingRewards, setLoadingRewards] = useState(false);
+  const [rewardsError, setRewardsError] = useState("");
+  const [claimingId, setClaimingId] = useState(null);
+  const [claimSuccess, setClaimSuccess] = useState("");
+  const [claimError, setClaimError] = useState("");
 
   // User info
   const userName = localStorage.getItem("name") || "Citizen User";
@@ -395,6 +425,87 @@ export default function EcoPulseStaff() {
     }
   }, []);
 
+  const fetchUserRewards = useCallback(async () => {
+    setLoadingRewards(true);
+    setRewardsError("");
+    try {
+      const token = getAccessToken();
+      if (!token) return;
+      const response = await API.get("/waste/user/rewards/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.data && response.data.success) {
+        setUserRewards(response.data.rewards || []);
+        if (response.data.summary) {
+          setRewardsSummary(response.data.summary);
+        }
+      } else {
+        setUserRewards([]);
+      }
+    } catch (err) {
+      console.error("Error fetching user rewards:", err);
+      const errMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        "Failed to load your rewards.";
+      setRewardsError(errMsg);
+    } finally {
+      setLoadingRewards(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUserRewards();
+  }, [fetchUserRewards]);
+
+  const handleClaimReward = async (id) => {
+    setClaimingId(id);
+    setClaimError("");
+    setClaimSuccess("");
+    try {
+      const token = getAccessToken();
+      const response = await API.post(
+        `/waste/reward-submissions/${id}/claim/`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.data && response.data.success) {
+        setClaimSuccess(response.data.message || "Reward claimed successfully!");
+        const updated = response.data.reward;
+        setUserRewards((prev) =>
+          prev.map((r) => (r.id === id ? updated : r))
+        );
+        fetchUserRewards();
+      } else {
+        setClaimError(response.data?.error || "Failed to claim reward.");
+      }
+    } catch (err) {
+      console.error("Claim reward error:", err);
+      const errMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        "Failed to claim reward. Please try again.";
+      setClaimError(errMsg);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  const calculateDaysRemaining = (validTillStr) => {
+    if (!validTillStr) return 0;
+    const diffMs = new Date(validTillStr).getTime() - Date.now();
+    if (diffMs <= 0) return 0;
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  };
+
+  const openRewards = () => {
+    setDrawerOpen(false);
+    setRewardsOpen(true);
+    fetchUserRewards();
+  };
+
   const openHistory = () => {
     setDrawerOpen(false);
     setHistoryOpen(true);
@@ -423,7 +534,9 @@ export default function EcoPulseStaff() {
   };
 
   const handleMenuClick = (key) => {
-    if (key === "history") {
+    if (key === "rewards" || key === "profile") {
+      openRewards();
+    } else if (key === "history") {
       openHistory();
     } else if (key === "complaints") {
       openComplaintsQueue();
@@ -903,6 +1016,13 @@ export default function EcoPulseStaff() {
           >
             track status
           </button>
+          <button
+            className="staff-btn staff-btn-ghost"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            onClick={() => setShowRewardRulesModal(true)}
+          >
+            Reward
+          </button>
           <button className="staff-btn staff-btn-solid" onClick={() => setDrawerOpen(true)}>
             my profile
           </button>
@@ -1049,6 +1169,46 @@ export default function EcoPulseStaff() {
             <CloseIcon />
           </button>
         </div>
+
+        {/* REWARD SUMMARY CARD IN PROFILE DRAWER */}
+        <div
+          style={{
+            margin: "12px 18px",
+            padding: "14px 16px",
+            background: "linear-gradient(135deg, var(--panel) 0%, #fff 100%)",
+            borderRadius: "16px",
+            border: "1.5px solid var(--mint-3)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            cursor: "pointer",
+          }}
+          onClick={openRewards}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--green-deep)" }}>
+              ★ Rewards & Bottles
+            </span>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ink)" }}>
+              🍼 {rewardsSummary.total_bottles} Bottles
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--ink)", lineHeight: 1.1 }}>
+                {rewardsSummary.total_earned_points}
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)", marginLeft: "4px" }}>Points</span>
+              </div>
+              <div style={{ fontSize: "11.5px", color: "var(--muted)", marginTop: "2px" }}>
+                Active: {rewardsSummary.active_points} · Claimed: {rewardsSummary.claimed_points}
+              </div>
+            </div>
+            <span style={{ fontSize: "12px", color: "var(--green)", fontWeight: 600 }}>
+              View & Claim &rarr;
+            </span>
+          </div>
+        </div>
+
         <div className="staff-drawer-menu">
           {MENU_ITEMS.map((item) => (
             <button
@@ -2233,6 +2393,409 @@ export default function EcoPulseStaff() {
           payment={receiptPayment}
           onClose={() => setReceiptPayment(null)}
         />
+      )}
+
+      {/* ============================================================ */}
+      {/* REWARD RULES & GUIDELINES POPUP */}
+      {/* ============================================================ */}
+      {showRewardRulesModal && (
+        <div className="ep-modal-overlay" onClick={() => setShowRewardRulesModal(false)}>
+          <div
+            className="ep-modal-card"
+            style={{ maxWidth: "560px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ep-modal-head">
+              <div className="ep-modal-title-area">
+                <h2>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="7"></circle>
+                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+                  </svg>
+                  Reward Rules & Guidelines
+                </h2>
+                <p>Please review the terms before submitting your photo for rewards</p>
+              </div>
+              <button
+                className="ep-modal-close-btn"
+                onClick={() => setShowRewardRulesModal(false)}
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="ep-modal-body" style={{ padding: "24px 28px" }}>
+              <div style={{
+                background: "var(--panel)",
+                border: "1px solid var(--mint-3)",
+                borderRadius: "14px",
+                padding: "16px 20px",
+                marginBottom: "20px"
+              }}>
+                <p style={{ margin: 0, fontSize: "14px", color: "var(--green-deep)", fontWeight: 600, lineHeight: 1.5 }}>
+                  Ensure your submitted photo accurately demonstrates genuine waste segregation or clean-up activity.
+                </p>
+              </div>
+
+              <ol style={{
+                margin: 0,
+                paddingLeft: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                fontSize: "14px",
+                color: "var(--ink)",
+                lineHeight: 1.55
+              }}>
+                <li>Upload a clear and genuine photo.</li>
+                <li>The uploaded photo must be related to the waste-management/reward activity.</li>
+                <li>Do not upload unrelated, duplicate, or inappropriate images.</li>
+                <li>The uploaded photo will be reviewed by the administrator.</li>
+                <li>Reward eligibility will be decided after admin verification.</li>
+                <li>Only submit valid photos.</li>
+              </ol>
+
+              <div style={{ marginTop: "28px", display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  className="staff-btn staff-btn-solid"
+                  style={{ minWidth: "120px", padding: "11px 24px", fontSize: "14px" }}
+                  onClick={() => {
+                    setShowRewardRulesModal(false);
+                    navigate("/reward-submission");
+                  }}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MY REWARDS & BOTTLES MODAL */}
+      {/* ============================================================ */}
+      {rewardsOpen && (
+        <div className="ep-modal-overlay" onClick={() => setRewardsOpen(false)}>
+          <div
+            className="ep-modal-card"
+            style={{ maxWidth: "820px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ep-modal-head">
+              <div className="ep-modal-title-area">
+                <h2>
+                  <Award size={22} color="var(--green)" />
+                  My Rewards & Bottles
+                </h2>
+                <p>Municipal reward points, 30-day validity tracking, and claimed vouchers</p>
+              </div>
+              <div className="ep-modal-actions">
+                <button
+                  className="ep-modal-refresh-btn"
+                  onClick={fetchUserRewards}
+                  disabled={loadingRewards}
+                  title="Refresh rewards"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    style={{ animation: loadingRewards ? "staffSpin 1s linear infinite" : "none" }}
+                  >
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {loadingRewards ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  className="ep-modal-close-btn"
+                  onClick={() => setRewardsOpen(false)}
+                  aria-label="Close"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="ep-modal-body" style={{ padding: "20px 24px" }}>
+              {claimSuccess && (
+                <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", borderRadius: "12px", padding: "12px 16px", marginBottom: "16px", fontSize: "13.5px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>✓ {claimSuccess}</span>
+                </div>
+              )}
+              {claimError && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: "12px", padding: "12px 16px", marginBottom: "16px", fontSize: "13.5px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>⚠️ {claimError}</span>
+                </div>
+              )}
+
+              {/* POINTS & BOTTLES OVERVIEW SUMMARY */}
+              <div
+                style={{
+                  background: "linear-gradient(135deg, var(--panel) 0%, #fff 100%)",
+                  border: "1.5px solid var(--mint-3)",
+                  borderRadius: "18px",
+                  padding: "18px 22px",
+                  marginBottom: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
+                  <div>
+                    <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--green-deep)" }}>
+                      REWARD SUMMARY
+                    </span>
+                    <div style={{ fontSize: "28px", fontWeight: 800, color: "var(--ink)", lineHeight: 1.1, marginTop: "4px" }}>
+                      {rewardsSummary.total_earned_points}{" "}
+                      <span style={{ fontSize: "16px", fontWeight: 600, color: "var(--muted)" }}>Total Points</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)" }}>Reward Bottles</div>
+                    <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--green-deep)", marginTop: "2px" }}>
+                      {"🍼 ".repeat(Math.min(rewardsSummary.total_bottles, 6))}
+                      {rewardsSummary.total_bottles > 6 && `+${rewardsSummary.total_bottles - 6} `}
+                      ({rewardsSummary.total_bottles} Bottles)
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--muted)" }}>1 bottle = 5 points</div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                    gap: "10px",
+                    paddingTop: "12px",
+                    borderTop: "1px dashed var(--mint-3)",
+                  }}
+                >
+                  <div style={{ background: "#fff", border: "1px solid var(--mint-3)", borderRadius: "12px", padding: "10px 12px" }}>
+                    <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>Active Points</span>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: "var(--green-deep)" }}>
+                      {rewardsSummary.active_points} pts
+                    </div>
+                    <span style={{ fontSize: "11px", color: "var(--muted)" }}>🍼 {rewardsSummary.active_bottles || 0} bottles</span>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #a7f3d0", borderRadius: "12px", padding: "10px 12px" }}>
+                    <span style={{ fontSize: "11px", color: "#065f46", fontWeight: 600 }}>Claimed Points</span>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: "#059669" }}>
+                      {rewardsSummary.claimed_points} pts
+                    </div>
+                    <span style={{ fontSize: "11px", color: "#065f46" }}>🍼 {rewardsSummary.claimed_bottles || 0} bottles</span>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: "12px", padding: "10px 12px" }}>
+                    <span style={{ fontSize: "11px", color: "#991b1b", fontWeight: 600 }}>Expired Points</span>
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: "#dc2626" }}>
+                      {rewardsSummary.expired_points} pts
+                    </div>
+                    <span style={{ fontSize: "11px", color: "#991b1b" }}>🍼 {rewardsSummary.expired_bottles || 0} bottles</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* REWARD HISTORY LIST */}
+              <div>
+                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--ink)", margin: "0 0 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Individual Reward History</span>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>
+                    {userRewards.length} Reward{userRewards.length === 1 ? "" : "s"} Assigned
+                  </span>
+                </h3>
+
+                {loadingRewards && userRewards.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                    <div style={{ width: 32, height: 32, border: "3px solid var(--mint-3)", borderTopColor: "var(--green)", borderRadius: "50%", margin: "0 auto 12px", animation: "staffSpin 1s linear infinite" }} />
+                    <span style={{ fontSize: "13.5px", color: "var(--muted)" }}>Loading your rewards...</span>
+                  </div>
+                ) : userRewards.length === 0 ? (
+                  /* Empty State */
+                  <div style={{ textAlign: "center", padding: "44px 20px", background: "#fbfdfc", borderRadius: "16px", border: "1.5px dashed var(--mint-3)" }}>
+                    <Award size={44} color="var(--green)" style={{ opacity: 0.35, marginBottom: "10px" }} />
+                    <p style={{ fontSize: "15px", fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+                      No rewards assigned yet.
+                    </p>
+                    <p style={{ fontSize: "13px", color: "var(--muted)", margin: "6px auto 16px", maxWidth: "360px" }}>
+                      Submit verified photos of your waste segregation through the Reward button to earn points and bottles!
+                    </p>
+                    <button
+                      className="staff-btn staff-btn-solid"
+                      onClick={() => {
+                        setRewardsOpen(false);
+                        setShowRewardRulesModal(true);
+                      }}
+                      style={{ fontSize: "13px", padding: "8px 18px" }}
+                    >
+                      Submit for Reward &rarr;
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    {userRewards.map((item) => {
+                      const st = item.computed_status || item.status;
+                      const daysLeft = calculateDaysRemaining(item.valid_till);
+                      const isClaimed = st === "Claimed" || Boolean(item.claimed_at);
+                      const isExpired = !isClaimed && (st === "Expired" || daysLeft <= 0);
+
+                      return (
+                        <div
+                          key={item.id}
+                          style={{
+                            background: "#fff",
+                            border: `1.5px solid ${isClaimed ? "#a7f3d0" : isExpired ? "#fecaca" : "var(--mint-3)"}`,
+                            borderRadius: "16px",
+                            padding: "16px 18px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--ink)" }}>
+                                  Reward #{item.id}
+                                </span>
+                                <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                  • {item.waste_type || "Waste Management"}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                Activity Date: {item.date || "N/A"} · Quantity: {item.estimated_quantity ? `${item.estimated_quantity} kg` : "N/A"}
+                              </span>
+                            </div>
+
+                            {/* Status Badge */}
+                            <span
+                              style={{
+                                fontSize: "11.5px",
+                                fontWeight: 700,
+                                padding: "3px 10px",
+                                borderRadius: "999px",
+                                background: isClaimed ? "#ecfdf5" : isExpired ? "#fef2f2" : "var(--panel)",
+                                color: isClaimed ? "#065f46" : isExpired ? "#991b1b" : "var(--green-deep)",
+                                border: `1px solid ${isClaimed ? "#a7f3d0" : isExpired ? "#fecaca" : "var(--mint-3)"}`,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              {isClaimed && <CheckCircle2 size={12} />}
+                              {isClaimed ? "Claimed" : isExpired ? "Expired" : "Active"}
+                            </span>
+                          </div>
+
+                          {/* Points & Bottle Display */}
+                          <div
+                            style={{
+                              background: isClaimed ? "linear-gradient(135deg, #f0fdf4 0%, #fff 100%)" : "linear-gradient(135deg, var(--panel) 0%, #fff 100%)",
+                              border: `1px solid ${isClaimed ? "#bbf7d0" : "var(--mint-3)"}`,
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: "8px",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                              <span style={{ fontSize: "20px", fontWeight: 800, color: "var(--ink)" }}>
+                                {item.points} Points
+                              </span>
+                              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--green-deep)" }}>
+                                {"🍼 ".repeat(Math.min(item.bottle_count || 1, 6))}
+                                {(item.bottle_count || 1) > 6 && `+${(item.bottle_count || 1) - 6} `}
+                                ({item.bottle_count || 1} Bottle{(item.bottle_count || 1) === 1 ? "" : "s"})
+                              </span>
+                            </div>
+                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                              1 bottle = 5 points
+                            </span>
+                          </div>
+
+                          {/* Validity & Dates Info */}
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                              gap: "8px",
+                              fontSize: "12px",
+                              color: "var(--ink)",
+                              paddingTop: "6px",
+                            }}
+                          >
+                            <div>
+                              <span style={{ color: "var(--muted)" }}>Valid From: </span>
+                              <span style={{ fontWeight: 600 }}>{item.valid_from_formatted ? item.valid_from_formatted.split(" ")[0] : item.valid_from ? new Date(item.valid_from).toLocaleDateString() : "N/A"}</span>
+                            </div>
+                            <div>
+                              <span style={{ color: "var(--muted)" }}>Valid Till: </span>
+                              <span style={{ fontWeight: 600 }}>{item.valid_till_formatted ? item.valid_till_formatted.split(" ")[0] : item.valid_till ? new Date(item.valid_till).toLocaleDateString() : "N/A"}</span>
+                            </div>
+                          </div>
+
+                          {/* Action / Countdown Banner */}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: "10px",
+                              paddingTop: "8px",
+                              borderTop: "1px dashed var(--mint-3)",
+                            }}
+                          >
+                            {isClaimed ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#065f46", fontSize: "12.5px", fontWeight: 600 }}>
+                                <CheckCircle2 size={15} />
+                                <span>Claimed On: {item.claimed_at_formatted || new Date(item.claimed_at).toLocaleString()}</span>
+                              </div>
+                            ) : isExpired ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#991b1b", fontSize: "12.5px", fontWeight: 600 }}>
+                                <span>⚠️ This reward expired and can no longer be claimed.</span>
+                              </div>
+                            ) : (
+                              /* Active Reward with Countdown & Claim Button */
+                              <>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--green-deep)", fontSize: "13px", fontWeight: 700 }}>
+                                  <Clock size={15} />
+                                  <span>{daysLeft} day{daysLeft === 1 ? "" : "s"} remaining</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleClaimReward(item.id)}
+                                  disabled={claimingId === item.id}
+                                  className="staff-btn staff-btn-solid"
+                                  style={{
+                                    padding: "8px 18px",
+                                    fontSize: "12.5px",
+                                    cursor: claimingId === item.id ? "not-allowed" : "pointer",
+                                    opacity: claimingId === item.id ? 0.7 : 1,
+                                    borderRadius: "8px",
+                                  }}
+                                >
+                                  {claimingId === item.id ? "Claiming..." : "Claim Reward"}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ============================================================ */}

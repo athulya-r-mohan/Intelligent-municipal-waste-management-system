@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../api/api";
+import { getAccessToken, performLogout } from "../utils/auth";
 import "../components/Recyclerpage.css";
 import NotificationBell from "../components/NotificationBell";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
-import { performLogout } from "../utils/auth";
+import RecycledReportModal from "../components/RecycledReportModal";
 import {
   ArrowLeft,
   LayoutDashboard,
@@ -16,8 +18,13 @@ import {
   Clock3,
   Wallet,
   Activity,
+  Calendar,
+  Weight,
+  FileText,
+  AlertCircle,
+  Inbox,
+  ArrowRight,
 } from "lucide-react";
-
 
 // ---------------------------------------------------------------------------
 // EcoPulse — Recycler Dashboard
@@ -28,37 +35,6 @@ const NAV_ITEMS = [
   { key: "profile", label: "My Profile", icon: User },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "settings", label: "Settings", icon: Settings },
-];
-
-const CARDS = [
-  {
-    key: "newly",
-    title: "Newly Recycled Items",
-    value: "128",
-    hint: "items logged this week",
-    icon: Recycle,
-  },
-  {
-    key: "completed",
-    title: "Completed Recycling",
-    value: "342",
-    hint: "pickups fulfilled",
-    icon: CheckCircle2,
-  },
-  {
-    key: "pending",
-    title: "Pending Pickups",
-    value: "6",
-    hint: "awaiting collection",
-    icon: Clock3,
-  },
-  {
-    key: "payment",
-    title: "Payment",
-    value: "₹2,450",
-    hint: "credited this month",
-    icon: Wallet,
-  },
 ];
 
 function useLiveClock() {
@@ -110,9 +86,9 @@ function Logo({ onClick }) {
   );
 }
 
-function Card({ title, value, hint, icon: Icon }) {
+function Card({ title, value, hint, icon: Icon, onClick }) {
   return (
-    <div className="recycler-card">
+    <div className="recycler-card" onClick={onClick}>
       <div className="recycler-card-icon">
         <Icon size={20} strokeWidth={2} />
       </div>
@@ -125,10 +101,54 @@ function Card({ title, value, hint, icon: Icon }) {
   );
 }
 
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 export default function EcoPulseRecyclerDashboard() {
   const navigate = useNavigate();
   const [active, setActive] = useState("dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [selectedReportRecord, setSelectedReportRecord] = useState(null);
+
+  const [pendingTasks, setPendingTasks] = useState([]);
+  const [completedTasks, setCompletedTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    fetchRecyclerTasks();
+  }, []);
+
+  const fetchRecyclerTasks = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const token = getAccessToken();
+      const res = await API.get("/waste/mcf/recycler/tasks/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data?.success) {
+        setPendingTasks(res.data.pending_tasks || []);
+        setCompletedTasks(res.data.completed_tasks || []);
+      } else {
+        setErrorMsg(res.data?.error || "Failed to load recycler tasks.");
+      }
+    } catch (err) {
+      console.error("Error fetching recycler tasks:", err);
+      setErrorMsg(
+        err.response?.data?.error || "Failed to connect to backend server."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBack = () => {
     if (window.history.length > 1) window.history.back();
@@ -142,6 +162,39 @@ export default function EcoPulseRecyclerDashboard() {
   const handleLogout = () => {
     setShowLogoutModal(true);
   };
+
+  const cardsData = [
+    {
+      key: "newly",
+      title: "Newly Recycled Items",
+      value: loading ? "..." : String(pendingTasks.length),
+      hint: "pending recycling tasks",
+      icon: Recycle,
+      onClick: () => navigate("/recycler/newly-recycled-items"),
+    },
+    {
+      key: "completed",
+      title: "Completed Recycling",
+      value: loading ? "..." : String(completedTasks.length),
+      hint: "recycling tasks fulfilled",
+      icon: CheckCircle2,
+      onClick: () => navigate("/recycler/completed-items"),
+    },
+    {
+      key: "pending",
+      title: "Pending Pickups",
+      value: "6",
+      hint: "awaiting collection",
+      icon: Clock3,
+    },
+    {
+      key: "payment",
+      title: "Payment",
+      value: "₹2,450",
+      hint: "credited this month",
+      icon: Wallet,
+    },
+  ];
 
   return (
     <div className="recycler-root">
@@ -186,12 +239,22 @@ export default function EcoPulseRecyclerDashboard() {
 
         <main className="recycler-main">
           <h1 className="recycler-main-heading">Recycler Dashboard</h1>
-          <p className="recycler-main-sub">Here's what's happening with your recycling activity.</p>
+          <p className="recycler-main-sub">
+            Here's what's happening with your assigned recycling tasks and activity.
+          </p>
+
           <div className="recycler-grid">
-            {CARDS.map((c) => (
-              <Card key={c.key} {...c} />
+            {cardsData.map(({ key, ...cardProps }) => (
+              <Card key={key} {...cardProps} />
             ))}
           </div>
+
+          {errorMsg && (
+            <div className="recycler-error-msg" style={{ marginTop: 20 }}>
+              <AlertCircle size={18} />
+              <span>{errorMsg}</span>
+            </div>
+          )}
         </main>
       </div>
 

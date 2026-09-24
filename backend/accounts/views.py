@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 
@@ -17,39 +17,44 @@ class RegisterView(APIView):
         data = request.data
 
         try:
+            if User.objects.filter(username=data['email']).exists():
+                return Response(
+                    {
+                        "error": "Email already exists"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             ward = Ward.objects.get(
                 ward_id=data['ward_id']
             )
 
+            with transaction.atomic():
+                user = User.objects.create_user(
 
-            user = User.objects.create_user(
+                    username=data['email'],
 
-                username=data['email'],
+                    email=data['email'],
 
-                email=data['email'],
+                    password=data['password']
 
-                password=data['password']
+                )
 
-            )
+                UserProfile.objects.create(
 
+                    user=user,
 
-            UserProfile.objects.create(
+                    name=data['name'],
 
-                user=user,
+                    phone=data['phone'],
 
-                name=data['name'],
+                    address=data['address'],
 
-                phone=data['phone'],
+                    ward=ward,
 
-                address=data['address'],
+                    role="CITIZEN"
 
-                ward=ward,
-
-                role="CITIZEN"
-
-            )
-
+                )
 
             return Response(
                 {
@@ -58,7 +63,6 @@ class RegisterView(APIView):
                 },
                 status=status.HTTP_201_CREATED
             )
-
 
         except Ward.DoesNotExist:
 
@@ -70,7 +74,6 @@ class RegisterView(APIView):
                 status=400
             )
 
-
         except IntegrityError:
 
             return Response(
@@ -80,6 +83,7 @@ class RegisterView(APIView):
                 },
                 status=400
             )
+
 class LoginView(APIView):
 
     def post(self, request):

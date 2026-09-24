@@ -20,7 +20,8 @@ from rest_framework.authentication import BasicAuthentication, SessionAuthentica
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from decimal import Decimal, InvalidOperation
 
 from .serializers import (
     WastePickupRequestSerializer,
@@ -29,6 +30,7 @@ from .serializers import (
     MCFRecyclerAssignmentSerializer,
     RecyclerOptionSerializer,
     PaymentSerializer,
+    RewardSubmissionSerializer,
 )
 
 from ultralytics import YOLO
@@ -43,6 +45,7 @@ from .models import (
     StaffMCFCollection,
     MCFRecyclerAssignment,
     Payment,
+    RewardSubmission,
 )
 
 from .priority_detector import determine_complaint_priority
@@ -1528,6 +1531,7 @@ class DashboardStatsView(APIView):
         completed_count = WastePickupRequest.objects.filter(status="COMPLETED").count()
         assigned_count = WastePickupRequest.objects.filter(status="ASSIGNED").count()
         total_requests = WastePickupRequest.objects.count()
+        recycled_count = MCFRecyclerAssignment.objects.filter(status="COMPLETED").count()
 
         return Response(
             {
@@ -1537,6 +1541,7 @@ class DashboardStatsView(APIView):
                     "completed_count": completed_count,
                     "assigned_count": assigned_count,
                     "total_requests": total_requests,
+                    "recycled_count": recycled_count,
                 }
             },
             status=status.HTTP_200_OK
@@ -2534,6 +2539,7 @@ class AdminMCFAssignRecyclerView(APIView):
                 "recycler": recycler,
                 "total_quantity": total_qty,
                 "assigned_by": assigned_user,
+                "status": "PENDING",
             }
         )
 
@@ -2572,6 +2578,160 @@ class ExistingRecyclerListView(APIView):
             "success": True,
             "count": qs.count(),
             "recyclers": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+def get_recycler_for_user(user):
+    if not user or not user.is_authenticated:
+        return None
+    try:
+        if hasattr(user, "recycler"):
+            return user.recycler
+    except Exception:
+        pass
+    rec = Recycler.objects.filter(user=user).first()
+    if rec:
+        return rec
+    if getattr(user, "email", None):
+        rec = Recycler.objects.filter(user__email__iexact=user.email.strip()).first()
+        if rec:
+            return rec
+    if getattr(user, "username", None):
+        rec = Recycler.objects.filter(user__username__iexact=user.username.strip()).first()
+        if rec:
+            return rec
+    return None
+
+
+class RecyclerTasksView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        recycler = get_recycler_for_user(request.user)
+        if not recycler:
+            return Response(
+                {"success": False, "error": "Current authenticated user is not registered as a Recycler."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        pending_qs = MCFRecyclerAssignment.objects.filter(
+            recycler=recycler
+        ).filter(
+            models.Q(status="PENDING") | models.Q(status__isnull=True) | models.Q(status="")
+        ).select_related("recycler", "assigned_by").order_by("-date", "-created_at")
+
+        completed_qs = MCFRecyclerAssignment.objects.filter(
+            recycler=recycler,
+            status="COMPLETED"
+        ).select_related("recycler", "assigned_by").order_by("-completed_at", "-date")
+
+        pending_serializer = MCFRecyclerAssignmentSerializer(pending_qs, many=True, context={"request": request})
+        completed_serializer = MCFRecyclerAssignmentSerializer(completed_qs, many=True, context={"request": request})
+
+        return Response({
+            "success": True,
+            "pending_tasks": pending_serializer.data,
+            "completed_tasks": completed_serializer.data,
+            "counts": {
+                "newly": pending_qs.count(),
+                "completed": completed_qs.count()
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class RecyclerCompleteTaskView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        recycler = get_recycler_for_user(request.user)
+        if not recycler:
+            return Response(
+                {"success": False, "error": "Current authenticated user is not registered as a Recycler."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        assignment_id = request.data.get("assignment_id")
+        if not assignment_id:
+            return Response(
+                {"success": False, "error": "assignment_id is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            assignment = MCFRecyclerAssignment.objects.select_related("recycler").get(pk=assignment_id)
+        except MCFRecyclerAssignment.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Assignment #{assignment_id} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if assignment.recycler != recycler:
+            return Response(
+                {"success": False, "error": "You are not authorized to complete this assignment."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if assignment.status == "COMPLETED":
+            return Response(
+                {"success": False, "error": "This recycling task has already been completed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        raw_qty = request.data.get("recyclable_quantity")
+        if raw_qty is None or str(raw_qty).strip() == "":
+            return Response(
+                {"success": False, "error": "Recyclable waste quantity is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            recyclable_qty = Decimal(str(raw_qty).strip())
+        except (ValueError, TypeError, InvalidOperation):
+            return Response(
+                {"success": False, "error": "Please enter a valid numeric recyclable quantity."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if recyclable_qty < Decimal("0"):
+            return Response(
+                {"success": False, "error": "Recyclable quantity cannot be negative."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if recyclable_qty > assignment.total_quantity:
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Recyclable quantity ({recyclable_qty} kg) cannot exceed assigned quantity of {assignment.total_quantity} kg."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        note = str(request.data.get("note", "") or "").strip()
+
+        recycling_image = request.FILES.get("recycling_image")
+        if recycling_image:
+            valid_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+            ext = os.path.splitext(recycling_image.name)[1].lower()
+            if ext not in valid_extensions:
+                return Response(
+                    {"success": False, "error": "Invalid image format. Allowed formats: JPG, JPEG, PNG, WEBP."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            assignment.recycling_image = recycling_image
+
+        assignment.recyclable_quantity = recyclable_qty
+        assignment.note = note
+        assignment.status = "COMPLETED"
+        assignment.completed_at = timezone.now()
+        assignment.save()
+
+        serializer = MCFRecyclerAssignmentSerializer(assignment, context={"request": request})
+        return Response({
+            "success": True,
+            "message": "Recycling task completed successfully.",
+            "assignment": serializer.data,
         }, status=status.HTTP_200_OK)
 
 
@@ -2870,6 +3030,518 @@ class UserPaymentsListView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+# ============================================================
+# ADMIN RECYCLED WASTE HISTORY VIEWS
+# ============================================================
+
+class AdminRecyclingHistoryMonthsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = MCFRecyclerAssignment.objects.filter(status="COMPLETED")
+        
+        months_dict = {}
+        for item in qs:
+            d = item.completed_at.date() if item.completed_at else item.date
+            if not d:
+                continue
+            key = (d.year, d.month)
+            if key not in months_dict:
+                months_dict[key] = {
+                    "year": d.year,
+                    "month": d.month,
+                    "month_name": d.strftime("%B"),
+                    "label": d.strftime("%B %Y"),
+                    "total_records": 0,
+                    "total_kg": 0.0,
+                }
+            months_dict[key]["total_records"] += 1
+            qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else item.total_quantity or 0)
+            months_dict[key]["total_kg"] += qty
+
+        sorted_months = sorted(months_dict.values(), key=lambda x: (x["year"], x["month"]), reverse=True)
+
+        return Response({
+            "success": True,
+            "count": len(sorted_months),
+            "months": sorted_months,
+        }, status=status.HTTP_200_OK)
 
 
+class AdminRecyclingHistoryCategoriesView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        year_str = request.query_params.get("year")
+        month_str = request.query_params.get("month")
+
+        if not year_str or not month_str:
+            return Response(
+                {"success": False, "error": "Year and month query parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            year = int(year_str)
+            month = int(month_str)
+        except ValueError:
+            return Response(
+                {"success": False, "error": "Invalid year or month value."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        all_completed = MCFRecyclerAssignment.objects.filter(status="COMPLETED")
+        matched_items = [
+            item for item in all_completed
+            if (item.completed_at.date() if item.completed_at else item.date).year == year
+            and (item.completed_at.date() if item.completed_at else item.date).month == month
+        ]
+
+        from datetime import date
+        month_date = date(year, month, 1)
+        month_label = month_date.strftime("%B %Y")
+
+        ai_categories = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+        category_map = {cat: {"name": cat, "count": 0, "total_kg": 0.0} for cat in ai_categories}
+
+        for item in matched_items:
+            cat_name = item.waste_type.capitalize() if item.waste_type else "Miscellaneous"
+            matched_cat = next((c for c in ai_categories if c.lower() == cat_name.lower()), "Miscellaneous")
+            
+            category_map[matched_cat]["count"] += 1
+            qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else item.total_quantity or 0)
+            category_map[matched_cat]["total_kg"] += qty
+
+        categories_list = [category_map[cat] for cat in ai_categories]
+
+        return Response({
+            "success": True,
+            "year": year,
+            "month": month,
+            "month_label": month_label,
+            "total_records": len(matched_items),
+            "categories": categories_list,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminRecyclingHistoryRecordsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        year_str = request.query_params.get("year")
+        month_str = request.query_params.get("month")
+        category = request.query_params.get("category", "").strip()
+
+        if not year_str or not month_str:
+            return Response(
+                {"success": False, "error": "Year and month query parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            year = int(year_str)
+            month = int(month_str)
+        except ValueError:
+            return Response(
+                {"success": False, "error": "Invalid year or month value."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        all_completed = MCFRecyclerAssignment.objects.filter(status="COMPLETED").select_related("recycler", "recycler__user", "assigned_by")
+        matched_items = [
+            item for item in all_completed
+            if (item.completed_at.date() if item.completed_at else item.date).year == year
+            and (item.completed_at.date() if item.completed_at else item.date).month == month
+            and (not category or item.waste_type.lower() == category.lower())
+        ]
+
+        serializer = MCFRecyclerAssignmentSerializer(matched_items, many=True, context={"request": request})
+
+        return Response({
+            "success": True,
+            "year": year,
+            "month": month,
+            "category": category,
+            "count": len(matched_items),
+            "records": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+
+# ============================================================
+# REWARD SUBMISSION VIEWS
+# ============================================================
+
+class RewardSubmissionCreateView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        user = request.user
+        photo = request.FILES.get("photo")
+        date_str = request.data.get("date")
+        bin_location = request.data.get("bin_location")
+        waste_type = request.data.get("waste_type")
+        estimated_quantity = request.data.get("estimated_quantity")
+
+        # 1. Validate Date
+        if not date_str or not str(date_str).strip():
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please select the date.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            from datetime import datetime
+            parsed_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+        except ValueError:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Invalid date format. Expected YYYY-MM-DD.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 2. Validate Photo
+        if not photo:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please upload a photo before submitting.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate file extension and MIME type
+        valid_mime_prefixes = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
+        valid_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+        file_ext = os.path.splitext(photo.name)[1].lower()
+
+        if file_ext not in valid_extensions and (photo.content_type and photo.content_type.lower() not in valid_mime_prefixes):
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please upload a valid image file (JPG, JPEG, PNG).",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. Validate Bin Location
+        if not bin_location or not str(bin_location).strip():
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please select or specify the bin location.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        cleaned_bin_location = str(bin_location).strip()
+
+        # 4. Validate Waste Type
+        valid_waste_types = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+        if not waste_type or not str(waste_type).strip():
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please select the waste type.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        matched_waste_type = next((wt for wt in valid_waste_types if wt.lower() == str(waste_type).strip().lower()), None)
+        if not matched_waste_type:
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Invalid waste type. Must be one of: {', '.join(valid_waste_types)}.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 5. Validate Estimated Quantity
+        if estimated_quantity is None or str(estimated_quantity).strip() == "":
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please enter the estimated waste quantity.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            from decimal import Decimal
+            qty_val = Decimal(str(estimated_quantity).strip())
+            if qty_val <= 0:
+                return Response(
+                    {
+                        "success": False,
+                        "error": "Estimated quantity must be greater than 0 kg.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Please enter a valid numeric quantity.",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        submission = RewardSubmission.objects.create(
+            user=user,
+            photo=photo,
+            date=parsed_date,
+            bin_location=cleaned_bin_location,
+            waste_type=matched_waste_type,
+            estimated_quantity=qty_val,
+            status="Pending",
+        )
+
+        serializer = RewardSubmissionSerializer(submission, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "message": "Reward submission sent successfully.",
+                "submission": serializer.data,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class AdminRewardSubmissionListView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = getattr(request.user, "userprofile", None)
+        is_admin = request.user.is_staff or request.user.is_superuser or (profile and profile.role == "ADMIN")
+        if not is_admin:
+            return Response(
+                {"success": False, "error": "Unauthorized. Admin privileges required."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        submissions = (
+            RewardSubmission.objects
+            .select_related("user", "user__userprofile", "reward_assigned_by", "reward_assigned_by__userprofile")
+            .order_by("-created_at")
+        )
+
+        serializer = RewardSubmissionSerializer(submissions, many=True, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "count": submissions.count(),
+                "submissions": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class AdminAssignRewardView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        return self._assign_reward(request, pk)
+
+    def patch(self, request, pk=None):
+        return self._assign_reward(request, pk)
+
+    def _assign_reward(self, request, pk=None):
+        profile = getattr(request.user, "userprofile", None)
+        is_admin = request.user.is_staff or request.user.is_superuser or (profile and profile.role == "ADMIN")
+        if not is_admin:
+            return Response(
+                {"success": False, "error": "Unauthorized. Only administrators can assign rewards."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            submission = (
+                RewardSubmission.objects
+                .select_related("user", "user__userprofile", "reward_assigned_by", "reward_assigned_by__userprofile")
+                .get(id=pk)
+            )
+        except RewardSubmission.DoesNotExist:
+            return Response(
+                {"success": False, "error": "Reward submission not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if submission.points is not None or submission.status in ["Active", "Reward Assigned", "Claimed"]:
+            existing_points = submission.points if submission.points is not None else submission.reward_amount
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Reward has already been assigned for this submission ({existing_points} points).",
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        raw_points = request.data.get("points")
+        if raw_points is None:
+            raw_points = request.data.get("reward_amount")
+
+        if raw_points is None or str(raw_points).strip() == "":
+            return Response(
+                {"success": False, "error": "Reward points are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        points_str = str(raw_points).strip()
+        if "." in points_str:
+            return Response(
+                {"success": False, "error": "Reward points must be an integer, not a decimal value."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            points_val = int(points_str)
+        except (ValueError, TypeError):
+            return Response(
+                {"success": False, "error": "Please enter a valid numeric reward points value."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if points_val <= 0:
+            return Response(
+                {"success": False, "error": "Reward points must be greater than 0."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if points_val % 5 != 0:
+            return Response(
+                {"success": False, "error": "Reward points must be a multiple of 5 (1 bottle = 5 points). Examples: 5, 10, 15, 20."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        now = timezone.now()
+        valid_till = now + timedelta(days=30)
+
+        submission.points = points_val
+        submission.reward_amount = points_val
+        submission.valid_from = now
+        submission.valid_till = valid_till
+        submission.reward_assigned_at = now
+        submission.reward_assigned_by = request.user
+        submission.status = "Active"
+        submission.save()
+
+        serializer = RewardSubmissionSerializer(submission, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Successfully assigned {points_val} points ({points_val // 5} bottles) valid for 30 days.",
+                "submission": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class UserRewardListView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        submissions = (
+            RewardSubmission.objects
+            .filter(user=user, points__isnull=False, points__gt=0)
+            .select_related("user", "user__userprofile", "reward_assigned_by", "reward_assigned_by__userprofile")
+            .order_by("-valid_from", "-created_at")
+        )
+
+        all_records = list(submissions)
+        total_earned_points = sum(s.points for s in all_records if s.points)
+        total_bottles = total_earned_points // 5
+
+        active_points = sum(s.points for s in all_records if s.computed_status == "Active" and s.points)
+        claimed_points = sum(s.points for s in all_records if s.computed_status == "Claimed" and s.points)
+        expired_points = sum(s.points for s in all_records if s.computed_status == "Expired" and s.points)
+
+        serializer = RewardSubmissionSerializer(all_records, many=True, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "total_earned_points": total_earned_points,
+                "total_bottles": total_bottles,
+                "active_points": active_points,
+                "claimed_points": claimed_points,
+                "expired_points": expired_points,
+                "summary": {
+                    "total_earned_points": total_earned_points,
+                    "total_bottles": total_bottles,
+                    "active_points": active_points,
+                    "claimed_points": claimed_points,
+                    "expired_points": expired_points,
+                    "active_bottles": active_points // 5,
+                    "claimed_bottles": claimed_points // 5,
+                    "expired_bottles": expired_points // 5,
+                },
+                "rewards": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class UserClaimRewardView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        user = request.user
+        try:
+            submission = RewardSubmission.objects.get(id=pk)
+        except RewardSubmission.DoesNotExist:
+            return Response(
+                {"success": False, "error": "Reward not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if submission.user != user:
+            return Response(
+                {"success": False, "error": "Unauthorized. You cannot claim another user's reward."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if not submission.points or submission.points <= 0:
+            return Response(
+                {"success": False, "error": "No reward points have been assigned to this submission."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if submission.claimed_at is not None or submission.status == "Claimed":
+            return Response(
+                {"success": False, "error": "This reward has already been claimed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        now = timezone.now()
+        if submission.valid_till and now >= submission.valid_till:
+            return Response(
+                {"success": False, "error": "This reward has expired and can no longer be claimed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        submission.claimed_at = now
+        submission.status = "Claimed"
+        submission.save()
+
+        serializer = RewardSubmissionSerializer(submission, context={"request": request})
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Congratulations! You claimed {submission.points} points ({submission.bottle_count} bottles).",
+                "reward": serializer.data,
+            },
+            status=status.HTTP_200_OK
+        )
 

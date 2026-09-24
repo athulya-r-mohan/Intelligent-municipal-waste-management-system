@@ -108,6 +108,37 @@ const STYLES = `
     box-shadow: 0 0 0 3px rgba(31, 157, 99, 0.15);
   }
 
+  input.invalid-gmail,
+  input.error-input {
+    border-color: #dc2626 !important;
+    text-decoration: underline !important;
+    text-decoration-color: #dc2626 !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
+  }
+
+  input.invalid-gmail::placeholder,
+  input.error-input::placeholder {
+    text-decoration: none !important;
+  }
+
+  input.invalid-gmail:focus,
+  input.error-input:focus {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;
+    text-decoration: underline !important;
+    text-decoration-color: #dc2626 !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
+  }
+
+  .error {
+    display: block;
+    color: #dc2626;
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
   .eye-toggle {
     position: absolute;
     right: 12px;
@@ -261,17 +292,31 @@ export default function EcoPulseLogin() {
   });
 
   const [errors, setErrors] = useState({});
+  const [emailTouched, setEmailTouched] = useState(false);
+
+  const isValidGmail = (email) => {
+    return /^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email);
+  };
+
+  const isEmailInvalid =
+    ((emailTouched || formData.email.length > 0) && !isValidGmail(formData.email)) ||
+    !!errors.email;
 
   // Handle Input Change
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+
+    if (name === "email") {
+      setEmailTouched(true);
+    }
 
     setErrors({
       ...errors,
-      [e.target.name]: "",
+      [name]: "",
     });
   };
 
@@ -378,7 +423,18 @@ export default function EcoPulseLogin() {
                   placeholder="username@gmail.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className={errors.email ? "error-input" : ""}
+                  className={isEmailInvalid ? "error-input invalid-gmail" : ""}
+                  style={
+                    isEmailInvalid
+                      ? {
+                          borderColor: "#dc2626",
+                          textDecoration: "underline",
+                          textDecorationColor: "#dc2626",
+                          textDecorationThickness: "2px",
+                          textUnderlineOffset: "3px",
+                        }
+                      : undefined
+                  }
                 />
               </div>
 

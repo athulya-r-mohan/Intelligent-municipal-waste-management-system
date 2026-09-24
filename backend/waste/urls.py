@@ -24,12 +24,22 @@ from .views import (
     AdminMCFDateDetailsView,
     AdminMCFAssignRecyclerView,
     ExistingRecyclerListView,
+    RecyclerTasksView,
+    RecyclerCompleteTaskView,
     PaymentDetailByPickupView,
     PaymentCreateOrderView,
     PaymentVerifyView,
     AdminPaymentListView,
     AdminRequestPaymentReminderView,
     UserPaymentsListView,
+    AdminRecyclingHistoryMonthsView,
+    AdminRecyclingHistoryCategoriesView,
+    AdminRecyclingHistoryRecordsView,
+    RewardSubmissionCreateView,
+    AdminRewardSubmissionListView,
+    AdminAssignRewardView,
+    UserRewardListView,
+    UserClaimRewardView,
 )
 
 urlpatterns = [
@@ -196,6 +206,16 @@ urlpatterns = [
         ExistingRecyclerListView.as_view(),
         name="mcf-recyclers"
     ),
+    path(
+        "mcf/recycler/tasks/",
+        RecyclerTasksView.as_view(),
+        name="mcf-recycler-tasks"
+    ),
+    path(
+        "mcf/recycler/complete-task/",
+        RecyclerCompleteTaskView.as_view(),
+        name="mcf-recycler-complete-task"
+    ),
 
     # ============================================================
     # FIXED ₹50 PICKUP PAYMENT SYSTEM
@@ -235,4 +255,52 @@ urlpatterns = [
         AdminRequestPaymentReminderView.as_view(),
         name="admin-request-payment-reminder"
     ),
-]
+
+    # ============================================================
+    # ADMIN RECYCLED WASTE HISTORY ROUTES
+    # ============================================================
+    path(
+        "admin/recycling-history/months/",
+        AdminRecyclingHistoryMonthsView.as_view(),
+        name="admin-recycling-history-months"
+    ),
+    path(
+        "admin/recycling-history/categories/",
+        AdminRecyclingHistoryCategoriesView.as_view(),
+        name="admin-recycling-history-categories"
+    ),
+    path(
+        "admin/recycling-history/records/",
+        AdminRecyclingHistoryRecordsView.as_view(),
+        name="admin-recycling-history-records"
+    ),
+
+    # ============================================================
+    # REWARD SUBMISSION ROUTES
+    # ============================================================
+    path(
+        "reward-submissions/submit/",
+        RewardSubmissionCreateView.as_view(),
+        name="reward-submission-submit"
+    ),
+    path(
+        "reward-submissions/admin/",
+        AdminRewardSubmissionListView.as_view(),
+        name="reward-submission-admin-list"
+    ),
+    path(
+        "reward-submissions/<int:pk>/assign-reward/",
+        AdminAssignRewardView.as_view(),
+        name="reward-submission-assign-reward"
+    ),
+    path(
+        "user/rewards/",
+        UserRewardListView.as_view(),
+        name="user-rewards"
+    ),
+    path(
+        "reward-submissions/<int:pk>/claim/",
+        UserClaimRewardView.as_view(),
+        name="reward-submission-claim"
+    ),
+]

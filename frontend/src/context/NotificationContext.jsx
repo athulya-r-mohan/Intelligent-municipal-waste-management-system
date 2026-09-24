@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { playNotificationSound, unlockAudio } from "../utils/sound";
+import { getAccessToken } from "../utils/auth";
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
@@ -18,12 +19,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("token") ||
-    "";
+  const token = getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -69,7 +65,13 @@ export const NotificationProvider = ({ children }) => {
         setUnreadCount(res.data.unread_count);
       }
     } catch (err) {
-      // Quiet fail on network hiccups
+      if (err.response?.status === 401) {
+        if (pollingTimerRef.current) {
+          clearInterval(pollingTimerRef.current);
+          pollingTimerRef.current = null;
+        }
+        setUnreadCount(0);
+      }
     }
   }, []);
 
@@ -110,7 +112,16 @@ export const NotificationProvider = ({ children }) => {
         initialLoadDoneRef.current = true;
       }
     } catch (err) {
-      console.warn("Notification fetch error:", err.message);
+      if (err.response?.status === 401) {
+        if (pollingTimerRef.current) {
+          clearInterval(pollingTimerRef.current);
+          pollingTimerRef.current = null;
+        }
+        setNotifications([]);
+        setUnreadCount(0);
+      } else {
+        console.warn("Notification fetch error:", err.message);
+      }
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -130,7 +141,9 @@ export const NotificationProvider = ({ children }) => {
         setIsPushSubscribed(false);
       }
     } catch (err) {
-      // Quiet fail
+      if (err.response?.status === 401) {
+        setIsPushSubscribed(false);
+      }
     }
   }, [isPushSupported]);
 
@@ -283,7 +296,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Start polling cycle when authenticated
   useEffect(() => {
-    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (token) {
       fetchNotifications(false);
       checkPushSubscription();
