@@ -264,6 +264,40 @@ function AssignModal({
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
 
+  // Minimum valid date = max(today, request.date)
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  const requestDateStr = useMemo(() => {
+    if (!request?.date) return todayStr;
+    const dStr = String(request.date).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dStr)) return dStr;
+    const parsed = new Date(request.date);
+    if (!isNaN(parsed.getTime())) {
+      const yyyy = parsed.getFullYear();
+      const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+      const dd = String(parsed.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    return todayStr;
+  }, [request?.date, todayStr]);
+
+  const minScheduledDate = useMemo(() => {
+    return requestDateStr > todayStr ? requestDateStr : todayStr;
+  }, [requestDateStr, todayStr]);
+
+  const [scheduledDate, setScheduledDate] = useState(
+    request?.scheduledPickupDate
+      ? String(request.scheduledPickupDate).slice(0, 10)
+      : minScheduledDate
+  );
+  const [scheduledDateError, setScheduledDateError] = useState("");
+
   // Determine if AI successfully detected a valid waste type
   const validDetectedImages = (request?.imageResults || []).filter(
     (image) =>
@@ -527,11 +561,22 @@ function AssignModal({
       selectedStaff?.staffId ??
       staff;
 
+    if (!scheduledDate) {
+      setScheduledDateError("Please select a scheduled pickup date.");
+      return;
+    }
+
+    if (scheduledDate < minScheduledDate) {
+      setScheduledDateError(`Scheduled date cannot be earlier than ${minScheduledDate}.`);
+      return;
+    }
+
     onConfirm(
       request.requestId,
       staffName,
       staffId,
-      hasValidAiDetection ? null : manualWasteType
+      hasValidAiDetection ? null : manualWasteType,
+      scheduledDate
     );
   };
 
@@ -791,6 +836,39 @@ function AssignModal({
               </>
             )}
           </div>
+
+          {/* PICKUP SCHEDULED DATE */}
+          <div className="modal-field">
+            <label>
+              Pickup Scheduled Date <span style={{ color: "#e11d48" }}>*</span>
+            </label>
+            <input
+              type="date"
+              value={scheduledDate}
+              min={minScheduledDate}
+              onChange={(e) => {
+                setScheduledDate(e.target.value);
+                setScheduledDateError("");
+              }}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: scheduledDateError ? "1px solid #e11d48" : "1px solid #dcede0",
+                fontSize: "14px",
+                color: "#1e293b",
+                outline: "none",
+                background: "#f7fbf8",
+                boxSizing: "border-box",
+              }}
+              required
+            />
+            {scheduledDateError && (
+              <div style={{ color: "#e11d48", fontSize: "12px", marginTop: "4px" }}>
+                {scheduledDateError}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* FOOTER */}
@@ -808,6 +886,7 @@ function AssignModal({
             className="confirm-button"
             disabled={
               !staff ||
+              !scheduledDate ||
               staffLoading ||
               staffList.length === 0 ||
               (!hasValidAiDetection && !manualWasteType)
@@ -1179,6 +1258,11 @@ export default function PickupRequests() {
                 request?.assignedStaffId ??
                 null,
 
+              scheduledPickupDate:
+                request?.scheduled_pickup_date ??
+                request?.scheduledPickupDate ??
+                null,
+
               staffMarkedPending:
                 Boolean(
                   request?.staff_marked_pending ||
@@ -1391,12 +1475,14 @@ export default function PickupRequests() {
     requestId,
     staffName,
     staffId,
-    manualWasteType
+    manualWasteType,
+    scheduledDate
   ) => {
     try {
       const payload = {
         request_id: requestId,
         staff_id: staffId,
+        scheduled_pickup_date: scheduledDate,
       };
 
       if (manualWasteType) {
@@ -1417,6 +1503,7 @@ export default function PickupRequests() {
                 ...request,
                 assignedStaff: staffName,
                 assignedStaffId: staffId,
+                scheduledPickupDate: scheduledDate,
                 status: "ASSIGNED",
                 ...(manualWasteType
                   ? {
@@ -1436,6 +1523,7 @@ export default function PickupRequests() {
 
       setToast(
         `Request #${requestId} successfully assigned to ${staffName}` +
+          (scheduledDate ? ` for ${scheduledDate}` : "") +
           (manualWasteType ? ` (Waste Type: ${manualWasteType})` : "")
       );
 
@@ -1967,9 +2055,18 @@ export default function PickupRequests() {
                       {/* DATE */}
                       <td className="date-cell">
                         {
-                          request.status === "COMPLETED" && request.completedAt
-                            ? request.completedAt
-                            : (request.date || "N/A")
+                          request.status === "COMPLETED" && request.completedAt ? (
+                            request.completedAt
+                          ) : (
+                            <div>
+                              <div>{request.date || "N/A"}</div>
+                              {request.scheduledPickupDate && (
+                                <div style={{ fontSize: "11px", color: "#1e6b4e", fontWeight: 600, marginTop: "2px" }}>
+                                  📅 Sched: {request.scheduledPickupDate}
+                                </div>
+                              )}
+                            </div>
+                          )
                         }
                       </td>
 

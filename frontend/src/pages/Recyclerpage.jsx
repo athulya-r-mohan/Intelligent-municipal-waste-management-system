@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Inbox,
   ArrowRight,
+  BarChart3,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,7 @@ import {
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "analytics", label: "Analytics", icon: BarChart3 },
   { key: "profile", label: "My Profile", icon: User },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "settings", label: "Settings", icon: Settings },
@@ -221,6 +223,8 @@ export default function EcoPulseRecyclerDashboard() {
                 onClick={() => {
                   if (key === "notifications") {
                     navigate("/notifications");
+                  } else if (key === "analytics") {
+                    navigate("/recycler/analytics");
                   } else {
                     setActive(key);
                   }

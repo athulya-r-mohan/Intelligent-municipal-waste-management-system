@@ -1173,19 +1173,57 @@ class AssignPickupView(APIView):
             clean_waste_type = str(manual_waste_type).strip()
             pickup_request.waste_images.all().update(waste_type=clean_waste_type)
 
-        # Save assignment and update status
+        # Scheduled pickup date validation
+        raw_scheduled_date = data.get("scheduled_pickup_date")
+        if not raw_scheduled_date or not str(raw_scheduled_date).strip():
+            return Response(
+                {"success": False, "error": "Pickup scheduled date is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            parsed_scheduled_date = datetime.strptime(str(raw_scheduled_date).strip(), "%Y-%m-%d").date()
+        except ValueError:
+            try:
+                parsed_scheduled_date = datetime.strptime(str(raw_scheduled_date).strip(), "%d/%m/%Y").date()
+            except ValueError:
+                return Response(
+                    {"success": False, "error": "Invalid scheduled date format. Expected YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        today = timezone.now().date()
+        if parsed_scheduled_date < today:
+            return Response(
+                {"success": False, "error": "Scheduled pickup date cannot be in the past."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        request_date = pickup_request.created_at.date()
+        if parsed_scheduled_date < request_date:
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Scheduled pickup date cannot be earlier than the request date ({request_date.strftime('%d/%m/%Y')})."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save assignment, scheduled date, and update status
         pickup_request.assigned_staff = staff
+        pickup_request.scheduled_pickup_date = parsed_scheduled_date
         pickup_request.status = "ASSIGNED"
-        pickup_request.save(update_fields=["assigned_staff", "status", "updated_at"])
+        pickup_request.save(update_fields=["assigned_staff", "scheduled_pickup_date", "status", "updated_at"])
 
         staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
+        date_str_formatted = parsed_scheduled_date.strftime("%d/%m/%Y")
         
         # Trigger Notifications
         try:
             create_notification(
                 recipient=staff.user,
                 title="New Pickup Task Assigned",
-                message=f"You have been assigned pickup request #{pickup_request.id} at {pickup_request.location_name}.",
+                message=f"You have been assigned pickup request #{pickup_request.id} scheduled for {date_str_formatted} at {pickup_request.location_name}.",
                 notification_type="TASK_ASSIGNED",
                 related_pickup=pickup_request,
                 action_url="/stafftask",
@@ -1193,7 +1231,7 @@ class AssignPickupView(APIView):
             create_notification(
                 recipient=pickup_request.user,
                 title="Staff Assigned to Your Pickup",
-                message=f"Field staff {staff_name} has been assigned to your waste pickup request #{pickup_request.id}.",
+                message=f"Field staff {staff_name} has been assigned to your waste pickup request #{pickup_request.id} (Scheduled: {date_str_formatted}).",
                 notification_type="TASK_ASSIGNED",
                 related_pickup=pickup_request,
                 action_url="/user",
@@ -1206,7 +1244,7 @@ class AssignPickupView(APIView):
         return Response(
             {
                 "success": True,
-                "message": f"Pickup request #{pickup_request.id} successfully assigned to {staff_name}.",
+                "message": f"Pickup request #{pickup_request.id} successfully assigned to {staff_name} for {date_str_formatted}.",
                 "pickup_request": serializer.data
             },
             status=status.HTTP_200_OK
@@ -3544,4 +3582,650 @@ class UserClaimRewardView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+# ============================================================
+# ADMIN REAL-TIME ANALYTICS VIEW
+# ============================================================
+import calendar
+
+class AdminAnalyticsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        now = timezone.now()
+        curr_year = now.year
+        curr_month = now.month
+
+        # Query param for specific historical month report
+        req_year = request.query_params.get("year")
+        req_month = request.query_params.get("month")
+
+        if req_year and req_month:
+            try:
+                target_year = int(req_year)
+                target_month = int(req_month)
+                month_report = self._calculate_month_analytics(target_year, target_month)
+                return Response({
+                    "success": True,
+                    "report": month_report
+                }, status=status.HTTP_200_OK)
+            except ValueError:
+                return Response({
+                    "success": False,
+                    "error": "Invalid year or month query parameter."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Dynamic previous month calculation
+        if curr_month == 1:
+            prev_month = 12
+            prev_year = curr_year - 1
+        else:
+            prev_month = curr_month - 1
+            prev_year = curr_year
+
+        # Dynamic Days remaining in current month
+        total_days_in_curr_month = calendar.monthrange(curr_year, curr_month)[1]
+        days_remaining = max(0, total_days_in_curr_month - now.day)
+
+        # Current Month and Previous Month Analytics
+        curr_month_data = self._calculate_month_analytics(curr_year, curr_month)
+        prev_month_data = self._calculate_month_analytics(prev_year, prev_month)
+
+        # Waste comparison structure (all 7 project AI categories)
+        categories = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+        curr_cat_map = {c["category"]: c["collected_kg"] for c in curr_month_data["waste_collection"]["categories"]}
+        prev_cat_map = {c["category"]: c["collected_kg"] for c in prev_month_data["waste_collection"]["categories"]}
+
+        comparison = []
+        for cat in categories:
+            comparison.append({
+                "category": cat,
+                "prev_month_kg": prev_cat_map.get(cat, 0.0),
+                "curr_month_kg": curr_cat_map.get(cat, 0.0),
+            })
+
+        # Historical available months
+        available_months = self._get_available_historical_months()
+
+        return Response({
+            "success": True,
+            "timestamp": now.isoformat(),
+            "days_remaining": days_remaining,
+            "current_month": {
+                "year": curr_year,
+                "month": curr_month,
+                "label": now.strftime("%B %Y"),
+                "total_days": total_days_in_curr_month,
+                "current_day": now.day,
+            },
+            "previous_month": {
+                "year": prev_year,
+                "month": prev_month,
+                "label": date(prev_year, prev_month, 1).strftime("%B %Y"),
+            },
+            "waste_collection": curr_month_data["waste_collection"],
+            "waste_comparison": comparison,
+            "recycled_waste": curr_month_data["recycled_waste"],
+            "task_status": curr_month_data["task_status"],
+            "monthly_reports": available_months,
+        }, status=status.HTTP_200_OK)
+
+    def _calculate_month_analytics(self, year, month):
+        month_date = date(year, month, 1)
+        month_label = month_date.strftime("%B %Y")
+        categories = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+
+        # 1. Waste Collection for this month from StaffMCFCollection
+        mcf_totals = (
+            StaffMCFCollection.objects
+            .filter(date__year=year, date__month=month)
+            .aggregate(
+                total_paper=models.Sum("paper"),
+                total_plastic=models.Sum("plastic"),
+                total_glass=models.Sum("glass"),
+                total_metal=models.Sum("metal"),
+                total_organic=models.Sum("organic"),
+                total_electronics=models.Sum("electronics"),
+                total_miscellaneous=models.Sum("miscellaneous"),
+                grand_total=models.Sum("total_quantity"),
+            )
+        )
+
+        waste_cat_list = [
+            {"category": "Paper", "collected_kg": float(mcf_totals["total_paper"] or 0)},
+            {"category": "Plastic", "collected_kg": float(mcf_totals["total_plastic"] or 0)},
+            {"category": "Glass", "collected_kg": float(mcf_totals["total_glass"] or 0)},
+            {"category": "Metal", "collected_kg": float(mcf_totals["total_metal"] or 0)},
+            {"category": "Organic", "collected_kg": float(mcf_totals["total_organic"] or 0)},
+            {"category": "Electronics", "collected_kg": float(mcf_totals["total_electronics"] or 0)},
+            {"category": "Miscellaneous", "collected_kg": float(mcf_totals["total_miscellaneous"] or 0)},
+        ]
+        total_collected_kg = float(mcf_totals["grand_total"] or 0)
+
+        # 2. Recycled Waste for this month from MCFRecyclerAssignment (COMPLETED)
+        completed_recycling = MCFRecyclerAssignment.objects.filter(status="COMPLETED")
+        month_recycling_items = [
+            item for item in completed_recycling
+            if (item.completed_at.date() if item.completed_at else item.date).year == year
+            and (item.completed_at.date() if item.completed_at else item.date).month == month
+        ]
+
+        recycled_map = {cat: 0.0 for cat in categories}
+        total_recycled_kg = 0.0
+        for item in month_recycling_items:
+            cat_name = item.waste_type.capitalize() if item.waste_type else "Miscellaneous"
+            matched_cat = next((c for c in categories if c.lower() == cat_name.lower()), "Miscellaneous")
+            qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else item.total_quantity or 0)
+            recycled_map[matched_cat] += qty
+            total_recycled_kg += qty
+
+        recycled_cat_list = [
+            {"category": cat, "recycled_kg": round(recycled_map[cat], 2)}
+            for cat in categories
+        ]
+
+        # 3. Collection Task Status for this specific month from WastePickupRequest
+        completed_pickups = (
+            WastePickupRequest.objects.filter(
+                status="COMPLETED",
+                created_at__year=year,
+                created_at__month=month
+            ).count()
+        )
+        pending_pickups = (
+            WastePickupRequest.objects.filter(
+                status__in=["PENDING", "ASSIGNED"],
+                created_at__year=year,
+                created_at__month=month
+            ).count()
+        )
+        total_pickups = completed_pickups + pending_pickups
+
+        return {
+            "year": year,
+            "month": month,
+            "month_label": month_label,
+            "waste_collection": {
+                "unit": "kg",
+                "total_kg": round(total_collected_kg, 2),
+                "categories": waste_cat_list,
+            },
+            "recycled_waste": {
+                "unit": "kg",
+                "total_recycled_kg": round(total_recycled_kg, 2),
+                "categories": recycled_cat_list,
+                "completed_assignments_count": len(month_recycling_items),
+            },
+            "task_status": {
+                "completed": completed_pickups,
+                "pending": pending_pickups,
+                "total": total_pickups,
+            },
+        }
+
+    def _get_available_historical_months(self):
+        mcf_dates = StaffMCFCollection.objects.values_list("date", flat=True)
+        recycling_dates = MCFRecyclerAssignment.objects.filter(status="COMPLETED").values_list("completed_at", "date")
+        pickup_dates = WastePickupRequest.objects.values_list("created_at", flat=True)
+
+        distinct_months = set()
+        for d in mcf_dates:
+            if d:
+                distinct_months.add((d.year, d.month))
+
+        for comp_at, d in recycling_dates:
+            dt = comp_at.date() if comp_at else d
+            if dt:
+                distinct_months.add((dt.year, dt.month))
+
+        for pt in pickup_dates:
+            if pt:
+                distinct_months.add((pt.year, pt.month))
+
+        sorted_keys = sorted(distinct_months, key=lambda x: (x[0], x[1]), reverse=True)
+
+        results = []
+        for y, m in sorted_keys:
+            data = self._calculate_month_analytics(y, m)
+            has_data = (
+                data["waste_collection"]["total_kg"] > 0 or
+                data["recycled_waste"]["total_recycled_kg"] > 0 or
+                data["task_status"]["total"] > 0
+            )
+            if has_data:
+                results.append({
+                    "year": y,
+                    "month": m,
+                    "label": data["month_label"],
+                    "total_waste_collected_kg": data["waste_collection"]["total_kg"],
+                    "total_recycled_kg": data["recycled_waste"]["total_recycled_kg"],
+                    "completed_tasks": data["task_status"]["completed"],
+                    "pending_tasks": data["task_status"]["pending"],
+                })
+        return results
+
+
+# ============================================================
+# STAFF REAL-TIME ANALYTICS VIEW
+# ============================================================
+class StaffAnalyticsView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "No Staff profile associated with the current user."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        now = timezone.now()
+        curr_year = now.year
+        curr_month = now.month
+
+        # Query param for specific historical month report
+        req_year = request.query_params.get("year")
+        req_month = request.query_params.get("month")
+
+        if req_year and req_month:
+            try:
+                target_year = int(req_year)
+                target_month = int(req_month)
+                month_report = self._calculate_month_analytics(staff, target_year, target_month)
+                return Response({
+                    "success": True,
+                    "report": month_report
+                }, status=status.HTTP_200_OK)
+            except ValueError:
+                return Response({
+                    "success": False,
+                    "error": "Invalid year or month query parameter."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Dynamic previous month calculation
+        if curr_month == 1:
+            prev_month = 12
+            prev_year = curr_year - 1
+        else:
+            prev_month = curr_month - 1
+            prev_year = curr_year
+
+        total_days_in_curr_month = calendar.monthrange(curr_year, curr_month)[1]
+        days_remaining = max(0, total_days_in_curr_month - now.day)
+
+        curr_month_data = self._calculate_month_analytics(staff, curr_year, curr_month)
+        prev_month_data = self._calculate_month_analytics(staff, prev_year, prev_month)
+
+        prev_label = date(prev_year, prev_month, 1).strftime("%B %Y")
+        curr_label = now.strftime("%B %Y")
+
+        comparison = [
+            {
+                "status": "Completed",
+                "prev_month": prev_month_data["task_analytics"]["completed"],
+                "curr_month": curr_month_data["task_analytics"]["completed"],
+            },
+            {
+                "status": "Pending",
+                "prev_month": prev_month_data["task_analytics"]["pending"],
+                "curr_month": curr_month_data["task_analytics"]["pending"],
+            },
+            {
+                "status": "Rescheduled",
+                "prev_month": prev_month_data["task_analytics"]["rescheduled"],
+                "curr_month": curr_month_data["task_analytics"]["rescheduled"],
+            },
+        ]
+
+        available_months = self._get_available_historical_months(staff)
+
+        return Response({
+            "success": True,
+            "timestamp": now.isoformat(),
+            "staff_id": staff.staff_id,
+            "staff_name": staff.user.get_full_name() or staff.user.username,
+            "days_remaining": days_remaining,
+            "current_month": {
+                "year": curr_year,
+                "month": curr_month,
+                "label": curr_label,
+                "total_days": total_days_in_curr_month,
+                "current_day": now.day,
+            },
+            "previous_month": {
+                "year": prev_year,
+                "month": prev_month,
+                "label": prev_label,
+            },
+            "task_analytics": curr_month_data["task_analytics"],
+            "task_comparison": comparison,
+            "waste_collection": curr_month_data["waste_collection"],
+            "monthly_reports": available_months,
+        }, status=status.HTTP_200_OK)
+
+    def _calculate_month_analytics(self, staff, year, month):
+        month_date = date(year, month, 1)
+        month_label = month_date.strftime("%B %Y")
+
+        # Completed tasks: assigned_staff=staff, status='COMPLETED'
+        completed_count = (
+            WastePickupRequest.objects.filter(
+                assigned_staff=staff,
+                status="COMPLETED"
+            ).filter(
+                models.Q(collection__completed_at__year=year, collection__completed_at__month=month) |
+                models.Q(updated_at__year=year, updated_at__month=month)
+            ).distinct().count()
+        )
+
+        # Pending tasks: assigned_staff=staff, status='ASSIGNED'
+        pending_count = (
+            WastePickupRequest.objects.filter(
+                assigned_staff=staff,
+                status="ASSIGNED",
+                created_at__year=year,
+                created_at__month=month
+            ).count()
+        )
+
+        # Rescheduled tasks: assigned_staff=staff, status='PENDING', staff_marked_pending=True
+        rescheduled_count = (
+            WastePickupRequest.objects.filter(
+                assigned_staff=staff,
+                status="PENDING",
+                staff_marked_pending=True,
+                updated_at__year=year,
+                updated_at__month=month
+            ).count()
+        )
+
+        total_tasks = completed_count + pending_count + rescheduled_count
+
+        # Waste Collection for this month from StaffMCFCollection for this staff
+        mcf_totals = (
+            StaffMCFCollection.objects
+            .filter(staff=staff, date__year=year, date__month=month)
+            .aggregate(
+                total_paper=models.Sum("paper"),
+                total_plastic=models.Sum("plastic"),
+                total_glass=models.Sum("glass"),
+                total_metal=models.Sum("metal"),
+                total_organic=models.Sum("organic"),
+                total_electronics=models.Sum("electronics"),
+                total_miscellaneous=models.Sum("miscellaneous"),
+                grand_total=models.Sum("total_quantity"),
+            )
+        )
+
+        waste_cat_list = [
+            {"category": "Paper", "collected_kg": float(mcf_totals["total_paper"] or 0)},
+            {"category": "Plastic", "collected_kg": float(mcf_totals["total_plastic"] or 0)},
+            {"category": "Glass", "collected_kg": float(mcf_totals["total_glass"] or 0)},
+            {"category": "Metal", "collected_kg": float(mcf_totals["total_metal"] or 0)},
+            {"category": "Organic", "collected_kg": float(mcf_totals["total_organic"] or 0)},
+            {"category": "Electronics", "collected_kg": float(mcf_totals["total_electronics"] or 0)},
+            {"category": "Miscellaneous", "collected_kg": float(mcf_totals["total_miscellaneous"] or 0)},
+        ]
+        total_collected_kg = float(mcf_totals["grand_total"] or 0)
+
+        return {
+            "year": year,
+            "month": month,
+            "month_label": month_label,
+            "task_analytics": {
+                "completed": completed_count,
+                "pending": pending_count,
+                "rescheduled": rescheduled_count,
+                "total": total_tasks,
+            },
+            "waste_collection": {
+                "unit": "kg",
+                "total_kg": round(total_collected_kg, 2),
+                "categories": waste_cat_list,
+            },
+        }
+
+    def _get_available_historical_months(self, staff):
+        mcf_dates = StaffMCFCollection.objects.filter(staff=staff).values_list("date", flat=True)
+        pickup_dates = WastePickupRequest.objects.filter(assigned_staff=staff).values_list("created_at", "updated_at")
+
+        distinct_months = set()
+        for d in mcf_dates:
+            if d:
+                distinct_months.add((d.year, d.month))
+
+        for cr, up in pickup_dates:
+            if cr:
+                distinct_months.add((cr.year, cr.month))
+            if up:
+                distinct_months.add((up.year, up.month))
+
+        sorted_keys = sorted(distinct_months, key=lambda x: (x[0], x[1]), reverse=True)
+
+        results = []
+        for y, m in sorted_keys:
+            data = self._calculate_month_analytics(staff, y, m)
+            has_data = (
+                data["waste_collection"]["total_kg"] > 0 or
+                data["task_analytics"]["total"] > 0
+            )
+            if has_data:
+                results.append({
+                    "year": y,
+                    "month": m,
+                    "label": data["month_label"],
+                    "total_waste_collected_kg": data["waste_collection"]["total_kg"],
+                    "total_recycled_kg": 0.0,
+                    "completed_tasks": data["task_analytics"]["completed"],
+                    "pending_tasks": data["task_analytics"]["pending"],
+                    "rescheduled_tasks": data["task_analytics"]["rescheduled"],
+                })
+        return results
+
+
+# ============================================================
+# RECYCLER REAL-TIME ANALYTICS VIEW
+# ============================================================
+class RecyclerAnalyticsView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        recycler = get_recycler_for_user(request.user)
+        if not recycler:
+            return Response(
+                {"success": False, "error": "Current authenticated user is not registered as a Recycler."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        now = timezone.now()
+        curr_year = now.year
+        curr_month = now.month
+
+        # Query param for specific historical month report
+        req_year = request.query_params.get("year")
+        req_month = request.query_params.get("month")
+
+        if req_year and req_month:
+            try:
+                target_year = int(req_year)
+                target_month = int(req_month)
+                month_report = self._calculate_month_analytics(recycler, target_year, target_month)
+                return Response({
+                    "success": True,
+                    "report": month_report
+                }, status=status.HTTP_200_OK)
+            except ValueError:
+                return Response({
+                    "success": False,
+                    "error": "Invalid year or month query parameter."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Dynamic previous month calculation
+        if curr_month == 1:
+            prev_month = 12
+            prev_year = curr_year - 1
+        else:
+            prev_month = curr_month - 1
+            prev_year = curr_year
+
+        total_days_in_curr_month = calendar.monthrange(curr_year, curr_month)[1]
+        days_remaining = max(0, total_days_in_curr_month - now.day)
+
+        curr_month_data = self._calculate_month_analytics(recycler, curr_year, curr_month)
+        prev_month_data = self._calculate_month_analytics(recycler, prev_year, prev_month)
+
+        prev_label = date(prev_year, prev_month, 1).strftime("%B %Y")
+        curr_label = now.strftime("%B %Y")
+
+        comparison = [
+            {
+                "metric": "Waste Received",
+                "prev_month": prev_month_data["waste_assigned"]["total_assigned_kg"],
+                "curr_month": curr_month_data["waste_assigned"]["total_assigned_kg"],
+            },
+            {
+                "metric": "Waste Recycled",
+                "prev_month": prev_month_data["recycled_waste"]["total_recycled_kg"],
+                "curr_month": curr_month_data["recycled_waste"]["total_recycled_kg"],
+            },
+        ]
+
+        available_months = self._get_available_historical_months(recycler)
+
+        return Response({
+            "success": True,
+            "timestamp": now.isoformat(),
+            "recycler_id": recycler.recycler_id,
+            "organization": recycler.organization,
+            "days_remaining": days_remaining,
+            "current_month": {
+                "year": curr_year,
+                "month": curr_month,
+                "label": curr_label,
+                "total_days": total_days_in_curr_month,
+                "current_day": now.day,
+            },
+            "previous_month": {
+                "year": prev_year,
+                "month": prev_month,
+                "label": prev_label,
+            },
+            "waste_assigned": curr_month_data["waste_assigned"],
+            "recycled_waste": curr_month_data["recycled_waste"],
+            "recycler_comparison": comparison,
+            "task_status": curr_month_data["task_status"],
+            "monthly_reports": available_months,
+        }, status=status.HTTP_200_OK)
+
+    def _calculate_month_analytics(self, recycler, year, month):
+        month_date = date(year, month, 1)
+        month_label = month_date.strftime("%B %Y")
+        categories = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+
+        # Waste Came for Recycling (Assigned to this recycler in date__year, date__month)
+        assigned_qs = MCFRecyclerAssignment.objects.filter(
+            recycler=recycler,
+            date__year=year,
+            date__month=month
+        )
+
+        assigned_map = {cat: 0.0 for cat in categories}
+        total_assigned_kg = 0.0
+        for item in assigned_qs:
+            cat_name = item.waste_type.capitalize() if item.waste_type else "Miscellaneous"
+            matched_cat = next((c for c in categories if c.lower() == cat_name.lower()), "Miscellaneous")
+            qty = float(item.total_quantity or 0)
+            assigned_map[matched_cat] += qty
+            total_assigned_kg += qty
+
+        assigned_cat_list = [
+            {"category": cat, "assigned_kg": round(assigned_map[cat], 2)}
+            for cat in categories
+        ]
+
+        # Recycled Waste (Completed by this recycler in completed_at or date)
+        completed_qs = MCFRecyclerAssignment.objects.filter(
+            recycler=recycler,
+            status="COMPLETED"
+        ).filter(
+            models.Q(completed_at__year=year, completed_at__month=month) |
+            models.Q(completed_at__isnull=True, date__year=year, date__month=month)
+        )
+
+        recycled_map = {cat: 0.0 for cat in categories}
+        total_recycled_kg = 0.0
+        for item in completed_qs:
+            cat_name = item.waste_type.capitalize() if item.waste_type else "Miscellaneous"
+            matched_cat = next((c for c in categories if c.lower() == cat_name.lower()), "Miscellaneous")
+            qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else item.total_quantity or 0)
+            recycled_map[matched_cat] += qty
+            total_recycled_kg += qty
+
+        recycled_cat_list = [
+            {"category": cat, "recycled_kg": round(recycled_map[cat], 2)}
+            for cat in categories
+        ]
+
+        completed_tasks_count = completed_qs.count()
+        pending_tasks_count = assigned_qs.filter(status="PENDING").count()
+
+        return {
+            "year": year,
+            "month": month,
+            "month_label": month_label,
+            "waste_assigned": {
+                "unit": "kg",
+                "total_assigned_kg": round(total_assigned_kg, 2),
+                "categories": assigned_cat_list,
+            },
+            "recycled_waste": {
+                "unit": "kg",
+                "total_recycled_kg": round(total_recycled_kg, 2),
+                "categories": recycled_cat_list,
+                "completed_count": completed_tasks_count,
+            },
+            "task_status": {
+                "completed": completed_tasks_count,
+                "pending": pending_tasks_count,
+                "total": completed_tasks_count + pending_tasks_count,
+            },
+        }
+
+    def _get_available_historical_months(self, recycler):
+        assigned_dates = MCFRecyclerAssignment.objects.filter(recycler=recycler).values_list("date", "completed_at")
+
+        distinct_months = set()
+        for d, comp_at in assigned_dates:
+            if d:
+                distinct_months.add((d.year, d.month))
+            if comp_at:
+                distinct_months.add((comp_at.year, comp_at.month))
+
+        sorted_keys = sorted(distinct_months, key=lambda x: (x[0], x[1]), reverse=True)
+
+        results = []
+        for y, m in sorted_keys:
+            data = self._calculate_month_analytics(recycler, y, m)
+            has_data = (
+                data["waste_assigned"]["total_assigned_kg"] > 0 or
+                data["recycled_waste"]["total_recycled_kg"] > 0 or
+                data["task_status"]["total"] > 0
+            )
+            if has_data:
+                results.append({
+                    "year": y,
+                    "month": m,
+                    "label": data["month_label"],
+                    "waste_received_kg": data["waste_assigned"]["total_assigned_kg"],
+                    "total_recycled_kg": data["recycled_waste"]["total_recycled_kg"],
+                    "completed_tasks": data["task_status"]["completed"],
+                    "pending_tasks": data["task_status"]["pending"],
+                })
+        return results
+
+
 

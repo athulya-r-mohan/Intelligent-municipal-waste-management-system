@@ -52,6 +52,13 @@ class WastePickupRequest(models.Model):
         help_text="True if the assigned staff member explicitly marked this task as PENDING."
     )
 
+    scheduled_pickup_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date on which the assigned staff is scheduled to perform the pickup."
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )

@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Activity,
   Award,
+  BarChart3,
 } from "lucide-react";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -65,6 +66,7 @@ const NAV_ITEMS = [
   { key: "municipality", label: "Manage Municipality", icon: Building2 },
   { key: "profile", label: "My Profile", icon: UserCircle2 },
   { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 function Logo({ onClick }) {
@@ -297,6 +299,7 @@ export default function EcoPulseAdmin() {
                   if (item.key === "municipality") setPage("municipality");
                   else if (item.key === "dashboard") setPage("dashboard");
                   else if (item.key === "notifications") navigate("/notifications");
+                  else if (item.key === "analytics") navigate("/admin/analytics");
                 }}
               >
                 <Icon size={17} strokeWidth={2} />

@@ -5,8 +5,9 @@ import "../components/userpage.css";
 import NotificationBell from "../components/NotificationBell";
 import PaymentReceiptModal from "../components/PaymentReceiptModal";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import PickupInstructionModal from "../components/PickupInstructionModal";
 import { performLogout, getAccessToken } from "../utils/auth";
-import { Receipt, Award, CheckCircle2, Clock } from "lucide-react";
+import { Receipt, Award, CheckCircle2, Clock, FileText } from "lucide-react";
  
 const WARD_DATA = [
   { name: "Rosewood", code: "W1" },
@@ -112,6 +113,11 @@ const MENU_ITEMS = [
   },
   { key: "notifications", label: "Notifications", icon: <BellIcon /> },
   {
+    key: "instructions",
+    label: "Instructions",
+    icon: <FileText size={18} />,
+  },
+  {
     key: "profile",
     label: "My profile",
     icon: (
@@ -158,6 +164,7 @@ export default function EcoPulseStaff() {
   const [selectedComplaintDetail, setSelectedComplaintDetail] = useState(null);
   const [receiptPayment, setReceiptPayment] = useState(null);
   const [showRewardRulesModal, setShowRewardRulesModal] = useState(false);
+  const [showPickupInstructions, setShowPickupInstructions] = useState(false);
 
   // User Rewards & Points State
   const [rewardsOpen, setRewardsOpen] = useState(false);
@@ -545,6 +552,9 @@ export default function EcoPulseStaff() {
     } else if (key === "notifications") {
       setDrawerOpen(false);
       navigate("/notifications");
+    } else if (key === "instructions") {
+      setDrawerOpen(false);
+      navigate("/instructions");
     }
   };
 
@@ -1023,6 +1033,12 @@ export default function EcoPulseStaff() {
           >
             Reward
           </button>
+          <button
+            className="staff-btn staff-btn-ghost"
+            onClick={() => navigate("/instructions")}
+          >
+            Instructions
+          </button>
           <button className="staff-btn staff-btn-solid" onClick={() => setDrawerOpen(true)}>
             my profile
           </button>
@@ -1044,7 +1060,7 @@ export default function EcoPulseStaff() {
           <div className="staff-hero-actions">
             <button
               className="staff-action-pill staff-action-pill-accent"
-              onClick={() => navigate("/pickupform")}
+              onClick={() => setShowPickupInstructions(true)}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
@@ -1312,7 +1328,7 @@ export default function EcoPulseStaff() {
                   </p>
                   <button
                     className="staff-btn staff-btn-solid"
-                    onClick={() => { setTrackingOpen(false); navigate("/pickupform"); }}
+                    onClick={() => { setTrackingOpen(false); setShowPickupInstructions(true); }}
                   >
                     Create New Pickup Request
                   </button>
@@ -1646,7 +1662,7 @@ export default function EcoPulseStaff() {
                   </p>
                   <button
                     className="staff-btn staff-btn-solid"
-                    onClick={() => { setHistoryOpen(false); navigate("/pickupform"); }}
+                    onClick={() => { setHistoryOpen(false); setShowPickupInstructions(true); }}
                   >
                     Create New Pickup Request
                   </button>
@@ -2797,6 +2813,18 @@ export default function EcoPulseStaff() {
           </div>
         </div>
       )}
+
+      {/* ============================================================ */}
+      {/* PICKUP REQUEST INSTRUCTION MODAL */}
+      {/* ============================================================ */}
+      <PickupInstructionModal
+        isOpen={showPickupInstructions}
+        onClose={() => setShowPickupInstructions(false)}
+        onConfirm={() => {
+          setShowPickupInstructions(false);
+          navigate("/pickupform");
+        }}
+      />
 
       {/* ============================================================ */}
       {/* LOGOUT CONFIRMATION MODAL */}

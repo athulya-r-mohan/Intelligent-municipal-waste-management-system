@@ -9,6 +9,7 @@ import Userpage from "./pages/userpage";
 import Adminpage from "./pages/Adminpage";
 import Staffpage from "./pages/Staffpage";
 import StaffTaskpage from "./pages/StaffTaskpage";
+import StaffScheduledPickupTasks from "./pages/StaffScheduledPickupTasks";
 import Taskstatusupdate from "./pages/Taskstatusupdate";
 import Recyclerpage from "./pages/Recyclerpage";
 import RecyclerNewlyRecycledItems from "./pages/RecyclerNewlyRecycledItems";
@@ -29,6 +30,10 @@ import PaymentPage from "./pages/PaymentPage";
 import AdminPayments from "./pages/AdminPayments";
 import AdminRecycledHistory from "./pages/AdminRecycledHistory";
 import RewardSubmission from "./pages/RewardSubmission";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import StaffAnalytics from "./pages/StaffAnalytics";
+import RecyclerAnalytics from "./pages/RecyclerAnalytics";
+import InstructionsPage from "./pages/InstructionsPage";
 
 export default function App() {
   return (
@@ -41,6 +46,7 @@ export default function App() {
 
         {/* Citizen Routes */}
         <Route path="/user" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><Userpage /></ProtectedRoute>} />
+        <Route path="/instructions" element={<ProtectedRoute allowedRoles={["CITIZEN", "ADMIN", "STAFF"]}><InstructionsPage /></ProtectedRoute>} />
         <Route path="/pickupform" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><Pickuprequestform /></ProtectedRoute>} />
         <Route path="/complaintform" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><Wastecomplaintform /></ProtectedRoute>} />
         <Route path="/payment/:pickupId" element={<ProtectedRoute allowedRoles={["CITIZEN"]}><PaymentPage /></ProtectedRoute>} />
@@ -48,6 +54,7 @@ export default function App() {
 
         {/* Admin Routes */}
         <Route path="/admin" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Adminpage /></ProtectedRoute>} />
+        <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminAnalytics /></ProtectedRoute>} />
         <Route path="/admincomplaints" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Admincomplaints /></ProtectedRoute>} />
         <Route path="/complaints" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Admincomplaints /></ProtectedRoute>} />
         <Route path="/addstaff" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Addstaffform /></ProtectedRoute>} />
@@ -61,12 +68,15 @@ export default function App() {
 
         {/* Staff Routes */}
         <Route path="/staff" element={<ProtectedRoute allowedRoles={["STAFF"]}><Staffpage /></ProtectedRoute>} />
+        <Route path="/staff/analytics" element={<ProtectedRoute allowedRoles={["STAFF"]}><StaffAnalytics /></ProtectedRoute>} />
         <Route path="/stafftask" element={<ProtectedRoute allowedRoles={["STAFF"]}><StaffTaskpage /></ProtectedRoute>} />
+        <Route path="/staff/scheduled-pickups/:date" element={<ProtectedRoute allowedRoles={["STAFF"]}><StaffScheduledPickupTasks /></ProtectedRoute>} />
         <Route path="/taskupdate/:id" element={<ProtectedRoute allowedRoles={["STAFF"]}><Taskstatusupdate /></ProtectedRoute>} />
         <Route path="/staff/mcf" element={<ProtectedRoute allowedRoles={["STAFF"]}><StaffMCFCollection /></ProtectedRoute>} />
 
         {/* Recycler Routes */}
         <Route path="/recycler" element={<ProtectedRoute allowedRoles={["RECYCLER"]}><Recyclerpage /></ProtectedRoute>} />
+        <Route path="/recycler/analytics" element={<ProtectedRoute allowedRoles={["RECYCLER"]}><RecyclerAnalytics /></ProtectedRoute>} />
         <Route path="/recycler/newly-recycled-items" element={<ProtectedRoute allowedRoles={["RECYCLER"]}><RecyclerNewlyRecycledItems /></ProtectedRoute>} />
         <Route path="/recycler/completed-items" element={<ProtectedRoute allowedRoles={["RECYCLER"]}><RecyclerCompletedItems /></ProtectedRoute>} />
         <Route path="/recycler/task-completion" element={<ProtectedRoute allowedRoles={["RECYCLER"]}><RecyclerTaskCompletion /></ProtectedRoute>} />

@@ -218,6 +218,12 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    scheduled_pickup_date = serializers.DateField(
+        format="%Y-%m-%d",
+        read_only=True,
+        allow_null=True
+    )
+
     # ========================================================
     # ASSIGNED STAFF
     # ========================================================
@@ -276,6 +282,7 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
 
             "status",
             "date",
+            "scheduled_pickup_date",
 
             "assigned_staff",
             "assigned_staff_id",

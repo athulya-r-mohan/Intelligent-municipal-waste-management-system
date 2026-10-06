@@ -374,7 +374,7 @@ function StaffFilterBar({
 // ---------------------------------------------------------------------------
 // Task table
 // ---------------------------------------------------------------------------
-function TaskTable({
+export function TaskTable({
   tasks,
   loading,
   error,
@@ -458,7 +458,7 @@ function TaskTable({
               Waste Type
             </SortableTh>
             <SortableTh
-              columnKey="date"
+              columnKey="scheduledPickupDate"
               currentSortKey={sortKey}
               currentSortDir={sortDir}
               onSort={onSort}
@@ -470,7 +470,7 @@ function TaskTable({
                 borderBottom: "1px solid #cfe7bb",
               }}
             >
-              Date
+              Scheduled / Date
             </SortableTh>
             <SortableTh
               columnKey="status"
@@ -604,7 +604,31 @@ function TaskTable({
                 </span>
               </td>
               <td style={{ padding: "14px 16px", color: "#39511f", fontSize: 12.5 }}>
-                {t.date || "Today"}
+                {t.scheduledPickupDate ? (
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#1e6b4e", display: "flex", alignItems: "center", gap: 4 }}>
+                      <span>📅</span>
+                      <span>
+                        {(() => {
+                          const p = String(t.scheduledPickupDate).slice(0, 10).split("-");
+                          return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : t.scheduledPickupDate;
+                        })()}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#7fa363", marginTop: 2 }}>
+                      Req: {t.date || "N/A"}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ color: "#d97706", fontWeight: 600, fontSize: 11.5 }}>
+                      Unscheduled
+                    </div>
+                    <div style={{ fontSize: 11, color: "#7fa363" }}>
+                      Req: {t.date || "Today"}
+                    </div>
+                  </div>
+                )}
               </td>
               <td style={{ padding: "14px 16px" }}>
                 <button
@@ -638,7 +662,7 @@ function TaskTable({
 // ---------------------------------------------------------------------------
 // Pickup Route Modal
 // ---------------------------------------------------------------------------
-function PickupRouteModal({ task, onClose }) {
+export function PickupRouteModal({ task, onClose }) {
   if (!task) return null;
 
   const lat = task.latitude;
@@ -1744,9 +1768,35 @@ export default function MyTaskDashboard() {
     return complaints.filter((c) => ["RESOLVED", "COMPLETED", "CLOSED"].includes(String(c.status || "").toUpperCase()));
   }, [complaints]);
 
+  // Distinct scheduled pickup dates for active/pending tasks (sorted descending: newest at the top)
+  const distinctScheduledDates = useMemo(() => {
+    const datesSet = new Set();
+    pendingTasksRaw.forEach((t) => {
+      if (t.scheduledPickupDate) {
+        const sDate = String(t.scheduledPickupDate).slice(0, 10);
+        if (sDate) {
+          datesSet.add(sDate);
+        }
+      }
+    });
+
+    // Sort descending: newest date at the top
+    return Array.from(datesSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((isoDate) => {
+        const parts = isoDate.split("-");
+        const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : isoDate;
+        return {
+          isoDate,
+          label: formatted,
+        };
+      });
+  }, [pendingTasksRaw]);
+
   // Filtered & Sorted datasets
   const filteredPendingTasks = useMemo(() => {
     const list = pendingTasksRaw.filter((t) => {
+
       if (pendingReqFilter.search) {
         const q = pendingReqFilter.search.toLowerCase().trim();
         const idMatch = String(t.id || "").toLowerCase().includes(q);
@@ -1925,6 +1975,7 @@ export default function MyTaskDashboard() {
         wasteType: item.waste_type || "Waste",
         status: item.status || "ASSIGNED",
         date: item.date || "",
+        scheduledPickupDate: item.scheduled_pickup_date || null,
         userName: item.user_name || "",
         phone: item.phone || "",
       }));
@@ -2182,6 +2233,78 @@ export default function MyTaskDashboard() {
       {/* SECTION 1: PENDING REQUESTS */}
       {activeTab === "pending_requests" && (
         <div>
+          {/* PICKUP SCHEDULED / SCHEDULED PICKUP DATES */}
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #d4ecc7",
+              borderRadius: 12,
+              padding: "14px 18px",
+              marginBottom: 16,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <CalendarIcon size={16} color="#1e6b4e" />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#243515", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Pickup Scheduled
+                </div>
+                <div style={{ fontSize: 11.5, color: "#5f8268", fontWeight: 600 }}>
+                  Scheduled Pickup Dates
+                </div>
+              </div>
+            </div>
+
+            {distinctScheduledDates.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#788f69", fontStyle: "italic", padding: "6px 0" }}>
+                No scheduled pickup dates.
+              </div>
+            ) : (
+              <div
+                style={{
+                  border: "1px solid #e2f0d9",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  background: "#ffffff",
+                }}
+              >
+                {distinctScheduledDates.map((item, idx) => (
+                  <div
+                    key={item.isoDate}
+                    onClick={() => navigate(`/staff/scheduled-pickups/${item.isoDate}`)}
+                    role="button"
+                    tabIndex={0}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      borderBottom: idx < distinctScheduledDates.length - 1 ? "1px solid #eef6e9" : "none",
+                      background: "#ffffff",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f4faf1";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#ffffff";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 14 }}>📅</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: "#243515" }}>
+                        {item.label}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 15, color: "#1e6b4e", fontWeight: 700 }}>›</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <StaffFilterBar
             search={pendingReqFilter.search}
             onSearchChange={(search) => setPendingReqFilter((p) => ({ ...p, search }))}

@@ -40,6 +40,9 @@ from .views import (
     AdminAssignRewardView,
     UserRewardListView,
     UserClaimRewardView,
+    AdminAnalyticsView,
+    StaffAnalyticsView,
+    RecyclerAnalyticsView,
 )
 
 urlpatterns = [
@@ -302,5 +305,20 @@ urlpatterns = [
         "reward-submissions/<int:pk>/claim/",
         UserClaimRewardView.as_view(),
         name="reward-submission-claim"
+    ),
+    path(
+        "admin/analytics/",
+        AdminAnalyticsView.as_view(),
+        name="admin-analytics"
+    ),
+    path(
+        "staff/analytics/",
+        StaffAnalyticsView.as_view(),
+        name="staff-analytics"
+    ),
+    path(
+        "recycler/analytics/",
+        RecyclerAnalyticsView.as_view(),
+        name="recycler-analytics"
     ),
 ]

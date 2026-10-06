@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Activity,
+  BarChart3,
 } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
  
@@ -33,6 +34,7 @@ const LINKS = {
   scheduled: "#",
   mcf: "/staff/mcf",
   completed: "#",
+  analytics: "/staff/analytics",
 };
  
 const FONT_IMPORT_ID = "ecopulse-font-import";
@@ -65,6 +67,7 @@ const COLORS = {
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "myTasks", label: "My tasks", icon: ClipboardList },
+  { key: "analytics", label: "Analytics", icon: BarChart3 },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "profile", label: "My profile", icon: UserCircle2 },
   { key: "municipal", label: "View municipal", icon: Building2 },
