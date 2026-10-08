@@ -1751,14 +1751,28 @@ export default function MyTaskDashboard() {
   const [pendingCompSort, setPendingCompSort] = useState({ key: null, dir: null });
   const [completedCompSort, setCompletedCompSort] = useState({ key: null, dir: null });
 
-  // Categorize raw data into 4 buckets
-  const pendingTasksRaw = useMemo(() => {
-    return tasks.filter((t) => String(t.status || "").toUpperCase() !== "COMPLETED");
+  // Check if search or any filter is actively applied on pending requests tab
+  const isPendingReqFilterActive = Boolean(
+    pendingReqFilter.search ||
+    pendingReqFilter.wasteType ||
+    pendingReqFilter.date ||
+    pendingReqFilter.status
+  );
+
+  // Categorize raw data into datasets
+  const assignedTasks = useMemo(() => {
+    return tasks.filter((t) => String(t.status || "").trim().toUpperCase() === "ASSIGNED");
   }, [tasks]);
 
-  const completedTasksRaw = useMemo(() => {
-    return tasks.filter((t) => String(t.status || "").toUpperCase() === "COMPLETED");
+  const activeTasks = useMemo(() => {
+    return tasks.filter((t) => String(t.status || "").trim().toUpperCase() !== "COMPLETED");
   }, [tasks]);
+  const pendingTasksRaw = activeTasks;
+
+  const completedTasks = useMemo(() => {
+    return tasks.filter((t) => String(t.status || "").trim().toUpperCase() === "COMPLETED");
+  }, [tasks]);
+  const completedTasksRaw = completedTasks;
 
   const pendingComplaintsRaw = useMemo(() => {
     return complaints.filter((c) => !["RESOLVED", "COMPLETED", "CLOSED"].includes(String(c.status || "").toUpperCase()));
@@ -1768,10 +1782,38 @@ export default function MyTaskDashboard() {
     return complaints.filter((c) => ["RESOLVED", "COMPLETED", "CLOSED"].includes(String(c.status || "").toUpperCase()));
   }, [complaints]);
 
-  // Distinct scheduled pickup dates for active/pending tasks (sorted descending: newest at the top)
+  // Filtered dataset for active assigned scheduled pickup dates (excludes COMPLETED)
+  const filteredAllAssignedTasks = useMemo(() => {
+    return activeTasks.filter((t) => {
+      const statusUpper = String(t.status || "").trim().toUpperCase();
+      if (statusUpper === "COMPLETED") return false;
+      if (pendingReqFilter.status) {
+        if (statusUpper !== pendingReqFilter.status.trim().toUpperCase()) return false;
+      }
+
+      if (pendingReqFilter.search) {
+        const q = pendingReqFilter.search.toLowerCase().trim();
+        const idMatch = String(t.id || "").toLowerCase().includes(q);
+        const nameMatch = String(t.userName || "").toLowerCase().includes(q);
+        const locMatch = String(t.pickup || t.location_name || "").toLowerCase().includes(q);
+        const wardMatch = String(t.ward || "").toLowerCase().includes(q);
+        if (!idMatch && !nameMatch && !locMatch && !wardMatch) return false;
+      }
+      if (pendingReqFilter.wasteType) {
+        if (String(t.wasteType || "").toLowerCase() !== pendingReqFilter.wasteType.toLowerCase()) return false;
+      }
+      if (pendingReqFilter.date) {
+        const d = String(t.scheduledPickupDate || t.date || "").split("T")[0];
+        if (d !== pendingReqFilter.date) return false;
+      }
+      return true;
+    });
+  }, [activeTasks, pendingReqFilter]);
+
+  // Distinct scheduled pickup dates for active assigned tasks (sorted descending: newest at the top)
   const distinctScheduledDates = useMemo(() => {
     const datesSet = new Set();
-    pendingTasksRaw.forEach((t) => {
+    filteredAllAssignedTasks.forEach((t) => {
       if (t.scheduledPickupDate) {
         const sDate = String(t.scheduledPickupDate).slice(0, 10);
         if (sDate) {
@@ -1791,11 +1833,31 @@ export default function MyTaskDashboard() {
           label: formatted,
         };
       });
-  }, [pendingTasksRaw]);
+  }, [filteredAllAssignedTasks]);
 
   // Filtered & Sorted datasets
   const filteredPendingTasks = useMemo(() => {
-    const list = pendingTasksRaw.filter((t) => {
+    const selectedStatus = String(pendingReqFilter.status || "").trim().toUpperCase();
+    let baseList;
+    if (selectedStatus === "ASSIGNED") {
+      baseList = assignedTasks;
+    } else {
+      // "All Statuses" or other active statuses (strictly exclude COMPLETED)
+      baseList = activeTasks;
+    }
+
+    const list = baseList.filter((t) => {
+      const statusUpper = String(t.status || "").trim().toUpperCase();
+
+      // Unconditional Guard: Never allow COMPLETED tasks in Pending Requests
+      if (statusUpper === "COMPLETED") {
+        return false;
+      }
+
+      // Strict enforcement for selected status
+      if (selectedStatus && statusUpper !== selectedStatus) {
+        return false;
+      }
 
       if (pendingReqFilter.search) {
         const q = pendingReqFilter.search.toLowerCase().trim();
@@ -1810,17 +1872,21 @@ export default function MyTaskDashboard() {
       }
       if (pendingReqFilter.date) {
         const d = String(t.date || "").split("T")[0];
-        if (d !== pendingReqFilter.date) return false;
-      }
-      if (pendingReqFilter.status) {
-        if (String(t.status || "").toUpperCase() !== pendingReqFilter.status.toUpperCase()) return false;
+        const s = String(t.scheduledPickupDate || "").split("T")[0];
+        if (d !== pendingReqFilter.date && s !== pendingReqFilter.date) return false;
       }
       return true;
     });
-    return sortTableData(list, pendingReqSort.key, pendingReqSort.dir, {
+
+    // Guarantee that when pendingReqFilter.status === "ASSIGNED", only ASSIGNED tasks are returned
+    const finalList = selectedStatus === "ASSIGNED"
+      ? list.filter((t) => String(t.status || "").trim().toUpperCase() === "ASSIGNED")
+      : list;
+
+    return sortTableData(finalList, pendingReqSort.key, pendingReqSort.dir, {
       date: (t) => t.date || t.created_at || "",
     });
-  }, [pendingTasksRaw, pendingReqFilter, pendingReqSort]);
+  }, [activeTasks, assignedTasks, pendingReqFilter, pendingReqSort]);
 
   const filteredCompletedTasks = useMemo(() => {
     const list = completedTasksRaw.filter((t) => {
@@ -1837,7 +1903,8 @@ export default function MyTaskDashboard() {
       }
       if (completedReqFilter.date) {
         const d = String(t.date || "").split("T")[0];
-        if (d !== completedReqFilter.date) return false;
+        const s = String(t.scheduledPickupDate || "").split("T")[0];
+        if (d !== completedReqFilter.date && s !== completedReqFilter.date) return false;
       }
       if (completedReqFilter.status) {
         if (String(t.status || "").toUpperCase() !== completedReqFilter.status.toUpperCase()) return false;
@@ -1973,7 +2040,7 @@ export default function MyTaskDashboard() {
         longitude: item.longitude,
         ward: item.ward || (item.ward_id ? `Ward ${item.ward_id}` : "N/A"),
         wasteType: item.waste_type || "Waste",
-        status: item.status || "ASSIGNED",
+        status: item.status ? String(item.status).trim() : "PENDING",
         date: item.date || "",
         scheduledPickupDate: item.scheduled_pickup_date || null,
         userName: item.user_name || "",
@@ -2233,6 +2300,26 @@ export default function MyTaskDashboard() {
       {/* SECTION 1: PENDING REQUESTS */}
       {activeTab === "pending_requests" && (
         <div>
+          <StaffFilterBar
+            search={pendingReqFilter.search}
+            onSearchChange={(search) => setPendingReqFilter((p) => ({ ...p, search }))}
+            wasteType={pendingReqFilter.wasteType}
+            onWasteTypeChange={(wasteType) => setPendingReqFilter((p) => ({ ...p, wasteType }))}
+            date={pendingReqFilter.date}
+            onDateChange={(date) => setPendingReqFilter((p) => ({ ...p, date }))}
+            status={pendingReqFilter.status}
+            onStatusChange={(status) => setPendingReqFilter((p) => ({ ...p, status }))}
+            statusOptions={[
+              { value: "ASSIGNED", label: "Assigned" },
+              { value: "IN_PROGRESS", label: "In Progress" },
+              { value: "PENDING", label: "Pending" },
+            ]}
+            onClear={() => setPendingReqFilter({ search: "", wasteType: "", date: "", status: "" })}
+            placeholder="Search by User, ID, Location, Ward..."
+            totalCount={pendingTasksRaw.length}
+            filteredCount={filteredPendingTasks.length}
+          />
+
           {/* PICKUP SCHEDULED / SCHEDULED PICKUP DATES */}
           <div
             style={{
@@ -2305,35 +2392,49 @@ export default function MyTaskDashboard() {
             )}
           </div>
 
-          <StaffFilterBar
-            search={pendingReqFilter.search}
-            onSearchChange={(search) => setPendingReqFilter((p) => ({ ...p, search }))}
-            wasteType={pendingReqFilter.wasteType}
-            onWasteTypeChange={(wasteType) => setPendingReqFilter((p) => ({ ...p, wasteType }))}
-            date={pendingReqFilter.date}
-            onDateChange={(date) => setPendingReqFilter((p) => ({ ...p, date }))}
-            status={pendingReqFilter.status}
-            onStatusChange={(status) => setPendingReqFilter((p) => ({ ...p, status }))}
-            statusOptions={[
-              { value: "ASSIGNED", label: "Assigned" },
-              { value: "IN_PROGRESS", label: "In Progress" },
-              { value: "PENDING", label: "Pending" },
-            ]}
-            onClear={() => setPendingReqFilter({ search: "", wasteType: "", date: "", status: "" })}
-            placeholder="Search by User, ID, Location, Ward..."
-            totalCount={pendingTasksRaw.length}
-            filteredCount={filteredPendingTasks.length}
-          />
-          <TaskTable
-            tasks={filteredPendingTasks}
-            loading={loading}
-            error={error}
-            onStatusClick={handleStatusClick}
-            onOpenRoute={(task) => setActiveRoutePickup(task)}
-            sortKey={pendingReqSort.key}
-            sortDir={pendingReqSort.dir}
-            onSort={handleSortPendingReq}
-          />
+          {/* CONDITIONALLY RENDER TASK RESULTS ON THE SAME PAGE WHEN SEARCH / FILTER IS ACTIVE */}
+          {isPendingReqFilterActive && (
+            <div style={{ marginTop: 20 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                  paddingBottom: 8,
+                  borderBottom: "1.5px solid #cfe7bb",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      color: "#4c7a2e",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Filter / Search Results
+                  </div>
+                  <div style={{ fontSize: 13, color: "#2f4a1c", fontWeight: 600, marginTop: 2 }}>
+                    Showing {filteredPendingTasks.length} of {pendingTasksRaw.length} records
+                  </div>
+                </div>
+              </div>
+
+              <TaskTable
+                tasks={filteredPendingTasks}
+                loading={loading}
+                error={error}
+                onStatusClick={handleStatusClick}
+                onOpenRoute={(task) => setActiveRoutePickup(task)}
+                sortKey={pendingReqSort.key}
+                sortDir={pendingReqSort.dir}
+                onSort={handleSortPendingReq}
+              />
+            </div>
+          )}
         </div>
       )}
 

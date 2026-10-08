@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ArrowLeft, Calendar, RefreshCw } from "lucide-react";
+import { ArrowLeft, Calendar, RefreshCw, Navigation } from "lucide-react";
 import { TaskTable, PickupRouteModal } from "./StaffTaskpage";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
+import StaffOptimizedRouteModal from "../components/StaffOptimizedRouteModal";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -26,6 +27,8 @@ export default function StaffScheduledPickupTasks() {
   const [error, setError] = useState("");
   const [sort, setSort] = useState({ key: null, dir: null });
   const [activeRoutePickup, setActiveRoutePickup] = useState(null);
+  const [routeModalOpen, setRouteModalOpen] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
 
   // Format date for display (e.g. 2026-10-10 -> 10/10/2026)
   const formattedDate = useMemo(() => {
@@ -68,14 +71,12 @@ export default function StaffScheduledPickupTasks() {
         : [];
 
       // Format and filter:
-      // 1. Only active tasks (status !== 'COMPLETED')
-      // 2. Only tasks where scheduled_pickup_date === date
+      // Active scheduled tasks where scheduled_pickup_date === date (strictly excludes completed)
       const filtered = data
         .filter((item) => {
-          const status = String(item.status || "").toUpperCase();
-          if (status === "COMPLETED") return false;
           const sDate = item.scheduled_pickup_date ? String(item.scheduled_pickup_date).slice(0, 10) : null;
-          return sDate === date;
+          const statusUpper = String(item.status || "").trim().toUpperCase();
+          return sDate === date && statusUpper !== "COMPLETED";
         })
         .map((item) => ({
           id: item.request_id || item.id,
@@ -85,7 +86,7 @@ export default function StaffScheduledPickupTasks() {
           longitude: item.longitude,
           ward: item.ward || (item.ward_id ? `Ward ${item.ward_id}` : "N/A"),
           wasteType: item.waste_type || "Waste",
-          status: item.status || "ASSIGNED",
+          status: item.status ? String(item.status).trim() : "PENDING",
           date: item.date || "",
           scheduledPickupDate: item.scheduled_pickup_date || null,
           userName: item.user_name || "",
@@ -93,6 +94,7 @@ export default function StaffScheduledPickupTasks() {
         }));
 
       setTasks(filtered);
+      return filtered;
     } catch (err) {
       console.error("Failed to load scheduled tasks:", err);
       if (err.response?.status === 401) {
@@ -102,6 +104,7 @@ export default function StaffScheduledPickupTasks() {
       } else {
         setError("Failed to load assigned tasks. Please check backend server.");
       }
+      return [];
     } finally {
       setLoading(false);
     }
@@ -110,6 +113,26 @@ export default function StaffScheduledPickupTasks() {
   useEffect(() => {
     fetchMyTasks();
   }, [date]);
+
+  // Handler for "Optimize Today's Route"
+  const handleOptimizeRoute = async () => {
+    if (optimizing) return;
+    try {
+      setOptimizing(true);
+      // Re-fetch live tasks fresh from the API to include any same-day newly assigned tasks
+      const freshTasks = await fetchMyTasks();
+      if (!freshTasks || freshTasks.length === 0) {
+        alert("No pickup tasks scheduled for this date.");
+        return;
+      }
+      setRouteModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch fresh tasks for route optimization:", err);
+      alert("Failed to load tasks for route optimization. Please try again.");
+    } finally {
+      setOptimizing(false);
+    }
+  };
 
   const handleSort = (key) => {
     setSort((prev) => ({
@@ -160,7 +183,7 @@ export default function StaffScheduledPickupTasks() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#4c7a2e", textTransform: "uppercase", marginBottom: 4 }}>
-              Scheduled Pickup Tasks
+              Pickup Schedule
             </div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#1f2e22", display: "flex", alignItems: "center", gap: 10 }}>
               <Calendar size={22} color="#1e6b4e" />
@@ -178,27 +201,58 @@ export default function StaffScheduledPickupTasks() {
                 {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
               </span>
             </h1>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#5f8a45" }}>
+              Tasks for {formattedDate || date}
+            </p>
           </div>
 
-          <button
-            type="button"
-            onClick={fetchMyTasks}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: "#ffffff",
-              border: "1px solid #cfe7bb",
-              color: "#2f4a1c",
-              padding: "7px 14px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            <RefreshCw size={13} /> Refresh
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleOptimizeRoute}
+              disabled={optimizing}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                background: "#1e6b4e",
+                border: "none",
+                color: "#ffffff",
+                padding: "8px 16px",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: optimizing ? "wait" : "pointer",
+                boxShadow: "0 2px 5px rgba(30, 107, 78, 0.2)",
+                transition: "all 0.15s ease",
+                opacity: optimizing ? 0.75 : 1,
+              }}
+              title="Calculate and display an optimized pickup route for this date"
+            >
+              <Navigation size={14} />
+              {optimizing ? "Optimizing Route..." : "Optimize Today's Route"}
+            </button>
+
+            <button
+              type="button"
+              onClick={fetchMyTasks}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#ffffff",
+                border: "1px solid #cfe7bb",
+                color: "#2f4a1c",
+                padding: "7px 14px",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <RefreshCw size={13} /> Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -219,6 +273,17 @@ export default function StaffScheduledPickupTasks() {
         <PickupRouteModal
           task={activeRoutePickup}
           onClose={() => setActiveRoutePickup(null)}
+        />
+      )}
+
+      {/* Optimized Route Modal */}
+      {routeModalOpen && (
+        <StaffOptimizedRouteModal
+          tasks={tasks}
+          date={date}
+          formattedDate={formattedDate}
+          onClose={() => setRouteModalOpen(false)}
+          onRefresh={fetchMyTasks}
         />
       )}
     </div>

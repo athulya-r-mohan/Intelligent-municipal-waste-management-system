@@ -167,6 +167,12 @@ export default function TaskStatusUpdate() {
       return;
     }
 
+    const isTaskAlreadyCompleted = String(task?.status || "").toUpperCase() === "COMPLETED";
+    if (isTaskAlreadyCompleted) {
+      setFormError("This pickup task is already completed and cannot be modified.");
+      return;
+    }
+
     const isCompleted = status.toUpperCase() === "COMPLETED";
 
     // 1. Validation for COMPLETED status
@@ -247,6 +253,7 @@ export default function TaskStatusUpdate() {
   };
 
   const StatusIcon = statusOptions.find((s) => s.value === status)?.icon ?? CheckCircle2;
+  const isTaskCompleted = String(task?.status || "").toUpperCase() === "COMPLETED";
 
   // Build QR Code Image URL
   const qrDataString = paymentQr?.qr_string || `upi://pay?pa=ecopulse@upi&pn=EcoPulse%20Waste&am=${paymentQr?.amount || 50}&cu=INR`;
@@ -484,6 +491,28 @@ export default function TaskStatusUpdate() {
               </div>
             )}
 
+            {/* Completed Task Read-Only Notice */}
+            {isTaskCompleted && (
+              <div
+                style={{
+                  margin: "16px 20px 0 20px",
+                  padding: "11px 16px",
+                  background: "#eef8f0",
+                  border: "1px solid #bde5c6",
+                  borderRadius: 10,
+                  color: "#276b3c",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <CheckCircle2 size={16} />
+                <span>This pickup task has been completed and is read-only.</span>
+              </div>
+            )}
+
             {/* Status — single column */}
             <div
               style={{
@@ -494,14 +523,15 @@ export default function TaskStatusUpdate() {
                 <label style={labelStyle}>Status</label>
                 <button
                   type="button"
-                  onClick={() => setDropdownOpen((o) => !o)}
+                  disabled={isTaskCompleted}
+                  onClick={() => !isTaskCompleted && setDropdownOpen((o) => !o)}
                   style={{
                     ...fieldStyle,
                     width: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    cursor: "pointer",
+                    cursor: isTaskCompleted ? "default" : "pointer",
                     background:
                       status === "Completed" ? "#e4f5e7" : "#fdf3e3",
                     color: status === "Completed" ? "#276b3c" : "#8a5a12",
@@ -510,22 +540,25 @@ export default function TaskStatusUpdate() {
                       status === "Completed"
                         ? "1px solid #bde5c6"
                         : "1px solid #f0dcb0",
+                    opacity: isTaskCompleted ? 0.95 : 1,
                   }}
                 >
                   <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <StatusIcon size={15} />
                     {status}
                   </span>
-                  <ChevronDown
-                    size={15}
-                    style={{
-                      transform: dropdownOpen ? "rotate(180deg)" : "none",
-                      transition: "transform 0.15s ease",
-                    }}
-                  />
+                  {!isTaskCompleted && (
+                    <ChevronDown
+                      size={15}
+                      style={{
+                        transform: dropdownOpen ? "rotate(180deg)" : "none",
+                        transition: "transform 0.15s ease",
+                      }}
+                    />
+                  )}
                 </button>
 
-                {dropdownOpen && (
+                {dropdownOpen && !isTaskCompleted && (
                   <div
                     style={{
                       position: "absolute",
@@ -586,15 +619,17 @@ export default function TaskStatusUpdate() {
               <label style={labelStyle}>
                 Completion Image {status === "Completed" ? <span style={{ color: "#d9534f" }}>*</span> : "(Optional)"}
               </label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                style={{ display: "none" }}
-              />
+              {!isTaskCompleted && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ display: "none" }}
+                />
+              )}
               <div
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => !isTaskCompleted && fileInputRef.current?.click()}
                 style={{
                   border: image ? "1px solid #bde5c6" : "1.5px dashed #b7dcc0",
                   borderRadius: 14,
@@ -606,7 +641,7 @@ export default function TaskStatusUpdate() {
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  cursor: "pointer",
+                  cursor: isTaskCompleted ? "default" : "pointer",
                   gap: 6,
                   transition: "border-color 0.15s ease",
                 }}
@@ -635,7 +670,7 @@ export default function TaskStatusUpdate() {
                   </>
                 )}
               </div>
-              {image && (
+              {!isTaskCompleted && image && (
                 <button
                   type="button"
                   onClick={() => {
@@ -679,17 +714,21 @@ export default function TaskStatusUpdate() {
                 />
                 <input
                   value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
+                  onChange={(e) => !isTaskCompleted && setWeight(e.target.value)}
                   placeholder="0.0"
                   inputMode="decimal"
                   type="number"
                   step="0.1"
                   min="0"
+                  readOnly={isTaskCompleted}
+                  disabled={isTaskCompleted}
                   style={{
                     ...fieldStyle,
                     width: "100%",
                     paddingLeft: 34,
                     boxSizing: "border-box",
+                    background: isTaskCompleted ? "#f9fcf9" : "#ffffff",
+                    cursor: isTaskCompleted ? "default" : "text",
                   }}
                 />
                 <span
@@ -708,37 +747,61 @@ export default function TaskStatusUpdate() {
               </div>
             </div>
 
-            {/* Update button */}
+            {/* Update button / Read-only notice */}
             <div style={{ padding: "22px 20px 20px 20px" }}>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleUpdate}
-                style={{
-                  width: "100%",
-                  padding: "13px 0",
-                  borderRadius: 12,
-                  border: "none",
-                  background: submitted
-                    ? "#3f8a55"
-                    : submitting
-                    ? "#92c99f"
-                    : "linear-gradient(180deg, #5cb571 0%, #479a5c 100%)",
-                  color: "#ffffff",
-                  fontSize: 14.5,
-                  fontWeight: 700,
-                  letterSpacing: "0.01em",
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  boxShadow: "0 8px 20px -8px rgba(58, 138, 82, 0.55)",
-                  transition: "background 0.2s ease",
-                }}
-              >
-                {submitting
-                  ? "Updating..."
-                  : submitted
-                  ? "Updated ✓"
-                  : "Update Task"}
-              </button>
+              {isTaskCompleted ? (
+                <div
+                  style={{
+                    width: "100%",
+                    padding: "13px 0",
+                    borderRadius: 12,
+                    background: "#e4f5e7",
+                    color: "#276b3c",
+                    border: "1px solid #bde5c6",
+                    fontSize: 14.5,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <CheckCircle2 size={17} color="#276b3c" />
+                  Task Completed (Read-Only)
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={handleUpdate}
+                  style={{
+                    width: "100%",
+                    padding: "13px 0",
+                    borderRadius: 12,
+                    border: "none",
+                    background: submitted
+                      ? "#3f8a55"
+                      : submitting
+                      ? "#92c99f"
+                      : "linear-gradient(180deg, #5cb571 0%, #479a5c 100%)",
+                    color: "#ffffff",
+                    fontSize: 14.5,
+                    fontWeight: 700,
+                    letterSpacing: "0.01em",
+                    cursor: submitting ? "not-allowed" : "pointer",
+                    boxShadow: "0 8px 20px -8px rgba(58, 138, 82, 0.55)",
+                    transition: "background 0.2s ease",
+                  }}
+                >
+                  {submitting
+                    ? "Updating..."
+                    : submitted
+                    ? "Updated ✓"
+                    : "Update Task"}
+                </button>
+              )}
             </div>
 
             {/* ========================================================

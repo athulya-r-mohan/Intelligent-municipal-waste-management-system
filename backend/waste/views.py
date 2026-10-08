@@ -1395,6 +1395,16 @@ class StaffTaskUpdateView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        # 3.1 Completed check (Completed tasks are read-only and cannot be modified)
+        if task.status == "COMPLETED":
+            return Response(
+                {
+                    "success": False,
+                    "error": "This pickup task is already completed and cannot be modified."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # 4. Status extraction & normalization
         status_input = request.data.get("status") or request.POST.get("status") or ""
         new_status = str(status_input).strip().upper()

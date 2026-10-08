@@ -292,15 +292,6 @@ export default function EcoPulseLogin() {
   });
 
   const [errors, setErrors] = useState({});
-  const [emailTouched, setEmailTouched] = useState(false);
-
-  const isValidGmail = (email) => {
-    return /^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email);
-  };
-
-  const isEmailInvalid =
-    ((emailTouched || formData.email.length > 0) && !isValidGmail(formData.email)) ||
-    !!errors.email;
 
   // Handle Input Change
   const handleChange = (e) => {
@@ -309,10 +300,6 @@ export default function EcoPulseLogin() {
       ...formData,
       [name]: value,
     });
-
-    if (name === "email") {
-      setEmailTouched(true);
-    }
 
     setErrors({
       ...errors,
@@ -370,21 +357,17 @@ export default function EcoPulseLogin() {
     localStorage.setItem("role", response.data.role);
     localStorage.setItem("name", response.data.name);
 
-    // Redirect based on role
-    if (response.data.role === "CITIZEN") {
+    // Redirect based on role (case-insensitive and whitespace-safe)
+    const normalizedRole = (response.data.role || "").toString().trim().toUpperCase();
+
+    if (normalizedRole === "CITIZEN") {
       navigate("/user");
-    }
-    // login for admin
-    if (response.data.role === "ADMIN") {
-    navigate("/admin");
-    }
-    //login for staff
-    if(response.data.role==="STAFF"){
+    } else if (normalizedRole === "ADMIN") {
+      navigate("/admin");
+    } else if (normalizedRole === "STAFF") {
       navigate("/staff");
-    }
-    // login for recycler
-  if (response.data.role === "RECYCLER") {
-    navigate("/recycler");
+    } else if (normalizedRole === "RECYCLER") {
+      navigate("/recycler");
     }
 
   } catch (error) {
@@ -423,18 +406,7 @@ export default function EcoPulseLogin() {
                   placeholder="username@gmail.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className={isEmailInvalid ? "error-input invalid-gmail" : ""}
-                  style={
-                    isEmailInvalid
-                      ? {
-                          borderColor: "#dc2626",
-                          textDecoration: "underline",
-                          textDecorationColor: "#dc2626",
-                          textDecorationThickness: "2px",
-                          textUnderlineOffset: "3px",
-                        }
-                      : undefined
-                  }
+                  className={errors.email ? "error-input" : ""}
                 />
               </div>
 
