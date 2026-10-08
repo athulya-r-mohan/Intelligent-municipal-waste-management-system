@@ -197,6 +197,7 @@ function EcoPulseLogo() {
 
 export default function ResidentDirectory({ onBack }) {
   const [ward, setWard] = useState("All Wards");
+  const [wardOptions, setWardOptions] = useState(WARDS);
   const [nameQuery, setNameQuery] = useState("");
   const [appliedWard, setAppliedWard] = useState("All Wards");
   const [appliedQuery, setAppliedQuery] = useState("");
@@ -223,7 +224,21 @@ export default function ResidentDirectory({ onBack }) {
 
   useEffect(() => {
     fetchResidents();
+    fetchWards();
   }, []);
+
+  const fetchWards = async () => {
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/api/wards/");
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        const numbers = response.data.map((w) => `Ward ${w.ward_number}`);
+        const set = new Set(["All Wards", ...numbers]);
+        setWardOptions(Array.from(set));
+      }
+    } catch {
+      // Fallback to default WARDS list
+    }
+  };
 
   const fetchResidents = async () => {
     try {
@@ -253,7 +268,9 @@ export default function ResidentDirectory({ onBack }) {
     return residents.filter((r) => {
       const wardOk =
         appliedWard === "All Wards" ||
-        r.ward === appliedWard;
+        r.ward === appliedWard ||
+        (r.ward && r.ward.startsWith(appliedWard)) ||
+        (r.ward_number && appliedWard === `Ward ${r.ward_number}`);
 
       const qOk =
         appliedQuery.trim() === "" ||
@@ -364,7 +381,7 @@ export default function ResidentDirectory({ onBack }) {
               value={ward}
               onChange={(e) => setWard(e.target.value)}
             >
-              {WARDS.map((w) => (
+              {wardOptions.map((w) => (
                 <option key={w} value={w}>
                   {w}
                 </option>

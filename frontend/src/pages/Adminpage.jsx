@@ -27,6 +27,7 @@ import {
   Activity,
   Award,
   BarChart3,
+  MapPin,
 } from "lucide-react";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -59,6 +60,7 @@ const MUNICIPALITY_CARDS = [
   { key: "addstaff", title: "Add Staff", sub: "Onboard a new team member", icon: UserPlus },
   { key: "addrecyclers", title: "Add Recyclers", sub: "Register a recycling partner", icon: Users },
   { key: "usermgmt", title: "User Management", sub: "Roles & access control", icon: ShieldCheck },
+  { key: "managewards", title: "Manage Wards", sub: "Add and manage municipality wards", icon: MapPin },
 ];
 
 const NAV_ITEMS = [
@@ -418,7 +420,7 @@ export default function EcoPulseAdmin() {
         )}
 
         {page === "municipality" && (
-          <div className="admin-grid admin-grid-3">
+          <div className="admin-grid">
             {MUNICIPALITY_CARDS.map((c) => (
               <Card
                 key={c.key}
@@ -434,6 +436,9 @@ export default function EcoPulseAdmin() {
                   }
                   if (c.key === "usermgmt") {
                     navigate("/resident");
+                  }
+                  if (c.key === "managewards") {
+                    navigate("/admin/wards");
                   }
                 }}
               />

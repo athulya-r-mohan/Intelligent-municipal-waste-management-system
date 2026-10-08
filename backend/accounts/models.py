@@ -4,21 +4,31 @@ from django.contrib.auth.models import User
 
 class Ward(models.Model):
 
-    ward_id=models.AutoField(
+    ward_id = models.AutoField(
         primary_key=True
     )
 
-    ward_name=models.CharField(
-        max_length=100
+    ward_number = models.PositiveIntegerField(
+        unique=True,
+        null=True,
+        blank=True
     )
 
-    location=models.CharField(
-        max_length=200
+    ward_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default=""
+    )
+
+    location = models.CharField(
+        max_length=200,
+        blank=True,
+        default=""
     )
 
 
     def __str__(self):
-        return self.ward_name
+        return self.ward_name or f"Ward {self.ward_number or self.ward_id}"
 
 class UserProfile(models.Model):
 

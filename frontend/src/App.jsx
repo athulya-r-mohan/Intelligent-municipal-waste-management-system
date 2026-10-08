@@ -20,6 +20,7 @@ import Wastecomplaintform from "./pages/Wastecomplaintform";
 import Addstaffform from "./pages/Addstaffform";
 import Addrecycler from "./pages/Addrecycler";
 import Residentdirectory from "./pages/Residentdirectory";
+import WardManagement from "./pages/WardManagement";
 import PickupAssignment from "./pages/Pickupassignment";
 import Admincomplaints from "./pages/Admincomplaints";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/addstaff" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Addstaffform /></ProtectedRoute>} />
         <Route path="/addrecycler" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Addrecycler /></ProtectedRoute>} />
         <Route path="/resident" element={<ProtectedRoute allowedRoles={["ADMIN"]}><Residentdirectory /></ProtectedRoute>} />
+        <Route path="/admin/wards" element={<ProtectedRoute allowedRoles={["ADMIN"]}><WardManagement /></ProtectedRoute>} />
         <Route path="/assign" element={<ProtectedRoute allowedRoles={["ADMIN"]}><PickupAssignment /></ProtectedRoute>} />
         <Route path="/admin/mcf" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminMCFList /></ProtectedRoute>} />
         <Route path="/admin/mcf/details" element={<ProtectedRoute allowedRoles={["ADMIN"]}><AdminMCFDetails /></ProtectedRoute>} />

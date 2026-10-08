@@ -311,6 +311,11 @@ class ResidentDirectoryView(APIView):
         data = []
 
         for profile in residents:
+            ward_str = "Not Assigned"
+            if profile.ward:
+                num = profile.ward.ward_number or profile.ward.ward_id
+                name = profile.ward.ward_name
+                ward_str = f"Ward {num} - {name}" if name else f"Ward {num}"
 
             data.append({
                 "id": profile.id,
@@ -318,19 +323,139 @@ class ResidentDirectoryView(APIView):
                 "email": profile.user.email,
                 "phone": profile.phone,
                 "address": profile.address,
-                "ward": (
-                    profile.ward.ward_name
-                    if profile.ward
-                    else "Not Assigned"
-                )
+                "ward": ward_str,
+                "ward_id": profile.ward.ward_id if profile.ward else None,
+                "ward_number": profile.ward.ward_number if profile.ward else None,
+                "ward_name": profile.ward.ward_name if profile.ward else "",
             })
 
         return Response(data, status=status.HTTP_200_OK)
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.authentication import SessionAuthentication
+from django.shortcuts import get_object_or_404
+from .serializers import WardSerializer
 
 from .models import Staff
+
+
+def is_admin_user(request):
+    if not request.user or not request.user.is_authenticated:
+        return False
+    if request.user.is_staff or request.user.is_superuser:
+        return True
+    profile = getattr(request.user, "userprofile", None)
+    return bool(profile and profile.role == "ADMIN")
+
+
+class WardListCreateView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get(self, request):
+        wards = Ward.objects.all().order_by("ward_number", "ward_id")
+        serializer = WardSerializer(wards, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        if not is_admin_user(request):
+            return Response(
+                {"error": "Unauthorized. Only administrators can create wards."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = WardSerializer(data=request.data)
+        if not serializer.is_valid():
+            first_err = list(serializer.errors.values())[0]
+            msg = first_err[0] if isinstance(first_err, list) else str(first_err)
+            return Response(
+                {"error": msg, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ward = serializer.save()
+        return Response(
+            {
+                "message": f"Ward {ward.ward_number} created successfully.",
+                "ward": WardSerializer(ward).data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class WardDetailView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get(self, request, pk):
+        ward = get_object_or_404(Ward, pk=pk)
+        serializer = WardSerializer(ward)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        return self.patch(request, pk)
+
+    def patch(self, request, pk):
+        if not is_admin_user(request):
+            return Response(
+                {"error": "Unauthorized. Only administrators can update wards."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        ward = get_object_or_404(Ward, pk=pk)
+        serializer = WardSerializer(ward, data=request.data, partial=True)
+        if not serializer.is_valid():
+            first_err = list(serializer.errors.values())[0]
+            msg = first_err[0] if isinstance(first_err, list) else str(first_err)
+            return Response(
+                {"error": msg, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        updated_ward = serializer.save()
+        return Response(
+            {
+                "message": f"Ward {updated_ward.ward_number} updated successfully.",
+                "ward": WardSerializer(updated_ward).data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def delete(self, request, pk):
+        if not is_admin_user(request):
+            return Response(
+                {"error": "Unauthorized. Only administrators can delete wards."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        ward = get_object_or_404(Ward, pk=pk)
+
+        # Check safety: prevent deletion if active users or records depend on this ward
+        user_count = UserProfile.objects.filter(ward=ward).count()
+        if user_count > 0:
+            return Response(
+                {
+                    "error": f"This ward is currently in use by {user_count} user(s) and cannot be deleted."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ward_num = ward.ward_number or ward.ward_id
+        ward.delete()
+        return Response(
+            {"message": f"Ward {ward_num} deleted successfully."},
+            status=status.HTTP_200_OK
+        )
 
 
 @api_view(["GET"])
@@ -372,10 +497,11 @@ def get_staff_by_ward(request):
             "phone": staff_member.phone,
             "designation": staff_member.designation,
             "ward_id": profile.ward.ward_id if profile and profile.ward else None,
+            "ward_number": profile.ward.ward_number if profile and profile.ward else None,
             "ward_name": profile.ward.ward_name if profile and profile.ward else "",
         })
 
     return Response({
         "success": True,
         "staff": data
-    })
+    })

@@ -315,7 +315,7 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
 
             if profile.ward:
 
-                return profile.ward.ward_name
+                return profile.ward.ward_name or f"Ward {profile.ward.ward_number or profile.ward.ward_id}"
 
         except (
             UserProfile.DoesNotExist,
@@ -716,7 +716,7 @@ class WasteComplaintSerializer(serializers.ModelSerializer):
         try:
             profile = getattr(obj.user, "userprofile", None)
             if profile and profile.ward:
-                return profile.ward.ward_name
+                return profile.ward.ward_name or f"Ward {profile.ward.ward_number or profile.ward.ward_id}"
         except Exception:
             pass
         return ""
@@ -1008,7 +1008,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         try:
             profile = getattr(obj.user, "userprofile", None)
             if profile and profile.ward:
-                return profile.ward.ward_name
+                return profile.ward.ward_name or f"Ward {profile.ward.ward_number or profile.ward.ward_id}"
         except Exception:
             pass
         return ""

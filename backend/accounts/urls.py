@@ -1,5 +1,14 @@
 from django.urls import path
-from .views import AddStaffView, LoginView, RegisterView, AddRecyclerView,  ResidentDirectoryView,get_staff_by_ward
+from .views import (
+    AddStaffView,
+    LoginView,
+    RegisterView,
+    AddRecyclerView,
+    ResidentDirectoryView,
+    get_staff_by_ward,
+    WardListCreateView,
+    WardDetailView,
+)
 
 
 urlpatterns = [
@@ -8,6 +17,7 @@ urlpatterns = [
     path('add-staff/', AddStaffView.as_view()),
     path('add-recycler/', AddRecyclerView.as_view()),
     path("resident-directory/", ResidentDirectoryView.as_view()),
-    path("staff-by-ward/",get_staff_by_ward,name="staff-by-ward"),
-
-]
+    path("staff-by-ward/", get_staff_by_ward, name="staff-by-ward"),
+    path("wards/", WardListCreateView.as_view(), name="ward-list-create"),
+    path("wards/<int:pk>/", WardDetailView.as_view(), name="ward-detail"),
+]

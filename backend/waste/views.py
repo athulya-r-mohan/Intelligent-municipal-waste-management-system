@@ -1057,7 +1057,7 @@ class StaffByWardView(APIView):
                     staff.designation,
 
                 "ward":
-                    profile.ward.ward_name
+                    (profile.ward.ward_name or f"Ward {profile.ward.ward_number or profile.ward.ward_id}")
                     if profile and profile.ward
                     else "",
             })
@@ -1160,8 +1160,8 @@ class AssignPickupView(APIView):
                     "success": False,
                     "error": (
                         f"Cannot assign cross-ward staff. Selected staff belongs to "
-                        f"Ward '{staff_ward.ward_name}', but pickup request #{pickup_request.id} "
-                        f"is in Ward '{pickup_ward.ward_name}'."
+                        f"Ward '{staff_ward.ward_name or staff_ward.ward_number or staff_ward.ward_id}', but pickup request #{pickup_request.id} "
+                        f"is in Ward '{pickup_ward.ward_name or pickup_ward.ward_number or pickup_ward.ward_id}'."
                     )
                 },
                 status=status.HTTP_400_BAD_REQUEST
@@ -2124,7 +2124,7 @@ class AllStaffListView(APIView):
         data = []
         for s in staff_queryset:
             profile = getattr(s.user, "userprofile", None)
-            ward_name = profile.ward.ward_name if profile and profile.ward else "General Ward"
+            ward_name = (profile.ward.ward_name or f"Ward {profile.ward.ward_number or profile.ward.ward_id}") if profile and profile.ward else "General Ward"
             ward_id = profile.ward.ward_id if profile and profile.ward else None
             name = profile.name if profile and profile.name else (s.user.get_full_name() or s.user.username)
             phone = profile.phone if profile and profile.phone else s.phone
