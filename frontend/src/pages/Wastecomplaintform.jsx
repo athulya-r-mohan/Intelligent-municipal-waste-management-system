@@ -28,6 +28,7 @@ import {
 } from "react-leaflet";
 
 import L from "leaflet";
+import MapLocationSearch from "../components/MapLocationSearch";
 
 
 // ---------------------------------------------------------
@@ -197,6 +198,18 @@ export default function ComplaintForm({ onBack }) {
     setFormError("");
 
     await getLocationName(lat, lng);
+  };
+
+  const handleMapSearchSelect = async ({ lat, lng, displayName }) => {
+    setLocationMode("pick");
+    setSelectedPosition({ lat, lng });
+    setGeoError("");
+    setFormError("");
+    if (displayName) {
+      setLocationText(displayName);
+    } else {
+      await getLocationName(lat, lng);
+    }
   };
 
 
@@ -521,6 +534,11 @@ export default function ComplaintForm({ onBack }) {
             <TileLayer
               attribution='&copy; OpenStreetMap contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            <MapLocationSearch
+              onLocationSelect={handleMapSearchSelect}
+              placeholder="Search complaint location, area, landmark..."
             />
 
 

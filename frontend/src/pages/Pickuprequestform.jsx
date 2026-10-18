@@ -10,6 +10,7 @@ import {
 } from "react-leaflet";
 
 import "../components/Pickuprequestform.css";
+import MapLocationSearch from "../components/MapLocationSearch";
 
 import {
   ArrowLeft,
@@ -224,13 +225,18 @@ function MapController({
       return;
     }
 
-    map.flyTo(
-      [location.lat, location.lng],
-      16,
-      {
-        duration: 1.5,
-      }
-    );
+    // Only initiate flyTo if the map center is not already near the target position
+    const center = map.getCenter();
+    const dist = Math.hypot(center.lat - location.lat, center.lng - location.lng);
+    if (dist > 0.0002) {
+      map.flyTo(
+        [location.lat, location.lng],
+        16,
+        {
+          duration: 1.5,
+        }
+      );
+    }
   }, [
     currentLocation,
     pinPosition,
@@ -456,6 +462,14 @@ export default function EcoPulseWastePickup({
 
     setGeoError("");
     setLocationText("");
+  };
+
+  const handleMapSearchSelect = ({ lat, lng, displayName }) => {
+    setLocationMode("pick");
+    setCurrentLocation(null);
+    setPinPosition({ lat, lng });
+    setGeoError("");
+    setLocationText(displayName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
   };
 
   // ==================================================
@@ -1201,6 +1215,11 @@ export default function EcoPulseWastePickup({
             <TileLayer
               attribution="&copy; OpenStreetMap contributors"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            <MapLocationSearch
+              onLocationSelect={handleMapSearchSelect}
+              placeholder="Search pickup location, area, landmark..."
             />
 
             <LocationPicker

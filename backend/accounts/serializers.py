@@ -61,18 +61,40 @@ class WardSerializer(serializers.ModelSerializer):
     ward_number = serializers.IntegerField(required=True)
     ward_name = serializers.CharField(required=False, allow_blank=True, default="")
     location = serializers.CharField(required=False, allow_blank=True, default="")
+    mcf_location_name = serializers.CharField(required=False, allow_blank=True, default="")
+    mcf_latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+    mcf_longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
     user_count = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
 
     class Meta:
         model = Ward
-        fields = ["ward_id", "ward_number", "ward_name", "location", "user_count", "can_delete"]
+        fields = [
+            "ward_id",
+            "ward_number",
+            "ward_name",
+            "location",
+            "mcf_location_name",
+            "mcf_latitude",
+            "mcf_longitude",
+            "user_count",
+            "can_delete",
+        ]
         read_only_fields = ["ward_id"]
 
     def get_user_count(self, obj):
-        return obj.userprofile_set.count()
+        # Accurate count of active registered citizen accounts assigned to this ward
+        if hasattr(obj, "active_citizen_count"):
+            return obj.active_citizen_count
+        return obj.userprofile_set.filter(
+            role="CITIZEN",
+            user__is_active=True
+        ).count()
 
     def get_can_delete(self, obj):
+        # Safe guard: Prevent deletion if any user profile (citizen, staff, admin) is assigned
+        if hasattr(obj, "total_user_count"):
+            return obj.total_user_count == 0
         return obj.userprofile_set.count() == 0
 
     def validate_ward_number(self, value):

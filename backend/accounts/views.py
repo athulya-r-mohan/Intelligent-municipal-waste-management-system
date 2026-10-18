@@ -359,7 +359,16 @@ class WardListCreateView(APIView):
         return [IsAuthenticated()]
 
     def get(self, request):
-        wards = Ward.objects.all().order_by("ward_number", "ward_id")
+        from django.db.models import Count, Q
+
+        wards = Ward.objects.annotate(
+            active_citizen_count=Count(
+                "userprofile",
+                filter=Q(userprofile__role="CITIZEN", userprofile__user__is_active=True),
+                distinct=True
+            ),
+            total_user_count=Count("userprofile", distinct=True)
+        ).order_by("ward_number", "ward_id")
         serializer = WardSerializer(wards, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -398,7 +407,18 @@ class WardDetailView(APIView):
         return [IsAuthenticated()]
 
     def get(self, request, pk):
-        ward = get_object_or_404(Ward, pk=pk)
+        from django.db.models import Count, Q
+
+        ward = Ward.objects.annotate(
+            active_citizen_count=Count(
+                "userprofile",
+                filter=Q(userprofile__role="CITIZEN", userprofile__user__is_active=True),
+                distinct=True
+            ),
+            total_user_count=Count("userprofile", distinct=True)
+        ).filter(pk=pk).first()
+        if not ward:
+            return Response({"error": "Ward not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = WardSerializer(ward)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

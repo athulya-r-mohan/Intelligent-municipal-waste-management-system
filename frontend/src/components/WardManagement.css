@@ -638,3 +638,272 @@
   .wm-header-row { flex-direction: column; }
   .wm-search-box { max-width: 100%; }
 }
+
+/* ========================================================= */
+/* MCF Map & Table integration styles */
+/* ========================================================= */
+.wm-modal-box.wm-modal-with-map {
+  max-width: 600px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.wm-mcf-map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 250px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  overflow: hidden;
+  margin-top: 6px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.wm-mcf-map-wrapper .leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  z-index: 1;
+}
+
+.wm-mcf-selected-card {
+  margin-top: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wm-mcf-selected-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.wm-mcf-selected-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green-700);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wm-mcf-selected-address {
+  font-size: 12.5px;
+  color: var(--ink);
+  font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.wm-mcf-selected-coords {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  font-family: monospace;
+}
+
+.wm-mcf-clear-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #94a39d;
+  padding: 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.wm-mcf-clear-btn:hover {
+  color: var(--red);
+  background: #fee2e2;
+}
+
+.wm-mcf-unselected-card {
+  margin-top: 8px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Compact MCF text badge in the Table */
+.wm-mcf-subtext {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  max-width: 260px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.25;
+}
+
+.wm-mcf-tag {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #bbf7d0;
+  flex-shrink: 0;
+}
+
+.wm-mcf-tag.unassigned {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+.wm-mcf-addr {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 210px;
+}
+
+.wm-mcf-addr.empty {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* ---------- Manual Coordinates / GPS Fallback ---------- */
+.wm-mcf-manual-wrap {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfdfc;
+  overflow: hidden;
+}
+
+.wm-mcf-manual-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  background: transparent;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--green-800);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.wm-mcf-manual-toggle:hover {
+  background: var(--green-50);
+}
+
+.wm-mcf-manual-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.wm-mcf-manual-toggle-icon {
+  color: var(--green-600);
+  flex-shrink: 0;
+}
+
+.wm-mcf-manual-body {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.wm-mcf-manual-hint {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.wm-mcf-manual-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wm-mcf-manual-group {
+  margin-bottom: 10px;
+}
+
+.wm-mcf-manual-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.wm-mcf-manual-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.wm-mcf-manual-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.wm-mcf-manual-input {
+  font-size: 12.5px !important;
+  padding: 7px 10px !important;
+  border-radius: 8px !important;
+}
+
+.wm-mcf-field-hint {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  display: block;
+}
+
+.wm-mcf-manual-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.wm-mcf-manual-apply-btn {
+  background: var(--green-600);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease;
+}
+
+.wm-mcf-manual-apply-btn:hover {
+  background: var(--green-700);
+}
+

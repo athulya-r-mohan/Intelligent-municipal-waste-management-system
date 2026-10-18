@@ -26,6 +26,29 @@ class Ward(models.Model):
         default=""
     )
 
+    mcf_location_name = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Readable address or landmark for the ward Material Collection Facility"
+    )
+
+    mcf_latitude = models.DecimalField(
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+        help_text="Latitude coordinate for the ward MCF"
+    )
+
+    mcf_longitude = models.DecimalField(
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+        help_text="Longitude coordinate for the ward MCF"
+    )
+
 
     def __str__(self):
         return self.ward_name or f"Ward {self.ward_number or self.ward_id}"
