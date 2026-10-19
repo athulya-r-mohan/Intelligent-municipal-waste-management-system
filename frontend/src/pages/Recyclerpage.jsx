@@ -225,10 +225,13 @@ export default function EcoPulseRecyclerDashboard() {
                     navigate("/notifications");
                   } else if (key === "analytics") {
                     navigate("/recycler/analytics");
+                  } else if (key === "profile") {
+                    navigate("/profile");
                   } else {
                     setActive(key);
                   }
                 }}
+
               >
                 <Icon size={17} strokeWidth={2} />
                 {label}

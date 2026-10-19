@@ -14,6 +14,7 @@ import {
   MapPin,
   User,
   AlertCircle,
+  Truck,
 } from "lucide-react";
 
 // ============================================================
@@ -48,11 +49,13 @@ export default function TaskStatusUpdate() {
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [paymentQr, setPaymentQr] = useState(null);
+  const [pendingReason, setPendingReason] = useState("");
 
   const fileInputRef = useRef(null);
 
   const statusOptions = [
     { value: "Completed", icon: CheckCircle2 },
+    { value: "In Progress", icon: Truck },
     { value: "Pending", icon: Clock3 },
   ];
 
@@ -101,10 +104,18 @@ export default function TaskStatusUpdate() {
           if (data.payment_qr_data) {
             setPaymentQr(data.payment_qr_data);
           }
+        } else if (data.status === "IN_PROGRESS") {
+          setStatus("In Progress");
         } else if (data.status === "PENDING") {
           setStatus("Pending");
+          if (data.pending_reason) {
+            setPendingReason(data.pending_reason);
+          }
         } else {
-          setStatus("Completed");
+          setStatus("In Progress");
+        }
+        if (data.pending_reason && !pendingReason) {
+          setPendingReason(data.pending_reason);
         }
       } catch (err) {
         console.error("Failed to load task details:", err);
@@ -174,8 +185,20 @@ export default function TaskStatusUpdate() {
     }
 
     const isCompleted = status.toUpperCase() === "COMPLETED";
+    const isInProgress =
+      status.toLowerCase() === "in progress" ||
+      status.toUpperCase() === "IN_PROGRESS";
+    const isPending = status.toUpperCase() === "PENDING";
 
-    // 1. Validation for COMPLETED status
+    // 1. Validation for PENDING status
+    if (isPending) {
+      if (!pendingReason || pendingReason.trim() === "") {
+        setFormError("Reason for marking task as Pending is required.");
+        return;
+      }
+    }
+
+    // 2. Validation for COMPLETED status
     if (isCompleted) {
       if (!rawFile && !image) {
         setFormError("Completion photo is required when completing a task.");
@@ -198,7 +221,17 @@ export default function TaskStatusUpdate() {
       setSubmitting(true);
 
       const formData = new FormData();
-      formData.append("status", isCompleted ? "COMPLETED" : "PENDING");
+      let statusToSend = "COMPLETED";
+      if (isInProgress) {
+        statusToSend = "IN_PROGRESS";
+      } else if (isPending) {
+        statusToSend = "PENDING";
+      }
+      formData.append("status", statusToSend);
+
+      if (isPending) {
+        formData.append("pending_reason", pendingReason.trim());
+      }
 
       if (isCompleted) {
         if (rawFile) {
@@ -224,6 +257,8 @@ export default function TaskStatusUpdate() {
       setSuccessMessage(
         isCompleted
           ? `Task #${id} marked as COMPLETED! Collection record saved.`
+          : isInProgress
+          ? `Task #${id} marked as IN PROGRESS. Citizen has been notified!`
           : `Task #${id} status updated to PENDING.`
       );
 
@@ -233,7 +268,7 @@ export default function TaskStatusUpdate() {
 
       if (isCompleted && response.data?.payment_qr) {
         setPaymentQr(response.data.payment_qr);
-      } else if (!isCompleted) {
+      } else {
         setPaymentQr(null);
       }
 
@@ -533,12 +568,23 @@ export default function TaskStatusUpdate() {
                     justifyContent: "space-between",
                     cursor: isTaskCompleted ? "default" : "pointer",
                     background:
-                      status === "Completed" ? "#e4f5e7" : "#fdf3e3",
-                    color: status === "Completed" ? "#276b3c" : "#8a5a12",
+                      status === "Completed"
+                        ? "#e4f5e7"
+                        : status === "In Progress"
+                        ? "#e0f2fe"
+                        : "#fdf3e3",
+                    color:
+                      status === "Completed"
+                        ? "#276b3c"
+                        : status === "In Progress"
+                        ? "#0369a1"
+                        : "#8a5a12",
                     fontWeight: 700,
                     border:
                       status === "Completed"
                         ? "1px solid #bde5c6"
+                        : status === "In Progress"
+                        ? "1px solid #bae6fd"
                         : "1px solid #f0dcb0",
                     opacity: isTaskCompleted ? 0.95 : 1,
                   }}
@@ -614,138 +660,176 @@ export default function TaskStatusUpdate() {
               </div>
             </div>
 
-            {/* Completion image (Required for Completed, optional info for Pending) */}
-            <div style={{ padding: "18px 20px 0 20px" }}>
-              <label style={labelStyle}>
-                Completion Image {status === "Completed" ? <span style={{ color: "#d9534f" }}>*</span> : "(Optional)"}
-              </label>
-              {!isTaskCompleted && (
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  style={{ display: "none" }}
-                />
-              )}
-              <div
-                onClick={() => !isTaskCompleted && fileInputRef.current?.click()}
-                style={{
-                  border: image ? "1px solid #bde5c6" : "1.5px dashed #b7dcc0",
-                  borderRadius: 14,
-                  height: 150,
-                  background: image
-                    ? `#f4faf5 url(${image}) center/cover no-repeat`
-                    : "#f7fbf8",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: isTaskCompleted ? "default" : "pointer",
-                  gap: 6,
-                  transition: "border-color 0.15s ease",
-                }}
-              >
-                {!image && (
-                  <>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "50%",
-                        background: "#e4f5e7",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Upload size={17} color="#4c9a5f" />
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#4c6b53" }}>
-                      Tap to upload photo
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "#8fa896" }}>
-                      PNG or JPG, up to 10MB
-                    </div>
-                  </>
-                )}
-              </div>
-              {!isTaskCompleted && image && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImage(null);
-                    setRawFile(null);
+            {/* Reason for Pending (Mandatory when Pending) */}
+            {status === "Pending" && (
+              <div style={{ padding: "18px 20px 0 20px" }}>
+                <label style={labelStyle}>
+                  Reason for Pending <span style={{ color: "#d9534f" }}>*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={pendingReason}
+                  onChange={(e) => {
+                    if (!isTaskCompleted) {
+                      setPendingReason(e.target.value);
+                      if (formError) setFormError("");
+                    }
                   }}
-                  style={{
-                    marginTop: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#c25b4a",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <ImageIcon size={13} /> Remove photo
-                </button>
-              )}
-            </div>
-
-            {/* Estimated weight (Required for Completed) */}
-            <div style={{ padding: "18px 20px 0 20px" }}>
-              <label style={labelStyle}>
-                Estimated Weight {status === "Completed" ? <span style={{ color: "#d9534f" }}>*</span> : "(Optional)"}
-              </label>
-              <div style={{ position: "relative" }}>
-                <Scale
-                  size={16}
-                  color="#7fae87"
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-                <input
-                  value={weight}
-                  onChange={(e) => !isTaskCompleted && setWeight(e.target.value)}
-                  placeholder="0.0"
-                  inputMode="decimal"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  readOnly={isTaskCompleted}
                   disabled={isTaskCompleted}
+                  placeholder="Explain why this pickup could not be completed (e.g., Gate locked, Citizen not available, Severe weather, Road blocked)..."
                   style={{
                     ...fieldStyle,
                     width: "100%",
-                    paddingLeft: 34,
                     boxSizing: "border-box",
+                    minHeight: 84,
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    fontSize: 13.5,
+                    lineHeight: 1.5,
+                    padding: "10px 12px",
                     background: isTaskCompleted ? "#f9fcf9" : "#ffffff",
-                    cursor: isTaskCompleted ? "default" : "text",
+                    border: formError && (!pendingReason || !pendingReason.trim()) ? "1px solid #cf1322" : "1px solid #cfe7bb",
                   }}
                 />
-                <span
+              </div>
+            )}
+
+            {/* Completion image (Required for Completed, hidden for Pending and In Progress) */}
+            {status === "Completed" && (
+              <div style={{ padding: "18px 20px 0 20px" }}>
+                <label style={labelStyle}>
+                  Completion Image <span style={{ color: "#d9534f" }}>*</span>
+                </label>
+                {!isTaskCompleted && (
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                )}
+                <div
+                  onClick={() => !isTaskCompleted && fileInputRef.current?.click()}
                   style={{
-                    position: "absolute",
-                    right: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: "#8fa896",
+                    border: image ? "1px solid #bde5c6" : "1.5px dashed #b7dcc0",
+                    borderRadius: 14,
+                    height: 150,
+                    background: image
+                      ? `#f4faf5 url(${image}) center/cover no-repeat`
+                      : "#f7fbf8",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: isTaskCompleted ? "default" : "pointer",
+                    gap: 6,
+                    transition: "border-color 0.15s ease",
                   }}
                 >
-                  kg
-                </span>
+                  {!image && (
+                    <>
+                      <div
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: "50%",
+                          background: "#e4f5e7",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Upload size={17} color="#4c9a5f" />
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#4c6b53" }}>
+                        Tap to upload photo
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "#8fa896" }}>
+                        PNG or JPG, up to 10MB
+                      </div>
+                    </>
+                  )}
+                </div>
+                {!isTaskCompleted && image && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImage(null);
+                      setRawFile(null);
+                    }}
+                    style={{
+                      marginTop: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#c25b4a",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <ImageIcon size={13} /> Remove photo
+                  </button>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* Estimated weight (Required for Completed, hidden for Pending and In Progress) */}
+            {status === "Completed" && (
+              <div style={{ padding: "18px 20px 0 20px" }}>
+                <label style={labelStyle}>
+                  Estimated Weight <span style={{ color: "#d9534f" }}>*</span>
+                </label>
+                <div style={{ position: "relative" }}>
+                  <Scale
+                    size={16}
+                    color="#7fae87"
+                    style={{
+                      position: "absolute",
+                      left: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                    }}
+                  />
+                  <input
+                    value={weight}
+                    onChange={(e) => !isTaskCompleted && setWeight(e.target.value)}
+                    placeholder="0.0"
+                    inputMode="decimal"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    readOnly={isTaskCompleted}
+                    disabled={isTaskCompleted}
+                    style={{
+                      ...fieldStyle,
+                      width: "100%",
+                      paddingLeft: 34,
+                      boxSizing: "border-box",
+                      background: isTaskCompleted ? "#f9fcf9" : "#ffffff",
+                      cursor: isTaskCompleted ? "default" : "text",
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      fontSize: 12,
+                      color: "#8fa896",
+                      fontWeight: 600,
+                    }}
+                  >
+                    kg
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Update button / Read-only notice */}
             <div style={{ padding: "22px 20px 20px 20px" }}>

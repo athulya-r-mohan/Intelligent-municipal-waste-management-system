@@ -21,6 +21,7 @@ import {
   Eye,
   Layers,
   RotateCcw,
+  UserCircle2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -45,9 +46,11 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/staff" },
   { key: "myTasks", label: "My Tasks", icon: ClipboardList, path: "/stafftask" },
+  { key: "profile", label: "My Profile", icon: UserCircle2, path: "/profile" },
   { key: "notifications", label: "Notifications", icon: Bell, path: "/notifications" },
   { key: "analytics", label: "Analytics", icon: BarChart3, path: "/staff/analytics" },
 ];
+
 
 export default function StaffAnalytics() {
   const navigate = useNavigate();

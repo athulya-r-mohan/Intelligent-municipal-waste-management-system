@@ -127,6 +127,16 @@ const MENU_ITEMS = [
       </svg>
     ),
   },
+  {
+    key: "edit_profile",
+    label: "Edit Profile",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
  
 export default function EcoPulseStaff() {
@@ -155,6 +165,9 @@ export default function EcoPulseStaff() {
   const [hasPickup, setHasPickup] = useState(false);
   const [loadingTracking, setLoadingTracking] = useState(false);
   const [trackingError, setTrackingError] = useState("");
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   // User Complaints Queue State
   const [complaintsOpen, setComplaintsOpen] = useState(false);
@@ -342,7 +355,7 @@ export default function EcoPulseStaff() {
         "";
 
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await API.get("/waste/user/pickup-history/", { headers });
+      const response = await API.get("/waste/user/pickup-history/?status=ALL", { headers });
 
       if (response.data && response.data.success) {
         setHistoryRecords(response.data.history || []);
@@ -361,6 +374,40 @@ export default function EcoPulseStaff() {
       setLoadingHistory(false);
     }
   }, []);
+
+  // Cancel active pickup request
+  const handleCancelPickup = async () => {
+    if (!latestPickup) return;
+    const pickupId = latestPickup.request_id || latestPickup.id;
+    try {
+      setCancelling(true);
+      setCancelError("");
+      const token =
+        localStorage.getItem("access") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("token") ||
+        "";
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await API.post(`/waste/user/pickup-requests/${pickupId}/cancel/`, {}, { headers });
+      if (res.data && res.data.success) {
+        setConfirmCancelOpen(false);
+        fetchLatestPickup();
+        fetchUserHistory();
+      } else {
+        setCancelError(res.data?.error || "Failed to cancel pickup request.");
+      }
+    } catch (err) {
+      console.error("Cancellation error:", err);
+      setCancelError(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to cancel pickup request. Please try again."
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Fetch latest active pickup request for live tracking
   const fetchLatestPickup = useCallback(async () => {
@@ -543,6 +590,9 @@ export default function EcoPulseStaff() {
   const handleMenuClick = (key) => {
     if (key === "rewards" || key === "profile") {
       openRewards();
+    } else if (key === "edit_profile") {
+      setDrawerOpen(false);
+      navigate("/profile");
     } else if (key === "history") {
       openHistory();
     } else if (key === "complaints") {
@@ -599,6 +649,8 @@ export default function EcoPulseStaff() {
       currentStageIndex = 5;
     } else if (rawStatus === "COLLECTED") {
       currentStageIndex = 4;
+    } else if (rawStatus === "IN_PROGRESS") {
+      currentStageIndex = 4;
     } else if (rawStatus === "ASSIGNED" || hasStaff) {
       currentStageIndex = 3;
     } else if (pickup.waste_type && pickup.waste_type !== "Unknown") {
@@ -606,6 +658,13 @@ export default function EcoPulseStaff() {
     } else {
       currentStageIndex = 0;
     }
+
+    const schedDateFormatted = pickup.scheduled_pickup_date
+      ? (() => {
+          const p = String(pickup.scheduled_pickup_date).slice(0, 10).split("-");
+          return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : pickup.scheduled_pickup_date;
+        })()
+      : null;
 
     const stages = [
       {
@@ -650,7 +709,7 @@ export default function EcoPulseStaff() {
       {
         title: "Staff Assigned",
         desc: pickup.assigned_staff
-          ? `Assigned to ${pickup.assigned_staff}`
+          ? `Assigned to ${pickup.assigned_staff}${schedDateFormatted ? ` • Scheduled: ${schedDateFormatted}` : ""}`
           : "Assigning field staff for collection",
         icon: (
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -660,10 +719,12 @@ export default function EcoPulseStaff() {
         ),
       },
       {
-        title: "Waste Collected",
+        title: rawStatus === "IN_PROGRESS" ? "Collection in Progress" : "Waste Collected",
         desc: isCollected
           ? (pickup.estimated_weight ? `Collected (${pickup.estimated_weight} kg)` : "Waste collected by field crew")
-          : (rawStatus === "ASSIGNED" ? "Field crew dispatched to pickup address" : "Awaiting field collection"),
+          : rawStatus === "IN_PROGRESS"
+          ? `${pickup.assigned_staff || "Field staff"} has started collection and is en route`
+          : (rawStatus === "ASSIGNED" ? (schedDateFormatted ? `Scheduled for ${schedDateFormatted}` : "Field crew dispatched to pickup address") : "Awaiting field collection"),
         icon: (
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <rect x="1" y="3" width="15" height="13" rx="2" stroke="currentColor" strokeWidth="2.2"/>
@@ -816,6 +877,7 @@ export default function EcoPulseStaff() {
         .ep-badge-status{ display:inline-flex; align-items:center; gap:6px; padding:5px 14px; border-radius:999px; font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
         .ep-badge-pending{ background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
         .ep-badge-assigned{ background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; }
+        .ep-badge-inprogress{ background:#ffedd5; color:#c2410c; border:1px solid #fed7aa; }
         .ep-badge-collected{ background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
         .ep-badge-completed{ background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
         .ep-badge-cancelled{ background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
@@ -1345,6 +1407,33 @@ export default function EcoPulseStaff() {
                         </span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {(latestPickup.status === "PENDING" || latestPickup.status === "ASSIGNED") && (
+                          <button
+                            type="button"
+                            className="staff-btn"
+                            style={{
+                              background: "#ffffff",
+                              border: "1.5px solid #f87171",
+                              color: "#dc2626",
+                              fontSize: "12px",
+                              padding: "4px 12px",
+                              borderRadius: "8px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "5px",
+                              transition: "all .15s ease",
+                            }}
+                            onClick={() => {
+                              setCancelError("");
+                              setConfirmCancelOpen(true);
+                            }}
+                            title="Cancel this pickup request before staff starts collection"
+                          >
+                            ✕ Cancel Request
+                          </button>
+                        )}
                         <span
                           className={
                             "ep-badge-status " +
@@ -1352,6 +1441,8 @@ export default function EcoPulseStaff() {
                               ? "ep-badge-pending"
                               : latestPickup.status === "ASSIGNED"
                               ? "ep-badge-assigned"
+                              : latestPickup.status === "IN_PROGRESS"
+                              ? "ep-badge-inprogress"
                               : latestPickup.status === "COLLECTED"
                               ? "ep-badge-collected"
                               : latestPickup.status === "COMPLETED"
@@ -1367,7 +1458,7 @@ export default function EcoPulseStaff() {
                               background: "currentColor",
                             }}
                           />
-                          {latestPickup.status}
+                          {latestPickup.status === "IN_PROGRESS" ? "In Progress" : latestPickup.status}
                         </span>
                       </div>
                     </div>
@@ -1420,6 +1511,21 @@ export default function EcoPulseStaff() {
                           <div className="ep-track-value">{latestPickup.date || "N/A"}</div>
                         </div>
                       </div>
+
+                      {latestPickup.scheduled_pickup_date && (
+                        <div className="ep-track-field">
+                          <div className="ep-track-icon-box">🗓️</div>
+                          <div>
+                            <div className="ep-track-label">Scheduled Pickup Date</div>
+                            <div className="ep-track-value" style={{ fontWeight: 700, color: "var(--green-deep)" }}>
+                              {(() => {
+                                const p = String(latestPickup.scheduled_pickup_date).slice(0, 10).split("-");
+                                return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : latestPickup.scheduled_pickup_date;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="ep-track-field">
                         <div className="ep-track-icon-box">👷</div>
@@ -1588,6 +1694,113 @@ export default function EcoPulseStaff() {
       )}
 
       {/* ============================================================ */}
+      {/* CANCEL PICKUP CONFIRMATION MODAL */}
+      {/* ============================================================ */}
+      {confirmCancelOpen && latestPickup && (
+        <div
+          className="ep-modal-overlay"
+          style={{ zIndex: 1100 }}
+          onClick={() => !cancelling && setConfirmCancelOpen(false)}
+        >
+          <div
+            className="ep-modal-card"
+            style={{ maxWidth: 480, overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="ep-modal-head"
+              style={{
+                background: "#fef2f2",
+                borderBottom: "1px solid #fee2e2",
+              }}
+            >
+              <div className="ep-modal-title-area">
+                <h2 style={{ color: "#991b1b" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="9" stroke="#dc2626" strokeWidth="2.2" />
+                    <line x1="15" y1="9" x2="9" y2="15" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+                    <line x1="9" y1="9" x2="15" y2="15" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+                  </svg>
+                  Cancel Pickup Request
+                </h2>
+                <p style={{ color: "#7f1d1d" }}>
+                  Confirmation required for Pickup #{latestPickup.request_id || latestPickup.id}
+                </p>
+              </div>
+              <button
+                className="ep-modal-close-btn"
+                onClick={() => setConfirmCancelOpen(false)}
+                disabled={cancelling}
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="ep-modal-body" style={{ padding: "24px 26px" }}>
+              {cancelError && (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: 10,
+                    color: "#991b1b",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 16,
+                  }}
+                >
+                  {cancelError}
+                </div>
+              )}
+
+              <p style={{ fontSize: 14, color: "var(--ink)", lineHeight: 1.55, margin: "0 0 16px" }}>
+                Are you sure you want to cancel your waste pickup request? Once cancelled:
+              </p>
+
+              <ul style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 22px 20px", lineHeight: 1.6 }}>
+                <li>Field staff will not be dispatched to your location.</li>
+                <li>Your request status will immediately change to <strong>Cancelled</strong>.</li>
+                <li>This request will be preserved in your pickup history for your records.</li>
+              </ul>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <button
+                  type="button"
+                  className="staff-btn staff-btn-ghost"
+                  onClick={() => setConfirmCancelOpen(false)}
+                  disabled={cancelling}
+                  style={{ padding: "8px 18px", fontSize: 13 }}
+                >
+                  Keep Request
+                </button>
+                <button
+                  type="button"
+                  className="staff-btn"
+                  style={{
+                    background: "#dc2626",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "8px 20px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    borderRadius: 10,
+                    cursor: cancelling ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 6px rgba(220, 38, 38, 0.25)",
+                  }}
+                  onClick={handleCancelPickup}
+                  disabled={cancelling}
+                >
+                  {cancelling ? "Cancelling..." : "Confirm Cancellation"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
       {/* USER PICKUP / ROUTE HISTORY MODAL */}
       {/* ============================================================ */}
       {historyOpen && (
@@ -1688,10 +1901,24 @@ export default function EcoPulseStaff() {
                             <div className="ep-card-top">
                               <div className="ep-req-id">
                                 <span className="ep-req-pill">Pickup #{item.request_id}</span>
-                                <span className="ep-status-pill">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                                    <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
+                                <span
+                                  className="ep-status-pill"
+                                  style={
+                                    item.status === "CANCELLED"
+                                      ? { background: "#fee2e2", color: "#991b1b" }
+                                      : {}
+                                  }
+                                >
+                                  {item.status === "CANCELLED" ? (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                      <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                                      <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                      <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
                                   {item.status}
                                 </span>
                               </div>

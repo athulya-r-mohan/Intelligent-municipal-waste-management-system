@@ -8,6 +8,8 @@ from .views import (
     get_staff_by_ward,
     WardListCreateView,
     WardDetailView,
+    UserProfileView,
+    ChangePasswordView,
 )
 
 
@@ -20,4 +22,7 @@ urlpatterns = [
     path("staff-by-ward/", get_staff_by_ward, name="staff-by-ward"),
     path("wards/", WardListCreateView.as_view(), name="ward-list-create"),
     path("wards/<int:pk>/", WardDetailView.as_view(), name="ward-detail"),
-]
+    path("profile/", UserProfileView.as_view(), name="user-profile"),
+    path("profile/change-password/", ChangePasswordView.as_view(), name="user-change-password"),
+]
+

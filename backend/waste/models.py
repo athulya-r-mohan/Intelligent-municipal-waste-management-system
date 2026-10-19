@@ -8,6 +8,7 @@ class WastePickupRequest(models.Model):
     STATUS_CHOICES = [
         ("PENDING", "Pending"),
         ("ASSIGNED", "Assigned"),
+        ("IN_PROGRESS", "In Progress"),
         ("COLLECTED", "Collected"),
         ("COMPLETED", "Completed"),
         ("CANCELLED", "Cancelled"),
@@ -50,6 +51,12 @@ class WastePickupRequest(models.Model):
     staff_marked_pending = models.BooleanField(
         default=False,
         help_text="True if the assigned staff member explicitly marked this task as PENDING."
+    )
+
+    pending_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Reason provided by staff when marking task as PENDING."
     )
 
     scheduled_pickup_date = models.DateField(

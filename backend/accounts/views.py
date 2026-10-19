@@ -336,7 +336,12 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.authentication import SessionAuthentication
 from django.shortcuts import get_object_or_404
-from .serializers import WardSerializer
+from .serializers import (
+    WardSerializer,
+    UserProfileDetailsSerializer,
+    ProfileUpdateSerializer,
+    ChangePasswordSerializer,
+)
 
 from .models import Staff
 
@@ -524,4 +529,111 @@ def get_staff_by_ward(request):
     return Response({
         "success": True,
         "staff": data
-    })
+    })
+
+
+class UserProfileView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def _get_or_create_profile(self, user):
+        profile = UserProfile.objects.select_related("user", "ward").filter(user=user).first()
+        if not profile:
+            # Fallback for accounts created via createsuperuser or CLI
+            role = "ADMIN" if (user.is_superuser or user.is_staff) else "CITIZEN"
+            profile = UserProfile.objects.create(
+                user=user,
+                name=user.get_full_name() or user.username or "User",
+                role=role,
+                phone="",
+                address="",
+            )
+            profile = UserProfile.objects.select_related("user", "ward").get(pk=profile.pk)
+        return profile
+
+    def get(self, request):
+        profile = self._get_or_create_profile(request.user)
+        serializer = UserProfileDetailsSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        return self.patch(request)
+
+    def patch(self, request):
+        profile = self._get_or_create_profile(request.user)
+        serializer = ProfileUpdateSerializer(data=request.data, context={"request": request})
+
+        if not serializer.is_valid():
+            first_err = list(serializer.errors.values())[0]
+            msg = first_err[0] if isinstance(first_err, list) else str(first_err)
+            return Response(
+                {"error": msg, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        validated_name = serializer.validated_data["name"]
+        validated_email = serializer.validated_data["email"]
+        validated_address = serializer.validated_data.get("address", "")
+
+        user = request.user
+        email_changed = user.email.lower() != validated_email.lower()
+
+        with transaction.atomic():
+            # Update User email and username atomically (system uses username=email for auth)
+            if email_changed:
+                user.email = validated_email
+                user.username = validated_email
+                user.save(update_fields=["email", "username"])
+
+            # Update UserProfile name and address
+            profile.name = validated_name
+            profile.address = validated_address
+            profile.save(update_fields=["name", "address"])
+
+            # Keep address consistent across Staff and Recycler models if present
+            if hasattr(user, "staff"):
+                user.staff.address = validated_address
+                user.staff.save(update_fields=["address"])
+
+            if hasattr(user, "recycler"):
+                user.recycler.address = validated_address
+                user.recycler.save(update_fields=["address"])
+
+        updated_profile = UserProfile.objects.select_related("user", "ward").get(pk=profile.pk)
+        return Response({
+            "message": "Profile updated successfully.",
+            "profile": UserProfileDetailsSerializer(updated_profile).data,
+        }, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+
+        if not serializer.is_valid():
+            first_err = list(serializer.errors.values())[0]
+            msg = first_err[0] if isinstance(first_err, list) else str(first_err)
+            return Response(
+                {"error": msg, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = request.user
+        new_password = serializer.validated_data["new_password"]
+
+        with transaction.atomic():
+            user.set_password(new_password)
+            user.save(update_fields=["password"])
+
+        # Generate fresh JWT tokens so user session remains uninterrupted
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "message": "Password changed successfully.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        }, status=status.HTTP_200_OK)
+

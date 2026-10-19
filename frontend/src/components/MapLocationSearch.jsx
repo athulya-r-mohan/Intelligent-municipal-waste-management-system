@@ -244,7 +244,7 @@ export default function MapLocationSearch({
       return;
     }
 
-    const normalizedKey = trimmed.toLowerCase();
+    const normalizedKey = (isMcfSearch ? "mcf:" : "") + trimmed.toLowerCase();
 
     // 1. Check in-memory bounded cache
     if (searchCache.has(normalizedKey)) {
@@ -270,7 +270,7 @@ export default function MapLocationSearch({
     setFallbackInfo(null);
 
     // Throttled fetch complying with Nominatim 1 request per second policy
-    const fetchNominatim = async (q, sig) => {
+    const fetchNominatim = async (q, sig, forceBounded = isMcfSearch) => {
       const now = Date.now();
       const elapsed = now - lastRequestTimeRef.current;
       if (elapsed < 1000) {
@@ -279,9 +279,12 @@ export default function MapLocationSearch({
       if (sig.aborted) throw new DOMException("Aborted", "AbortError");
       lastRequestTimeRef.current = Date.now();
 
+      const boundedParam = forceBounded ? "1" : "0";
+      const countryParam = forceBounded ? "&countrycodes=in" : "";
+
       const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
         q
-      )}&addressdetails=1&limit=10&viewbox=74.85,12.85,77.58,8.18&bounded=0`;
+      )}&addressdetails=1&limit=10&viewbox=74.85,12.85,77.58,8.18&bounded=${boundedParam}${countryParam}`;
 
       let res;
       try {
@@ -323,36 +326,97 @@ export default function MapLocationSearch({
     };
 
     try {
-      // Step A: Search with raw query
-      let items = await fetchNominatim(trimmed, currentSig);
+      let items = [];
       let usedFallback = null;
 
-      const cleaned = cleanFacilityKeywords(trimmed);
-      const hasFacilityKeyword =
-        cleaned &&
-        cleaned.toLowerCase() !== trimmed.toLowerCase() &&
-        cleaned.length >= 2;
+      if (isMcfSearch) {
+        // --- MCF-SPECIFIC SEARCH LOGIC ---
+        // Step 1: Raw query with strict Kerala bounding (bounded=1 and countrycodes=in)
+        const rawResults = await fetchNominatim(trimmed, currentSig, true);
+        let keralaResults = rawResults.filter((item) => getLocationPriority(item) <= 1);
 
-      // In MCF search mode, if the user searched for a specific locality (e.g. "Pala" in "Mini MCF Pala"),
-      // filter out raw matches that do not match that locality (preventing unrelated nodes like Cherthala).
-      if (isMcfSearch && hasFacilityKeyword) {
-        const localityWord = cleaned.toLowerCase().trim();
-        items = items.filter((item) => {
-          const dn = (item.display_name || "").toLowerCase();
-          const nm = (item.name || "").toLowerCase();
-          return dn.includes(localityWord) || nm.includes(localityWord);
-        });
-      }
+        // Step 2: Synonym Normalization ('municipality' <-> 'municipal')
+        // OpenStreetMap frequently tags municipal facilities as 'Municipal office' instead of 'Municipality office'
+        if (keralaResults.length === 0) {
+          let synonymQuery = null;
+          if (/\bmunicipality\b/i.test(trimmed)) {
+            synonymQuery = trimmed.replace(/\bmunicipality\b/gi, "municipal");
+          } else if (/\bmunicipal\b/i.test(trimmed)) {
+            synonymQuery = trimmed.replace(/\bmunicipal\b/gi, "municipality");
+          }
 
-      // Step B: If no results found and query contained facility keywords, try simplified locality query
-      if (
-        items.length === 0 &&
-        hasFacilityKeyword
-      ) {
-        const fallbackItems = await fetchNominatim(cleaned, currentSig);
-        if (fallbackItems.length > 0) {
-          items = fallbackItems;
-          usedFallback = { original: trimmed, simplified: cleaned };
+          if (synonymQuery && synonymQuery.toLowerCase() !== trimmed.toLowerCase()) {
+            const synResults = await fetchNominatim(synonymQuery, currentSig, true);
+            const synKerala = synResults.filter((item) => getLocationPriority(item) <= 1);
+            if (synKerala.length > 0) {
+              keralaResults = synKerala.map((it) => ({
+                ...it,
+                isFacility: true,
+              }));
+              usedFallback = null; // Direct facility match under canonical OSM phrasing
+            }
+          }
+        }
+
+        // Step 3: Clean facility/waste keywords for Locality Fallback
+        // (e.g. 'mini mcf pala' -> search for 'pala' to help navigate the map)
+        if (keralaResults.length === 0) {
+          const cleaned = cleanFacilityKeywords(trimmed);
+          const hasFacilityKeyword =
+            cleaned &&
+            cleaned.toLowerCase() !== trimmed.toLowerCase() &&
+            cleaned.length >= 2;
+
+          if (hasFacilityKeyword) {
+            const locResults = await fetchNominatim(cleaned, currentSig, true);
+            const locKerala = locResults.filter((item) => getLocationPriority(item) <= 1);
+            if (locKerala.length > 0) {
+              keralaResults = locKerala.map((it) => ({
+                ...it,
+                isLocality: true,
+              }));
+              usedFallback = {
+                original: trimmed,
+                simplified: cleaned,
+                type: "locality",
+              };
+            } else if (!/kerala/i.test(cleaned)) {
+              // Step 4: Locality + Kerala fallback
+              const locKeralaQuery = `${cleaned}, Kerala`;
+              const kResults = await fetchNominatim(locKeralaQuery, currentSig, true);
+              const kKerala = kResults.filter((item) => getLocationPriority(item) <= 1);
+              if (kKerala.length > 0) {
+                keralaResults = kKerala.map((it) => ({
+                  ...it,
+                  isLocality: true,
+                }));
+                usedFallback = {
+                  original: trimmed,
+                  simplified: locKeralaQuery,
+                  type: "locality",
+                };
+              }
+            }
+          }
+        }
+
+        items = keralaResults;
+      } else {
+        // --- CITIZEN / DEFAULT MAP SEARCH (100% UNCHANGED) ---
+        items = await fetchNominatim(trimmed, currentSig, false);
+
+        const cleaned = cleanFacilityKeywords(trimmed);
+        const hasFacilityKeyword =
+          cleaned &&
+          cleaned.toLowerCase() !== trimmed.toLowerCase() &&
+          cleaned.length >= 2;
+
+        if (items.length === 0 && hasFacilityKeyword) {
+          const fallbackItems = await fetchNominatim(cleaned, currentSig, false);
+          if (fallbackItems.length > 0) {
+            items = fallbackItems;
+            usedFallback = { original: trimmed, simplified: cleaned };
+          }
         }
       }
 
@@ -368,8 +432,13 @@ export default function MapLocationSearch({
         return true;
       });
 
+      // In MCF mode, strictly enforce that NO non-Kerala or foreign results can ever be listed
+      const sanitizedList = isMcfSearch
+        ? uniqueList.filter((item) => getLocationPriority(item) <= 1)
+        : uniqueList;
+
       const rankedData = rankLocationResults(
-        uniqueList,
+        sanitizedList,
         wardContextRef.current
       );
       const topResults = rankedData.slice(0, 6);
@@ -402,7 +471,7 @@ export default function MapLocationSearch({
         setLoading(false);
       }
     }
-  }, []);
+  }, [isMcfSearch]);
 
   // Debounced input change (500ms debounce to comply with rate limits)
   const handleInputChange = (e) => {
@@ -449,6 +518,14 @@ export default function MapLocationSearch({
     map.flyTo([lat, lng], flyZoom, {
       duration: 1.2,
     });
+
+    if (isMcfSearch && item.isLocality) {
+      // REQUIREMENT: Never automatically save fallback locality coordinates as the MCF location.
+      // Locality fallback is used exclusively to navigate the map view to the town/area.
+      // The admin can then click on the map to pin the exact facility.
+      setIsOpen(false);
+      return;
+    }
 
     // Notify parent component to update pin/marker and address states
     if (onLocationSelect) {
@@ -541,18 +618,28 @@ export default function MapLocationSearch({
           ) : loading && results.length === 0 ? (
             <div className="map-search-status loading">
               <Loader2 size={14} className="map-search-spinner" />
-              <span>Searching locations...</span>
+              <span>{isMcfSearch ? "Searching facilities in Kerala..." : "Searching locations..."}</span>
             </div>
           ) : results.length === 0 ? (
             <div className="map-search-empty-box">
               <div className="map-search-empty-header">
                 <MapPin size={15} className="map-search-empty-icon" />
                 <span className="map-search-empty-title">
-                  No locations found for &quot;{query}&quot;
+                  {isMcfSearch
+                    ? `No facility found in Kerala for "${query}"`
+                    : `No locations found for "${query}"`}
                 </span>
               </div>
               <div className="map-search-empty-hint">
-                Search by town, city, or landmark name (e.g. <strong>Pala</strong>, <strong>Cherthala</strong>), or click anywhere on the map to pin the location directly.
+                {isMcfSearch ? (
+                  <>
+                    Facility not indexed in OpenStreetMap. Try searching by town or municipal name (e.g. <strong>Pala</strong>, <strong>Pala Municipal Office</strong>), or click anywhere on the map to pin the facility directly.
+                  </>
+                ) : (
+                  <>
+                    Search by town, city, or landmark name (e.g. <strong>Pala</strong>, <strong>Cherthala</strong>), or click anywhere on the map to pin the location directly.
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -561,8 +648,8 @@ export default function MapLocationSearch({
                 <div className="map-search-fallback-banner">
                   {isMcfSearch ? (
                     <>
-                      Exact facility not indexed in OpenStreetMap. Suggested area:{" "}
-                      <strong>&quot;{fallbackInfo.simplified}, Kerala&quot;</strong>. Select below to place the MCF pin:
+                      Exact facility not indexed in OpenStreetMap. Showing nearby locality:{" "}
+                      <strong>&quot;{fallbackInfo.simplified}&quot;</strong> to navigate the map:
                     </>
                   ) : (
                     <>
@@ -584,14 +671,30 @@ export default function MapLocationSearch({
                   <button
                     key={item.place_id || idx}
                     type="button"
-                    className="map-search-item"
+                    className={`map-search-item ${item.isLocality ? "is-locality" : ""}`}
                     onClick={() => handleSelectResult(item)}
                   >
-                    <MapPin size={16} className="map-search-item-icon" />
+                    <MapPin
+                      size={16}
+                      className={`map-search-item-icon ${item.isLocality ? "locality-icon" : ""}`}
+                    />
                     <div className="map-search-item-content">
-                      <div className="map-search-item-title">{primary}</div>
+                      <div className="map-search-item-title">
+                        {primary}
+                        {isMcfSearch && item.isLocality && (
+                          <span className="mcf-locality-badge">Nearby Locality</span>
+                        )}
+                        {isMcfSearch && item.isFacility && (
+                          <span className="mcf-facility-badge">Facility</span>
+                        )}
+                      </div>
                       {secondary && (
                         <div className="map-search-item-subtitle">{secondary}</div>
+                      )}
+                      {isMcfSearch && item.isLocality && (
+                        <div className="map-search-item-hint">
+                          Click to center map here (does not set MCF pin)
+                        </div>
                       )}
                     </div>
                   </button>

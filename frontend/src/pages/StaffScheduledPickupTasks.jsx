@@ -76,7 +76,7 @@ export default function StaffScheduledPickupTasks() {
         .filter((item) => {
           const sDate = item.scheduled_pickup_date ? String(item.scheduled_pickup_date).slice(0, 10) : null;
           const statusUpper = String(item.status || "").trim().toUpperCase();
-          return sDate === date && statusUpper !== "COMPLETED";
+          return sDate === date && statusUpper !== "COMPLETED" && statusUpper !== "CANCELLED";
         })
         .map((item) => ({
           id: item.request_id || item.id,
@@ -147,6 +147,34 @@ export default function StaffScheduledPickupTasks() {
 
   const handleStatusClick = (task) => {
     navigate(`/taskupdate/${task.id}`);
+  };
+
+  const handleStartPickup = async (task) => {
+    try {
+      const token = getAccessToken();
+      const config = token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : {};
+
+      await axios.post(
+        `${API_BASE_URL}/api/waste/staff/task-update/${task.id}/`,
+        { status: "IN_PROGRESS" },
+        config
+      );
+
+      fetchMyTasks();
+    } catch (err) {
+      console.error("Failed to start pickup task:", err);
+      alert(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to start pickup task."
+      );
+    }
   };
 
   return (
@@ -262,6 +290,7 @@ export default function StaffScheduledPickupTasks() {
         loading={loading}
         error={error}
         onStatusClick={handleStatusClick}
+        onStartPickup={handleStartPickup}
         onOpenRoute={(task) => setActiveRoutePickup(task)}
         sortKey={sort.key}
         sortDir={sort.dir}

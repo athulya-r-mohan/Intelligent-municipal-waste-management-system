@@ -27,7 +27,7 @@ const LINKS = {
   dashboard: "/staff",
   myTasks: "/StaffTask",
   notifications: "/notifications",
-  profile: "#",
+  profile: "/profile",
   municipal: "#",
   logout: "#",
   calendar: "#",

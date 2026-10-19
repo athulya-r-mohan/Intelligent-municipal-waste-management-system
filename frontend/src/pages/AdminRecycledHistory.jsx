@@ -210,8 +210,10 @@ export default function AdminRecycledHistory() {
                 onClick={() => {
                   if (item.key === "dashboard") navigate("/admin");
                   else if (item.key === "notifications") navigate("/notifications");
+                  else if (item.key === "profile") navigate("/profile");
                   else navigate("/admin");
                 }}
+
               >
                 <Icon size={17} strokeWidth={2} />
                 <span>{item.label}</span>

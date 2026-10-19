@@ -35,6 +35,7 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import StaffAnalytics from "./pages/StaffAnalytics";
 import RecyclerAnalytics from "./pages/RecyclerAnalytics";
 import InstructionsPage from "./pages/InstructionsPage";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   return (
@@ -86,6 +87,7 @@ export default function App() {
 
         {/* Common Authenticated Routes */}
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       </Routes>
     </NotificationProvider>
   );

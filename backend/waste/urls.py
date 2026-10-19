@@ -11,6 +11,7 @@ from .views import (
     DashboardStatsView,
     UserPickupHistoryView,
     UserLatestPickupView,
+    CitizenCancelPickupView,
     WasteComplaintCreateView,
     UserComplaintListView,
     UserComplaintDetailView,
@@ -56,6 +57,12 @@ urlpatterns = [
         "user/pickup-history/",
         UserPickupHistoryView.as_view(),
         name="user-pickup-history"
+    ),
+
+    path(
+        "user/pickup-requests/<int:pk>/cancel/",
+        CitizenCancelPickupView.as_view(),
+        name="user-cancel-pickup"
     ),
 
     path(

@@ -302,6 +302,7 @@ export default function EcoPulseAdmin() {
                   else if (item.key === "dashboard") setPage("dashboard");
                   else if (item.key === "notifications") navigate("/notifications");
                   else if (item.key === "analytics") navigate("/admin/analytics");
+                  else if (item.key === "profile") navigate("/profile");
                 }}
               >
                 <Icon size={17} strokeWidth={2} />

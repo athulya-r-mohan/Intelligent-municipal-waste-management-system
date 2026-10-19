@@ -192,10 +192,13 @@ export default function RecyclerCompletedItems() {
                     navigate("/recycler");
                   } else if (key === "notifications") {
                     navigate("/notifications");
+                  } else if (key === "profile") {
+                    navigate("/profile");
                   } else {
                     setActive(key);
                   }
                 }}
+
               >
                 <Icon size={17} strokeWidth={2} />
                 {label}

@@ -282,6 +282,9 @@ export default function StaffOptimizedRouteModal({
     const missing = [];
 
     tasks.forEach((item) => {
+      if (String(item?.status || "").toUpperCase() === "CANCELLED") {
+        return;
+      }
       const lat = item.latitude !== null && item.latitude !== undefined ? Number(item.latitude) : NaN;
       const lng = item.longitude !== null && item.longitude !== undefined ? Number(item.longitude) : NaN;
       if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {

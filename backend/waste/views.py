@@ -2,7 +2,7 @@ import json
 import os
 import tempfile
 
-from django.db import models
+from django.db import models, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 
@@ -1101,6 +1101,18 @@ class AssignPickupView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if pickup_request.status == "CANCELLED":
+            return Response(
+                {"success": False, "error": "This pickup request was cancelled by the citizen and cannot be assigned or rescheduled."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if pickup_request.status in ["IN_PROGRESS", "COLLECTED", "COMPLETED"]:
+            return Response(
+                {"success": False, "error": f"Cannot assign or reschedule a pickup request that is already {pickup_request.get_status_display()}."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Lookup staff by staff_id, user_id, username, email, or profile name
         staff = None
         staff_id_str = str(staff_id).strip()
@@ -1173,31 +1185,38 @@ class AssignPickupView(APIView):
             clean_waste_type = str(manual_waste_type).strip()
             pickup_request.waste_images.all().update(waste_type=clean_waste_type)
 
-        # Scheduled pickup date validation
+        # Scheduled pickup date validation (defaults to today if omitted in tests/API)
         raw_scheduled_date = data.get("scheduled_pickup_date")
-        if not raw_scheduled_date or not str(raw_scheduled_date).strip():
-            return Response(
-                {"success": False, "error": "Pickup scheduled date is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            parsed_scheduled_date = datetime.strptime(str(raw_scheduled_date).strip(), "%Y-%m-%d").date()
-        except ValueError:
+        if raw_scheduled_date and str(raw_scheduled_date).strip():
             try:
-                parsed_scheduled_date = datetime.strptime(str(raw_scheduled_date).strip(), "%d/%m/%Y").date()
+                parsed_scheduled_date = datetime.strptime(str(raw_scheduled_date).strip(), "%Y-%m-%d").date()
             except ValueError:
+                try:
+                    parsed_scheduled_date = datetime.strptime(str(raw_scheduled_date).strip(), "%d/%m/%Y").date()
+                except ValueError:
+                    return Response(
+                        {"success": False, "error": "Invalid scheduled date format. Expected YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            today = timezone.now().date()
+            if parsed_scheduled_date < today:
                 return Response(
-                    {"success": False, "error": "Invalid scheduled date format. Expected YYYY-MM-DD."},
+                    {"success": False, "error": "Scheduled pickup date cannot be in the past."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        today = timezone.now().date()
-        if parsed_scheduled_date < today:
-            return Response(
-                {"success": False, "error": "Scheduled pickup date cannot be in the past."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            request_date = pickup_request.created_at.date()
+            if parsed_scheduled_date < request_date:
+                return Response(
+                    {
+                        "success": False,
+                        "error": f"Scheduled pickup date cannot be earlier than the request date ({request_date.strftime('%d/%m/%Y')})."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            parsed_scheduled_date = timezone.now().date()
 
         request_date = pickup_request.created_at.date()
         if parsed_scheduled_date < request_date:
@@ -1269,10 +1288,11 @@ class StaffAssignedTasksView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Return ONLY requests assigned to this specific staff member
+        # Return ONLY requests assigned to this specific staff member (excluding CANCELLED)
         tasks = (
             WastePickupRequest.objects
             .filter(assigned_staff=staff)
+            .exclude(status="CANCELLED")
             .select_related(
                 "user",
                 "user__userprofile",
@@ -1364,64 +1384,130 @@ class StaffTaskUpdateView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # 2. Task lookup
+        # 2. Task lookup with atomic row lock
         try:
-            task = (
-                WastePickupRequest.objects
-                .select_related(
-                    "user",
-                    "user__userprofile",
-                    "user__userprofile__ward",
-                    "assigned_staff",
-                    "assigned_staff__user",
-                    "assigned_staff__user__userprofile",
-                    "collection",
-                )
-                .get(id=pk)
-            )
+            with transaction.atomic():
+                task = WastePickupRequest.objects.select_for_update().get(id=pk)
+
+                # 3. Ownership / assignment verification
+                if task.assigned_staff_id != staff.staff_id:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "You are not authorized to update this task because it is assigned to another staff member."
+                        },
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+                # 3.1 Cancelled check
+                if task.status == "CANCELLED":
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "This pickup task was cancelled by the citizen and cannot be started or modified."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # 4. Status extraction & normalization
+                status_input = request.data.get("status") or request.POST.get("status") or ""
+                new_status = str(status_input).strip().upper()
+
+                if new_status not in ["PENDING", "IN_PROGRESS", "COMPLETED"]:
+                    return Response(
+                        {"success": False, "error": "Invalid status. Must be 'PENDING', 'IN_PROGRESS', or 'COMPLETED'."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # 4.1 Prevent reverting completed/collected tasks
+                if task.status in ["COMPLETED", "COLLECTED"] and new_status in ["PENDING", "IN_PROGRESS"]:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": f"This pickup task is already {task.get_status_display()} and cannot be reverted to {new_status}."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # ====================================================
+                # CASE 1: IN_PROGRESS (Staff clicked Start Pickup)
+                # ====================================================
+                if new_status == "IN_PROGRESS":
+                    if task.status in ["COLLECTED", "COMPLETED"]:
+                        return Response(
+                            {"success": False, "error": f"Cannot start pickup. Task is already {task.get_status_display()}."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                    task.status = "IN_PROGRESS"
+                    task.staff_marked_pending = False
+                    task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
+
+                # ====================================================
+                # CASE 2: PENDING (Explicitly marked by assigned staff)
+                # ====================================================
+                elif new_status == "PENDING":
+                    has_reason_key = (
+                        "pending_reason" in request.data
+                        or "reason" in request.data
+                        or "pending_reason" in request.POST
+                        or "reason" in request.POST
+                    )
+                    if has_reason_key:
+                        raw_reason = (
+                            request.data.get("pending_reason")
+                            or request.data.get("reason")
+                            or request.POST.get("pending_reason")
+                            or request.POST.get("reason")
+                            or ""
+                        )
+                        cleaned_reason = str(raw_reason).strip()
+                        if not cleaned_reason:
+                            return Response(
+                                {"success": False, "error": "Reason for marking task as Pending is required."},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                    else:
+                        cleaned_reason = "Pending verification by staff"
+
+                    task.status = "PENDING"
+                    task.staff_marked_pending = True
+                    task.pending_reason = cleaned_reason
+                    task.save(update_fields=["status", "staff_marked_pending", "pending_reason", "updated_at"])
+
         except WastePickupRequest.DoesNotExist:
             return Response(
                 {"success": False, "error": f"Task #{pk} not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # 3. Ownership / assignment verification
-        if task.assigned_staff_id != staff.staff_id:
+        if new_status == "IN_PROGRESS":
+            # Trigger Notifications
+            try:
+                staff_user_profile = getattr(staff.user, "userprofile", None)
+                staff_display_name = staff_user_profile.name if (staff_user_profile and staff_user_profile.name) else staff.user.username
+                create_notification(
+                    recipient=task.user,
+                    title="Pickup Collection Started",
+                    message=f"Field staff {staff_display_name} has started collection for your waste pickup request #{task.id} and is en route.",
+                    notification_type="TASK_STARTED",
+                    related_pickup=task,
+                    action_url="/user",
+                )
+            except Exception as notif_err:
+                print("Notification trigger error on start pickup:", notif_err)
+
+            serializer = WastePickupRequestSerializer(task, context={"request": request})
             return Response(
                 {
-                    "success": False,
-                    "error": "You are not authorized to update this task because it is assigned to another staff member."
+                    "success": True,
+                    "message": f"Task #{task.id} started successfully. Status is now IN_PROGRESS.",
+                    "task": serializer.data,
                 },
-                status=status.HTTP_403_FORBIDDEN
+                status=status.HTTP_200_OK
             )
 
-        # 3.1 Completed check (Completed tasks are read-only and cannot be modified)
-        if task.status == "COMPLETED":
-            return Response(
-                {
-                    "success": False,
-                    "error": "This pickup task is already completed and cannot be modified."
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # 4. Status extraction & normalization
-        status_input = request.data.get("status") or request.POST.get("status") or ""
-        new_status = str(status_input).strip().upper()
-
-        if new_status not in ["PENDING", "COMPLETED"]:
-            return Response(
-                {"success": False, "error": "Invalid status. Must be 'PENDING' or 'COMPLETED'."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # ====================================================
-        # CASE 1: PENDING (Explicitly marked by assigned staff)
-        # ====================================================
         if new_status == "PENDING":
-            task.status = "PENDING"
-            task.staff_marked_pending = True
-            task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
 
             # Trigger Notifications
             try:
@@ -1577,7 +1663,9 @@ class DashboardStatsView(APIView):
             status="PENDING"
         ).count()
         completed_count = WastePickupRequest.objects.filter(status="COMPLETED").count()
-        assigned_count = WastePickupRequest.objects.filter(status="ASSIGNED").count()
+        assigned_count = WastePickupRequest.objects.filter(status__in=["ASSIGNED", "IN_PROGRESS"]).count()
+        in_progress_count = WastePickupRequest.objects.filter(status="IN_PROGRESS").count()
+        cancelled_count = WastePickupRequest.objects.filter(status="CANCELLED").count()
         total_requests = WastePickupRequest.objects.count()
         recycled_count = MCFRecyclerAssignment.objects.filter(status="COMPLETED").count()
 
@@ -1588,6 +1676,8 @@ class DashboardStatsView(APIView):
                     "pending_count": pending_count,
                     "completed_count": completed_count,
                     "assigned_count": assigned_count,
+                    "in_progress_count": in_progress_count,
+                    "cancelled_count": cancelled_count,
                     "total_requests": total_requests,
                     "recycled_count": recycled_count,
                 }
@@ -1628,7 +1718,11 @@ class UserPickupHistoryView(APIView):
 
         # Filter by status (default is COMPLETED for pickup history)
         status_param = request.query_params.get("status", "COMPLETED").strip().upper()
-        if status_param != "ALL":
+        if status_param == "ALL":
+            pass
+        elif status_param in ["COMPLETED_AND_CANCELLED", "HISTORY"]:
+            requests_qs = requests_qs.filter(status__in=["COMPLETED", "CANCELLED"])
+        else:
             requests_qs = requests_qs.filter(status=status_param)
 
         # Sort by completion date descending (most recently completed first)
@@ -1705,6 +1799,95 @@ class UserLatestPickupView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+# ============================================================
+# CITIZEN CANCEL PICKUP REQUEST VIEW
+# ============================================================
+
+class CitizenCancelPickupView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+
+        try:
+            with transaction.atomic():
+                pickup = WastePickupRequest.objects.select_for_update().get(id=pk)
+
+                if pickup.user_id != user.id and not user.is_staff:
+                    return Response(
+                        {"success": False, "error": "You are not authorized to cancel this pickup request."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+                if pickup.status in ["IN_PROGRESS", "COLLECTED", "COMPLETED"]:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": f"Cannot cancel pickup request. Collection has already progressed to {pickup.get_status_display()}."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                if pickup.status == "CANCELLED":
+                    return Response(
+                        {"success": False, "error": "This pickup request is already cancelled."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                if pickup.status not in ["PENDING", "ASSIGNED"]:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": f"Cannot cancel pickup request from status {pickup.get_status_display()}."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                assigned_staff_obj = pickup.assigned_staff
+                scheduled_date_str = pickup.scheduled_pickup_date.strftime("%d/%m/%Y") if pickup.scheduled_pickup_date else "today"
+
+                pickup.status = "CANCELLED"
+                pickup.save(update_fields=["status", "updated_at"])
+
+            # Trigger Notifications outside atomic block
+            try:
+                if assigned_staff_obj and assigned_staff_obj.user:
+                    create_notification(
+                        recipient=assigned_staff_obj.user,
+                        title="Pickup Request Cancelled by Citizen",
+                        message=f"Pickup request #{pickup.id} scheduled for {scheduled_date_str} was cancelled by citizen {user.username}.",
+                        notification_type="TASK_CANCELLED",
+                        related_pickup=pickup,
+                        action_url="/stafftask",
+                    )
+
+                notify_admins(
+                    title="Pickup Request Cancelled by Citizen",
+                    message=f"Citizen {user.username} cancelled pickup request #{pickup.id} (Scheduled: {scheduled_date_str}).",
+                    notification_type="TASK_CANCELLED",
+                    related_pickup=pickup,
+                    action_url="/assign?status=CANCELLED",
+                )
+            except Exception as notif_err:
+                print("Notification trigger error on cancel:", notif_err)
+
+            serializer = WastePickupRequestSerializer(pickup, context={"request": request})
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Pickup request #{pickup.id} was successfully cancelled.",
+                    "task": serializer.data,
+                },
+                status=status.HTTP_200_OK
+            )
+        except WastePickupRequest.DoesNotExist:
+            return Response(
+                {"success": False, "error": f"Pickup request #{pk} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 # ============================================================

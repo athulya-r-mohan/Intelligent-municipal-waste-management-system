@@ -45,9 +45,11 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/recycler" },
+  { key: "profile", label: "My Profile", icon: User, path: "/profile" },
   { key: "notifications", label: "Notifications", icon: Bell, path: "/notifications" },
   { key: "analytics", label: "Analytics", icon: BarChart3, path: "/recycler/analytics" },
 ];
+
 
 export default function RecyclerAnalytics() {
   const navigate = useNavigate();

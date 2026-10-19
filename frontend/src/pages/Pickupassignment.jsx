@@ -62,9 +62,11 @@ const statusClass = {
   Collected: "status collected",
   Completed: "status completed",
   Cancelled: "status cancelled",
+  "In Progress": "status assigned",
 
   PENDING: "status pending",
   ASSIGNED: "status assigned",
+  IN_PROGRESS: "status assigned",
   COLLECTED: "status collected",
   COMPLETED: "status completed",
   CANCELLED: "status cancelled",
@@ -215,6 +217,26 @@ function CompletedDetailsModal({
               {request.wasteType || "Waste"}
             </div>
           </div>
+
+          {/* PREVIOUS PENDING REASON */}
+          {request.pendingReason && (
+            <div className="modal-field">
+              <label>Previous Pending Reason</label>
+              <div
+                className="modal-value"
+                style={{
+                  color: "#475569",
+                  fontSize: 13,
+                  background: "#f8fafc",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                {request.pendingReason}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* FOOTER */}
@@ -616,6 +638,28 @@ function AssignModal({
 
         {/* BODY */}
         <div className="modal-body">
+
+          {/* PENDING REASON DISPLAY */}
+          {request.pendingReason && (
+            <div className="modal-field">
+              <div
+                style={{
+                  background: request.status === "PENDING" ? "#fff7ed" : "#f8fafc",
+                  border: request.status === "PENDING" ? "1px solid #fed7aa" : "1px solid #e2e8f0",
+                  color: request.status === "PENDING" ? "#9a3412" : "#475569",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  fontSize: "12.5px",
+                  lineHeight: 1.4,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                  ⚠️ {request.status === "PENDING" ? "Staff Pending Reason:" : "Previous Pending Reason:"}
+                </div>
+                <div>{request.pendingReason}</div>
+              </div>
+            </div>
+          )}
 
           {/* LOCATION */}
           <div className="modal-field">
@@ -1268,6 +1312,11 @@ export default function PickupRequests() {
                   request?.staff_marked_pending ||
                   request?.staffMarkedPending
                 ),
+
+              pendingReason:
+                request?.pending_reason ||
+                request?.pendingReason ||
+                "",
 
               completionImage:
                 request?.completion_image ||
@@ -2038,15 +2087,66 @@ export default function PickupRequests() {
                             ] ||
                             "status"
                           }
+                          style={
+                            request.status === "CANCELLED"
+                              ? { background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5", fontWeight: 700 }
+                              : request.status === "IN_PROGRESS"
+                              ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", fontWeight: 700 }
+                              : {}
+                          }
                         >
                           {
-                            request.status
+                            request.status === "CANCELLED"
+                              ? "Cancelled by User"
+                              : request.status === "IN_PROGRESS"
+                              ? "In Progress"
+                              : request.status
                           }
                         </span>
 
                         {request.assignedStaff && (
                           <div style={{ fontSize: "11px", color: "#5f8268", marginTop: "3px" }}>
                             Staff: {request.assignedStaff}
+                          </div>
+                        )}
+
+                        {request.pendingReason && request.status === "PENDING" && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontSize: "11px",
+                              background: "#fff7ed",
+                              border: "1px solid #fed7aa",
+                              color: "#9a3412",
+                              borderRadius: 6,
+                              padding: "3px 6px",
+                              lineHeight: 1.3,
+                              maxWidth: 190,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            <span style={{ fontWeight: 700 }}>⚠️ Reason: </span>
+                            <span>{request.pendingReason}</span>
+                          </div>
+                        )}
+
+                        {request.pendingReason && request.status !== "PENDING" && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontSize: "10.5px",
+                              background: "#f8fafc",
+                              border: "1px solid #e2e8f0",
+                              color: "#64748b",
+                              borderRadius: 6,
+                              padding: "2px 5px",
+                              lineHeight: 1.25,
+                              maxWidth: 190,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600 }}>Previous Reason: </span>
+                            <span>{request.pendingReason}</span>
                           </div>
                         )}
 
@@ -2091,6 +2191,10 @@ export default function PickupRequests() {
                           >
                             <Eye size={13} /> View Proof
                           </button>
+                        ) : request.status === "CANCELLED" ? (
+                          <span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: 600 }}>—</span>
+                        ) : request.status === "IN_PROGRESS" ? (
+                          <span style={{ fontSize: "11.5px", color: "#b45309", fontWeight: 600, background: "#fef3c7", padding: "3px 8px", borderRadius: "6px" }}>In Progress</span>
                         ) : request.status === "ASSIGNED" ? (
                           <button
                             type="button"

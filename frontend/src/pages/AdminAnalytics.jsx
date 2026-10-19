@@ -235,6 +235,7 @@ export default function AdminAnalytics() {
                   else if (item.key === "municipality") navigate("/admin");
                   else if (item.key === "notifications") navigate("/notifications");
                   else if (item.key === "analytics") navigate("/admin/analytics");
+                  else if (item.key === "profile") navigate("/profile");
                 }}
               >
                 <Icon size={17} strokeWidth={2} />

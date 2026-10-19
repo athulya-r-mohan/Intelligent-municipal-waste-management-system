@@ -287,6 +287,7 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             "assigned_staff",
             "assigned_staff_id",
             "staff_marked_pending",
+            "pending_reason",
 
             "collection",
             "completion_image",

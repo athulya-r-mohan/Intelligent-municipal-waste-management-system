@@ -379,6 +379,7 @@ export function TaskTable({
   loading,
   error,
   onStatusClick,
+  onStartPickup,
   onOpenRoute,
   sortKey,
   sortDir,
@@ -631,25 +632,50 @@ export function TaskTable({
                 )}
               </td>
               <td style={{ padding: "14px 16px" }}>
-                <button
-                  onClick={() => onStatusClick(t)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "#6faa3c",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "7px 14px",
-                    borderRadius: 20,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Truck size={13} />
-                  {t.status || "Status"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {String(t.status || "").trim().toUpperCase() === "ASSIGNED" && (
+                    <button
+                      type="button"
+                      onClick={() => onStartPickup && onStartPickup(t)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        background: "#eab308",
+                        color: "#ffffff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: 16,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "all .15s ease",
+                      }}
+                      title="Start pickup collection for this request"
+                    >
+                      ▶ Start Pickup
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onStatusClick(t)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: String(t.status || "").trim().toUpperCase() === "IN_PROGRESS" ? "#d97706" : "#6faa3c",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "7px 14px",
+                      borderRadius: 20,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Truck size={13} />
+                    {String(t.status || "").trim().toUpperCase() === "IN_PROGRESS" ? "In Progress" : t.status || "Status"}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -1765,7 +1791,10 @@ export default function MyTaskDashboard() {
   }, [tasks]);
 
   const activeTasks = useMemo(() => {
-    return tasks.filter((t) => String(t.status || "").trim().toUpperCase() !== "COMPLETED");
+    return tasks.filter((t) => {
+      const s = String(t.status || "").trim().toUpperCase();
+      return s !== "COMPLETED" && s !== "CANCELLED";
+    });
   }, [tasks]);
   const pendingTasksRaw = activeTasks;
 
@@ -2107,6 +2136,34 @@ export default function MyTaskDashboard() {
     navigate(`/taskupdate/${task.id}`);
   };
 
+  const handleStartPickup = async (task) => {
+    try {
+      const token = getAccessToken();
+      const config = token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : {};
+
+      await axios.post(
+        `${API_BASE_URL}/api/waste/staff/task-update/${task.id}/`,
+        { status: "IN_PROGRESS" },
+        config
+      );
+
+      fetchMyTasks();
+    } catch (err) {
+      console.error("Failed to start pickup task:", err);
+      alert(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to start pickup task."
+      );
+    }
+  };
+
   const handleComplaintStatusUpdate = async (complaintId, newStatus) => {
     try {
       const token = getAccessToken();
@@ -2428,6 +2485,7 @@ export default function MyTaskDashboard() {
                 loading={loading}
                 error={error}
                 onStatusClick={handleStatusClick}
+                onStartPickup={handleStartPickup}
                 onOpenRoute={(task) => setActiveRoutePickup(task)}
                 sortKey={pendingReqSort.key}
                 sortDir={pendingReqSort.dir}

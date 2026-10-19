@@ -106,7 +106,7 @@ export default function InstructionsPage() {
           >
             Instructions
           </button>
-          <button className="staff-btn staff-btn-solid" onClick={() => navigate("/user")}>
+          <button className="staff-btn staff-btn-solid" onClick={() => navigate("/profile")}>
             my profile
           </button>
         </div>
