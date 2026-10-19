@@ -8,6 +8,7 @@ from .views import (
     AssignPickupView,
     StaffAssignedTasksView,
     StaffTaskUpdateView,
+    StaffBatchStartCollectionView,
     DashboardStatsView,
     UserPickupHistoryView,
     UserLatestPickupView,
@@ -117,6 +118,12 @@ urlpatterns = [
         "staff/tasks/<int:pk>/",
         StaffTaskUpdateView.as_view(),
         name="staff-task-detail"
+    ),
+
+    path(
+        "staff/start-today-collection/",
+        StaffBatchStartCollectionView.as_view(),
+        name="staff-start-today-collection"
     ),
 
     path(

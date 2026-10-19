@@ -23,6 +23,7 @@ import {
   Recycle,
   Clock,
   ArrowRight,
+  Building2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -57,50 +58,145 @@ export function haversineDistanceKm(lat1, lon1, lat2, lon2) {
 }
 
 // ---------------------------------------------------------------------------
-// Route Optimization (Nearest Neighbor + 2-Opt)
-// Fixed starting point: Stop 1 is always the first eligible pickup location.
-// Remaining stops (2 to N) are optimized to minimize travel distance.
+// Route Optimization (Ward MCF Origin -> Pickups -> Same Ward MCF Return)
+// Nearest Neighbor + 2-Opt local search on intermediate pickup stops.
 // ---------------------------------------------------------------------------
-export function optimizeRouteStops(validTasks) {
-  if (!validTasks || validTasks.length === 0) {
-    return { orderedTasks: [], totalDistanceKm: 0 };
-  }
-  if (validTasks.length === 1) {
+export function optimizeRouteStops(validPickups, staffWard) {
+  // Validate MCF coordinates
+  const mcfLat =
+    staffWard?.mcf_latitude !== null && staffWard?.mcf_latitude !== undefined
+      ? Number(staffWard.mcf_latitude)
+      : NaN;
+  const mcfLng =
+    staffWard?.mcf_longitude !== null && staffWard?.mcf_longitude !== undefined
+      ? Number(staffWard.mcf_longitude)
+      : NaN;
+
+  const hasValidMcf =
+    !isNaN(mcfLat) &&
+    !isNaN(mcfLng) &&
+    (mcfLat !== 0 || mcfLng !== 0) &&
+    mcfLat >= -90 &&
+    mcfLat <= 90 &&
+    mcfLng >= -180 &&
+    mcfLng <= 180;
+
+  if (!hasValidMcf) {
     return {
-      orderedTasks: [{ ...validTasks[0], stopNumber: 1 }],
+      hasValidMcf: false,
+      orderedTasks: [],
+      intermediatePickups: [],
       totalDistanceKm: 0,
     };
   }
 
-  const n = validTasks.length;
-  // Pre-calculate distance matrix
-  const dist = Array.from({ length: n }, () => Array(n).fill(0));
+  const mcfLocationName = staffWard?.mcf_location_name?.trim() || "Ward MCF";
+  const wardLabel = staffWard?.ward_name
+    ? `Ward ${staffWard.ward_number || staffWard.ward_id}: ${staffWard.ward_name}`
+    : staffWard?.ward_id
+    ? `Ward ${staffWard.ward_id}`
+    : "Ward";
+
+  const mcfStartStop = {
+    id: "mcf-start",
+    isMcfStart: true,
+    isMcf: true,
+    pickup: `Ward MCF (${mcfLocationName})`,
+    location_name: mcfLocationName,
+    lat: mcfLat,
+    lng: mcfLng,
+    stopNumber: 1,
+    ward: wardLabel,
+  };
+
+  if (!validPickups || validPickups.length === 0) {
+    return {
+      hasValidMcf: true,
+      orderedTasks: [],
+      intermediatePickups: [],
+      totalDistanceKm: 0,
+    };
+  }
+
+  // If 1 pickup: MCF -> Pickup 1 -> MCF
+  if (validPickups.length === 1) {
+    const p = validPickups[0];
+    const pickupStop = {
+      ...p,
+      stopNumber: 2,
+    };
+    const mcfEndStop = {
+      id: "mcf-end",
+      isMcfEnd: true,
+      isMcf: true,
+      pickup: `Return to Ward MCF (${mcfLocationName})`,
+      location_name: mcfLocationName,
+      lat: mcfLat,
+      lng: mcfLng,
+      stopNumber: 3,
+      ward: wardLabel,
+    };
+
+    const distToPickup = haversineDistanceKm(mcfLat, mcfLng, p.lat, p.lng);
+    const distReturn = haversineDistanceKm(p.lat, p.lng, mcfLat, mcfLng);
+    const totalDist = Number((distToPickup + distReturn).toFixed(2));
+
+    return {
+      hasValidMcf: true,
+      orderedTasks: [mcfStartStop, pickupStop, mcfEndStop],
+      intermediatePickups: [pickupStop],
+      totalDistanceKm: totalDist,
+    };
+  }
+
+  // If >= 2 pickups: Closed-loop TSP Nearest Neighbor + 2-Opt
+  const n = validPickups.length;
+
+  // Pre-calculate distance matrix between pickups
+  const distBetweenPickups = Array.from({ length: n }, () => Array(n).fill(0));
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       if (i !== j) {
-        dist[i][j] = haversineDistanceKm(
-          validTasks[i].lat,
-          validTasks[i].lng,
-          validTasks[j].lat,
-          validTasks[j].lng
+        distBetweenPickups[i][j] = haversineDistanceKm(
+          validPickups[i].lat,
+          validPickups[i].lng,
+          validPickups[j].lat,
+          validPickups[j].lng
         );
       }
     }
   }
 
-  // Step 1: Nearest Neighbor heuristic starting at index 0 (Stop 1)
-  const visited = new Set();
-  const routeIndices = [0];
-  visited.add(0);
+  // Distance from MCF to each pickup
+  const distFromMcf = validPickups.map((p) =>
+    haversineDistanceKm(mcfLat, mcfLng, p.lat, p.lng)
+  );
 
-  let current = 0;
+  // Step 1: Nearest Neighbor heuristic starting at MCF
+  const visited = new Set();
+  const routeIndices = [];
+
+  let firstIdx = 0;
+  let minFirstDist = Infinity;
+  for (let i = 0; i < n; i++) {
+    if (distFromMcf[i] < minFirstDist) {
+      minFirstDist = distFromMcf[i];
+      firstIdx = i;
+    }
+  }
+
+  routeIndices.push(firstIdx);
+  visited.add(firstIdx);
+
+  let current = firstIdx;
   while (visited.size < n) {
     let nearest = -1;
     let minD = Infinity;
     for (let candidate = 0; candidate < n; candidate++) {
       if (!visited.has(candidate)) {
-        if (dist[current][candidate] < minD) {
-          minD = dist[current][candidate];
+        const d = distBetweenPickups[current][candidate];
+        if (d < minD) {
+          minD = d;
           nearest = candidate;
         }
       }
@@ -114,32 +210,34 @@ export function optimizeRouteStops(validTasks) {
     }
   }
 
-  // Step 2: 2-Opt local search refinement (keeping index 0 fixed)
+  // Step 2: 2-Opt local search refinement for MCF -> Pickups -> MCF closed loop
   let improved = true;
   let iterations = 0;
   const maxIterations = 50;
-
-  const calculateRouteDistance = (indices) => {
-    let d = 0;
-    for (let i = 0; i < indices.length - 1; i++) {
-      d += dist[indices[i]][indices[i + 1]];
-    }
-    return d;
-  };
 
   while (improved && iterations < maxIterations) {
     improved = false;
     iterations++;
 
-    // i starts at 1 so index 0 (starting stop) remains fixed
-    for (let i = 1; i < n - 1; i++) {
+    for (let i = 0; i < n - 1; i++) {
       for (let k = i + 1; k < n; k++) {
-        const d1 = dist[routeIndices[i - 1]][routeIndices[i]];
-        const d2 = k + 1 < n ? dist[routeIndices[k]][routeIndices[k + 1]] : 0;
-        const d3 = dist[routeIndices[i - 1]][routeIndices[k]];
-        const d4 = k + 1 < n ? dist[routeIndices[i]][routeIndices[k + 1]] : 0;
+        const prevLat = i === 0 ? mcfLat : validPickups[routeIndices[i - 1]].lat;
+        const prevLng = i === 0 ? mcfLng : validPickups[routeIndices[i - 1]].lng;
+        const nextLat = k === n - 1 ? mcfLat : validPickups[routeIndices[k + 1]].lat;
+        const nextLng = k === n - 1 ? mcfLng : validPickups[routeIndices[k + 1]].lng;
 
-        if (d3 + d4 < d1 + d2 - 1e-6) {
+        const currentI = validPickups[routeIndices[i]];
+        const currentK = validPickups[routeIndices[k]];
+
+        const dOld =
+          haversineDistanceKm(prevLat, prevLng, currentI.lat, currentI.lng) +
+          haversineDistanceKm(currentK.lat, currentK.lng, nextLat, nextLng);
+
+        const dNew =
+          haversineDistanceKm(prevLat, prevLng, currentK.lat, currentK.lng) +
+          haversineDistanceKm(currentI.lat, currentI.lng, nextLat, nextLng);
+
+        if (dNew < dOld - 1e-6) {
           const reversedSegment = routeIndices.slice(i, k + 1).reverse();
           routeIndices.splice(i, reversedSegment.length, ...reversedSegment);
           improved = true;
@@ -150,16 +248,53 @@ export function optimizeRouteStops(validTasks) {
     }
   }
 
-  const orderedTasks = routeIndices.map((idx, seq) => ({
-    ...validTasks[idx],
-    stopNumber: seq + 1,
+  // Construct intermediate pickups with 2-based numbering (Stop 2..N+1)
+  const intermediatePickups = routeIndices.map((idx, seq) => ({
+    ...validPickups[idx],
+    stopNumber: seq + 2,
   }));
 
-  const totalDistanceKm = calculateRouteDistance(routeIndices);
+  const mcfEndStop = {
+    id: "mcf-end",
+    isMcfEnd: true,
+    isMcf: true,
+    pickup: `Return to Ward MCF (${mcfLocationName})`,
+    location_name: mcfLocationName,
+    lat: mcfLat,
+    lng: mcfLng,
+    stopNumber: n + 2,
+    ward: wardLabel,
+  };
+
+  const orderedTasks = [mcfStartStop, ...intermediatePickups, mcfEndStop];
+
+  // Calculate closed-loop tour distance (MCF -> Pickups -> MCF)
+  let totalDist = haversineDistanceKm(
+    mcfLat,
+    mcfLng,
+    intermediatePickups[0].lat,
+    intermediatePickups[0].lng
+  );
+  for (let i = 0; i < intermediatePickups.length - 1; i++) {
+    totalDist += haversineDistanceKm(
+      intermediatePickups[i].lat,
+      intermediatePickups[i].lng,
+      intermediatePickups[i + 1].lat,
+      intermediatePickups[i + 1].lng
+    );
+  }
+  totalDist += haversineDistanceKm(
+    intermediatePickups[intermediatePickups.length - 1].lat,
+    intermediatePickups[intermediatePickups.length - 1].lng,
+    mcfLat,
+    mcfLng
+  );
 
   return {
+    hasValidMcf: true,
     orderedTasks,
-    totalDistanceKm: Number(totalDistanceKm.toFixed(2)),
+    intermediatePickups,
+    totalDistanceKm: Number(totalDist.toFixed(2)),
   };
 }
 
@@ -182,7 +317,6 @@ export async function fetchOsrmRoadGeometry(orderedTasks) {
     if (!res.ok) return null;
     const data = await res.json();
     if (data.code === "Ok" && data.routes && data.routes.length > 0) {
-      // GeoJSON has [lon, lat], Leaflet polyline expects [lat, lon]
       return data.routes[0].geometry.coordinates.map(([lon, lat]) => [
         lat,
         lon,
@@ -190,16 +324,51 @@ export async function fetchOsrmRoadGeometry(orderedTasks) {
     }
     return null;
   } catch {
-    // Non-fatal: direct polyline fallback
     return null;
   }
 }
 
 // ---------------------------------------------------------------------------
+// Distinct MCF Depot Pin Marker Icon
+// ---------------------------------------------------------------------------
+function createMcfMarkerIcon(isSelected) {
+  const bg = isSelected ? "#064e3b" : "#1e6b4e";
+  return L.divIcon({
+    className: "custom-mcf-marker",
+    html: `
+      <div style="
+        background: ${bg};
+        color: #ffffff;
+        min-width: 50px;
+        height: 32px;
+        padding: 0 8px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        font-weight: 800;
+        font-size: 11.5px;
+        letter-spacing: 0.04em;
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      ">
+        🏁 MCF
+      </div>
+    `,
+    iconSize: [50, 32],
+    iconAnchor: [25, 16],
+    popupAnchor: [0, -16],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Numbered custom map pin using Leaflet DivIcon
 // ---------------------------------------------------------------------------
-function createNumberedMarkerIcon(number, isFirst, isSelected) {
-  const bg = isFirst ? "#15803d" : isSelected ? "#047857" : "#1e6b4e";
+function createNumberedMarkerIcon(number, isSelected) {
+  const bg = isSelected ? "#047857" : "#1e6b4e";
   return L.divIcon({
     className: "custom-route-marker",
     html: `
@@ -266,6 +435,7 @@ function MapFlyTo({ target }) {
 // ===========================================================================
 export default function StaffOptimizedRouteModal({
   tasks = [],
+  staffWard = null,
   date,
   formattedDate,
   onClose,
@@ -276,18 +446,53 @@ export default function StaffOptimizedRouteModal({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const markerRefs = useRef({});
 
-  // 1. Separate valid coordinates vs missing coordinates
-  const { validTasks, missingTasks } = useMemo(() => {
+  // 1. Separate valid coordinates vs missing coordinates & verify ward matching by ward ID
+  const { validTasks, missingTasks, otherWardCount } = useMemo(() => {
     const valid = [];
     const missing = [];
+    let otherWard = 0;
+
+    const staffWardId =
+      staffWard?.ward_id !== null && staffWard?.ward_id !== undefined
+        ? Number(staffWard.ward_id)
+        : null;
 
     tasks.forEach((item) => {
+      // Exclude cancelled requests
       if (String(item?.status || "").toUpperCase() === "CANCELLED") {
         return;
       }
-      const lat = item.latitude !== null && item.latitude !== undefined ? Number(item.latitude) : NaN;
-      const lng = item.longitude !== null && item.longitude !== undefined ? Number(item.longitude) : NaN;
-      if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+
+      // Safeguard: verify that pickup requests belong to the same ward using ward IDs
+      if (staffWardId !== null) {
+        const itemWardId =
+          item?.ward_id !== null && item?.ward_id !== undefined
+            ? Number(item.ward_id)
+            : null;
+        if (itemWardId !== null && itemWardId !== staffWardId) {
+          otherWard++;
+          return;
+        }
+      }
+
+      const lat =
+        item.latitude !== null && item.latitude !== undefined
+          ? Number(item.latitude)
+          : NaN;
+      const lng =
+        item.longitude !== null && item.longitude !== undefined
+          ? Number(item.longitude)
+          : NaN;
+
+      if (
+        !isNaN(lat) &&
+        !isNaN(lng) &&
+        (lat !== 0 || lng !== 0) &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180
+      ) {
         valid.push({
           ...item,
           lat,
@@ -298,13 +503,38 @@ export default function StaffOptimizedRouteModal({
       }
     });
 
-    return { validTasks: valid, missingTasks: missing };
-  }, [tasks]);
+    return {
+      validTasks: valid,
+      missingTasks: missing,
+      otherWardCount: otherWard,
+    };
+  }, [tasks, staffWard]);
 
-  // 2. Perform fresh route optimization
-  const { orderedTasks, totalDistanceKm } = useMemo(() => {
-    return optimizeRouteStops(validTasks);
-  }, [validTasks]);
+  // 2. Perform closed-loop route optimization starting and ending at staff ward MCF
+  const {
+    hasValidMcf,
+    orderedTasks,
+    intermediatePickups,
+    totalDistanceKm,
+  } = useMemo(() => {
+    return optimizeRouteStops(validTasks, staffWard);
+  }, [validTasks, staffWard]);
+
+  // MCF coordinates for quick access
+  const mcfLat =
+    staffWard?.mcf_latitude !== null && staffWard?.mcf_latitude !== undefined
+      ? Number(staffWard.mcf_latitude)
+      : NaN;
+  const mcfLng =
+    staffWard?.mcf_longitude !== null && staffWard?.mcf_longitude !== undefined
+      ? Number(staffWard.mcf_longitude)
+      : NaN;
+  const mcfName = staffWard?.mcf_location_name?.trim() || "Ward MCF";
+  const wardTitle = staffWard?.ward_name
+    ? `Ward ${staffWard.ward_number || staffWard.ward_id}: ${staffWard.ward_name}`
+    : staffWard?.ward_id
+    ? `Ward ${staffWard.ward_id}`
+    : "Assigned Ward";
 
   // 3. Attempt optional road geometry from OSRM with instant fallback
   useEffect(() => {
@@ -331,11 +561,14 @@ export default function StaffOptimizedRouteModal({
   const activePolylineCoords = roadPolyline || directPolylineCoords;
 
   const defaultCenter = useMemo(() => {
+    if (hasValidMcf) {
+      return [mcfLat, mcfLng];
+    }
     if (orderedTasks.length > 0) {
       return [orderedTasks[0].lat, orderedTasks[0].lng];
     }
-    return [9.698, 76.723]; // Default fallback to Kerala Kottayam area
-  }, [orderedTasks]);
+    return [9.698, 76.723];
+  }, [hasValidMcf, mcfLat, mcfLng, orderedTasks]);
 
   const selectedTask = useMemo(() => {
     return orderedTasks.find((t) => t.id === selectedStopId) || null;
@@ -352,34 +585,24 @@ export default function StaffOptimizedRouteModal({
     }
   };
 
-  // Open multi-stop or single stop in Google Maps
+  // Open multi-stop closed loop in Google Maps: MCF origin -> pickups waypoints -> MCF destination
   const handleOpenGoogleMapsRoute = () => {
-    if (orderedTasks.length === 0) return;
-    if (orderedTasks.length === 1) {
-      window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${orderedTasks[0].lat},${orderedTasks[0].lng}`,
-        "_blank"
-      );
-      return;
-    }
+    if (!hasValidMcf || intermediatePickups.length === 0) return;
 
-    const origin = `${orderedTasks[0].lat},${orderedTasks[0].lng}`;
-    const destination = `${orderedTasks[orderedTasks.length - 1].lat},${orderedTasks[orderedTasks.length - 1].lng}`;
-    const waypoints = orderedTasks
-      .slice(1, -1)
+    const origin = `${mcfLat},${mcfLng}`;
+    const destination = `${mcfLat},${mcfLng}`;
+    const waypoints = intermediatePickups
       .map((t) => `${t.lat},${t.lng}`)
       .join("|");
 
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${
-      waypoints ? `&waypoints=${waypoints}` : ""
-    }&travelmode=driving`;
-
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
     window.open(url, "_blank");
   };
 
   const handleStopClick = (task) => {
     setSelectedStopId(task.id);
-    const ref = markerRefs.current[task.id];
+    const refKey = task.isMcf ? "mcf-depot" : task.id;
+    const ref = markerRefs.current[refKey];
     if (ref) {
       ref.openPopup();
     }
@@ -451,7 +674,7 @@ export default function StaffOptimizedRouteModal({
                 }}
               >
                 <Navigation size={13} />
-                Optimized Route
+                Ward MCF Route
               </div>
               <h2
                 style={{
@@ -471,8 +694,20 @@ export default function StaffOptimizedRouteModal({
                 color: "#52793f",
               }}
             >
-              Sequence of <strong>{orderedTasks.length}</strong> pickup {orderedTasks.length === 1 ? "stop" : "stops"}
-              {totalDistanceKm > 0 ? ` (~${totalDistanceKm} km total trip)` : ""}
+              {!hasValidMcf ? (
+                <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                  Route unavailable: No valid MCF coordinates registered for {wardTitle}
+                </span>
+              ) : intermediatePickups.length === 0 ? (
+                <span>
+                  <strong>{wardTitle}</strong> • MCF: {mcfName} • No eligible pickups to optimize
+                </span>
+              ) : (
+                <span>
+                  <strong>{wardTitle} MCF</strong> → <strong>{intermediatePickups.length}</strong> intermediate {intermediatePickups.length === 1 ? "pickup" : "pickups"} → <strong>Same MCF Return</strong>
+                  {totalDistanceKm > 0 ? ` (~${totalDistanceKm} km round trip)` : ""}
+                </span>
+              )}
             </p>
           </div>
 
@@ -506,7 +741,7 @@ export default function StaffOptimizedRouteModal({
               </button>
             )}
 
-            {orderedTasks.length > 0 && (
+            {hasValidMcf && intermediatePickups.length > 0 && (
               <button
                 type="button"
                 onClick={handleOpenGoogleMapsRoute}
@@ -523,7 +758,7 @@ export default function StaffOptimizedRouteModal({
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
-                title="Launch Google Maps with this multi-stop route"
+                title="Launch Google Maps with complete Ward MCF closed-loop route"
               >
                 <ExternalLink size={13} /> Open in Google Maps
               </button>
@@ -548,8 +783,37 @@ export default function StaffOptimizedRouteModal({
           </div>
         </div>
 
+        {/* ERROR BANNER FOR MISSING MCF COORDINATES */}
+        {!hasValidMcf && (
+          <div
+            style={{
+              padding: "12px 20px",
+              background: "#fef2f2",
+              borderBottom: "1px solid #fecaca",
+              color: "#991b1b",
+              fontSize: 13,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <AlertTriangle
+              size={18}
+              color="#dc2626"
+              style={{ marginTop: 2, flexShrink: 0 }}
+            />
+            <div>
+              <strong style={{ display: "block", marginBottom: 2 }}>
+                Missing Ward MCF Coordinates
+              </strong>
+              No valid Material Collection Facility (MCF) or Mini MCF coordinates are registered for your assigned ward ({wardTitle}).
+              Route optimization cannot be generated without verified MCF origin and return coordinates. Please contact your municipality administrator.
+            </div>
+          </div>
+        )}
+
         {/* WARNING BANNER FOR MISSING COORDINATES */}
-        {missingTasks.length > 0 && (
+        {hasValidMcf && missingTasks.length > 0 && (
           <div
             style={{
               padding: "10px 18px",
@@ -562,13 +826,17 @@ export default function StaffOptimizedRouteModal({
               gap: 8,
             }}
           >
-            <AlertTriangle size={16} color="#d97706" style={{ marginTop: 2, flexShrink: 0 }} />
+            <AlertTriangle
+              size={16}
+              color="#d97706"
+              style={{ marginTop: 2, flexShrink: 0 }}
+            />
             <div>
-              <strong>Note:</strong> {missingTasks.length} assigned task(s) could not be plotted on the route due to missing GPS coordinates:
-              {" "}
+              <strong>Note:</strong> {missingTasks.length} assigned task(s) in your ward could not be plotted on the route due to missing GPS coordinates:{" "}
               {missingTasks.map((t, idx) => (
                 <span key={t.id}>
-                  #{t.id} ({t.pickup || t.location_name || "N/A"}){idx < missingTasks.length - 1 ? ", " : ""}
+                  #{t.id} ({t.pickup || t.location_name || "N/A"})
+                  {idx < missingTasks.length - 1 ? ", " : ""}
                 </span>
               ))}
             </div>
@@ -593,7 +861,47 @@ export default function StaffOptimizedRouteModal({
               background: "#eef2ea",
             }}
           >
-            {orderedTasks.length === 0 ? (
+            {!hasValidMcf ? (
+              <div
+                style={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 32,
+                  textAlign: "center",
+                  color: "#991b1b",
+                  background: "#fef8f8",
+                }}
+              >
+                <AlertTriangle
+                  size={46}
+                  color="#dc2626"
+                  style={{ marginBottom: 12 }}
+                />
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: "#7f1d1d",
+                    marginBottom: 6,
+                  }}
+                >
+                  Route Optimization Unavailable
+                </div>
+                <div
+                  style={{
+                    fontSize: 13.5,
+                    color: "#991b1b",
+                    maxWidth: 460,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Your assigned ward (<strong>{wardTitle}</strong>) has no saved MCF latitude and longitude coordinates. A registered Ward MCF is required as both the starting depot and returning destination.
+                </div>
+              </div>
+            ) : intermediatePickups.length === 0 ? (
               <div
                 style={{
                   height: "100%",
@@ -607,11 +915,17 @@ export default function StaffOptimizedRouteModal({
                 }}
               >
                 <MapPin size={38} color="#9ca3af" style={{ marginBottom: 10 }} />
-                <div style={{ fontWeight: 600, fontSize: 15, color: "#374151" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 15,
+                    color: "#374151",
+                  }}
+                >
                   No pickup locations available to optimize for this date.
                 </div>
                 <div style={{ fontSize: 13, marginTop: 4 }}>
-                  Ensure pickup requests have valid coordinates assigned.
+                  Assigned pickups for {wardTitle} must have valid coordinates.
                 </div>
               </div>
             ) : (
@@ -640,21 +954,119 @@ export default function StaffOptimizedRouteModal({
                       color: "#1e6b4e",
                       weight: 4,
                       opacity: 0.85,
-                      dashArray: roadPolyline ? null : "6, 8", // dashed if straight-line fallback
+                      dashArray: roadPolyline ? null : "6, 8",
                     }}
                   />
                 )}
 
-                {/* Numbered Stops Markers */}
-                {orderedTasks.map((task) => {
-                  const isFirst = task.stopNumber === 1;
+                {/* 1. Ward MCF Depot Marker (Serves as both Stop 1 & Return Destination) */}
+                <Marker
+                  position={[mcfLat, mcfLng]}
+                  icon={createMcfMarkerIcon(
+                    selectedStopId === "mcf-start" || selectedStopId === "mcf-end"
+                  )}
+                  ref={(el) => {
+                    if (el) markerRefs.current["mcf-depot"] = el;
+                  }}
+                  eventHandlers={{
+                    click: () => setSelectedStopId("mcf-start"),
+                  }}
+                >
+                  <Popup>
+                    <div style={{ padding: "4px 2px", minWidth: 220 }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          background: "#064e3b",
+                          color: "#ffffff",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          borderRadius: 4,
+                          padding: "2px 6px",
+                          marginBottom: 6,
+                        }}
+                      >
+                        🏁 WARD MCF (START & RETURN DEPOT)
+                      </div>
+
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 14,
+                          color: "#1f2937",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {mcfName}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: "#374151",
+                          marginBottom: 4,
+                        }}
+                      >
+                        🏢 {wardTitle}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: "#15803d",
+                          fontWeight: 600,
+                          background: "#f0fdf4",
+                          padding: "4px 6px",
+                          borderRadius: 4,
+                          marginTop: 4,
+                        }}
+                      >
+                        • Stop 1: Departure Origin<br />
+                        • Stop {orderedTasks.length}: Final Return Destination
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://www.google.com/maps/dir/?api=1&destination=${mcfLat},${mcfLng}`,
+                            "_blank"
+                          )
+                        }
+                        style={{
+                          marginTop: 10,
+                          width: "100%",
+                          background: "#1e6b4e",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "5px 10px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Navigation size={11} /> Navigate to Ward MCF
+                      </button>
+                    </div>
+                  </Popup>
+                </Marker>
+
+                {/* 2. Intermediate Pickups Markers */}
+                {intermediatePickups.map((task) => {
                   const isSelected = selectedStopId === task.id;
 
                   return (
                     <Marker
                       key={task.id}
                       position={[task.lat, task.lng]}
-                      icon={createNumberedMarkerIcon(task.stopNumber, isFirst, isSelected)}
+                      icon={createNumberedMarkerIcon(task.stopNumber, isSelected)}
                       ref={(el) => {
                         if (el) markerRefs.current[task.id] = el;
                       }}
@@ -669,7 +1081,7 @@ export default function StaffOptimizedRouteModal({
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 4,
-                              background: isFirst ? "#15803d" : "#1e6b4e",
+                              background: "#1e6b4e",
                               color: "#ffffff",
                               fontSize: 11,
                               fontWeight: 700,
@@ -678,31 +1090,75 @@ export default function StaffOptimizedRouteModal({
                               marginBottom: 6,
                             }}
                           >
-                            {isFirst ? "🏁 STOP 1 (START)" : `STOP ${task.stopNumber}`}
+                            STOP {task.stopNumber}
                           </div>
 
-                          <div style={{ fontWeight: 700, fontSize: 14, color: "#1f2937", marginBottom: 4 }}>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 14,
+                              color: "#1f2937",
+                              marginBottom: 4,
+                            }}
+                          >
                             Pickup Request #{task.id}
                           </div>
 
-                          <div style={{ fontSize: 12.5, color: "#374151", marginBottom: 4 }}>
+                          <div
+                            style={{
+                              fontSize: 12.5,
+                              color: "#374151",
+                              marginBottom: 4,
+                            }}
+                          >
                             📍 {task.pickup || task.location_name}
                           </div>
 
+                          {task.address && (
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#4b5563",
+                                marginBottom: 4,
+                              }}
+                            >
+                              🏠 {task.address}
+                            </div>
+                          )}
+
                           {task.ward && (
-                            <div style={{ fontSize: 12, color: "#4c7a2e", fontWeight: 600, marginBottom: 2 }}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#4c7a2e",
+                                fontWeight: 600,
+                                marginBottom: 2,
+                              }}
+                            >
                               {task.ward}
                             </div>
                           )}
 
                           {task.userName && (
-                            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#6b7280",
+                                marginTop: 2,
+                              }}
+                            >
                               👤 Resident: <strong>{task.userName}</strong>
                             </div>
                           )}
 
                           {task.wasteType && (
-                            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#6b7280",
+                                marginTop: 2,
+                              }}
+                            >
                               ♻️ Waste Type: <strong>{task.wasteType}</strong>
                             </div>
                           )}
@@ -764,8 +1220,16 @@ export default function StaffOptimizedRouteModal({
                 justifyContent: "space-between",
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#2f4a1c", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Stop Sequence
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: "#2f4a1c",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Route Sequence
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#52793f" }}>
                 {orderedTasks.length} Stops Total
@@ -779,55 +1243,118 @@ export default function StaffOptimizedRouteModal({
                 padding: "10px 14px",
               }}
             >
-              {orderedTasks.length === 0 ? (
-                <div style={{ padding: "20px 0", textAlign: "center", color: "#6b7280", fontSize: 13 }}>
+              {!hasValidMcf ? (
+                <div
+                  style={{
+                    padding: "30px 16px",
+                    textAlign: "center",
+                    color: "#dc2626",
+                    fontSize: 13,
+                  }}
+                >
+                  <AlertTriangle
+                    size={28}
+                    color="#dc2626"
+                    style={{ margin: "0 auto 8px" }}
+                  />
+                  <div style={{ fontWeight: 700 }}>Route Unavailable</div>
+                  <div
+                    style={{ fontSize: 12, color: "#7f1d1d", marginTop: 4 }}
+                  >
+                    Please register MCF coordinates for {wardTitle}.
+                  </div>
+                </div>
+              ) : orderedTasks.length === 0 ? (
+                <div
+                  style={{
+                    padding: "20px 0",
+                    textAlign: "center",
+                    color: "#6b7280",
+                    fontSize: 13,
+                  }}
+                >
                   No stops available.
                 </div>
               ) : (
                 orderedTasks.map((t, idx) => {
                   const isSelected = selectedStopId === t.id;
-                  const isFirst = t.stopNumber === 1;
-                  const isLast = t.stopNumber === orderedTasks.length;
+                  const isFirst = t.isMcfStart;
+                  const isLast = t.isMcfEnd;
 
                   return (
-                    <div key={t.id} style={{ marginBottom: 8, position: "relative" }}>
+                    <div
+                      key={t.id}
+                      style={{ marginBottom: 8, position: "relative" }}
+                    >
                       <div
                         onClick={() => handleStopClick(t)}
                         role="button"
                         tabIndex={0}
                         style={{
-                          border: isSelected ? "1.5px solid #1e6b4e" : "1px solid #e2f0d9",
+                          border: isSelected
+                            ? "1.5px solid #1e6b4e"
+                            : isFirst || isLast
+                            ? "1px solid #a7f3d0"
+                            : "1px solid #e2f0d9",
                           borderRadius: 10,
                           padding: "10px 12px",
-                          background: isSelected ? "#f4faf1" : "#ffffff",
+                          background: isSelected
+                            ? "#f4faf1"
+                            : isFirst || isLast
+                            ? "#f0fdf4"
+                            : "#ffffff",
                           cursor: "pointer",
                           transition: "all 0.15s ease",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 10,
+                          }}
+                        >
                           {/* STOP BADGE */}
                           <div
                             style={{
-                              background: isFirst ? "#15803d" : "#1e6b4e",
+                              background:
+                                isFirst || isLast ? "#064e3b" : "#1e6b4e",
                               color: "#ffffff",
-                              borderRadius: "50%",
-                              width: 24,
+                              borderRadius: isFirst || isLast ? "6px" : "50%",
+                              width: isFirst || isLast ? 34 : 24,
                               height: 24,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              fontSize: 12,
+                              fontSize: isFirst || isLast ? 10.5 : 12,
                               fontWeight: 700,
                               flexShrink: 0,
                             }}
                           >
-                            {t.stopNumber}
+                            {isFirst ? "MCF" : isLast ? "MCF" : t.stopNumber}
                           </div>
 
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-                              <span style={{ fontWeight: 700, fontSize: 13, color: "#1f2e22" }}>
-                                Pickup #{t.id}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 4,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  color: isFirst || isLast ? "#064e3b" : "#1f2e22",
+                                }}
+                              >
+                                {isFirst
+                                  ? "Stop 1: Ward MCF (Start)"
+                                  : isLast
+                                  ? `Stop ${t.stopNumber}: Ward MCF (Return)`
+                                  : `Pickup #${t.id}`}
                               </span>
                               {isFirst && (
                                 <span
@@ -841,10 +1368,10 @@ export default function StaffOptimizedRouteModal({
                                     textTransform: "uppercase",
                                   }}
                                 >
-                                  Start
+                                  Origin
                                 </span>
                               )}
-                              {isLast && orderedTasks.length > 1 && (
+                              {isLast && (
                                 <span
                                   style={{
                                     fontSize: 10,
@@ -856,7 +1383,7 @@ export default function StaffOptimizedRouteModal({
                                     textTransform: "uppercase",
                                   }}
                                 >
-                                  End
+                                  Return Depot
                                 </span>
                               )}
                             </div>
@@ -874,6 +1401,22 @@ export default function StaffOptimizedRouteModal({
                             >
                               📍 {t.pickup || t.location_name}
                             </div>
+
+                            {t.address && (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "#6b7280",
+                                  marginTop: 2,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                                title={t.address}
+                              >
+                                🏠 {t.address}
+                              </div>
+                            )}
 
                             <div
                               style={{
@@ -893,7 +1436,7 @@ export default function StaffOptimizedRouteModal({
                       </div>
 
                       {/* CONNECTOR LINE BETWEEN STOPS */}
-                      {!isLast && (
+                      {idx < orderedTasks.length - 1 && (
                         <div
                           style={{
                             width: 2,
@@ -921,12 +1464,32 @@ export default function StaffOptimizedRouteModal({
                 color: "#4b5563",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span>Total Stops:</span>
-                <strong style={{ color: "#1f2e22" }}>{orderedTasks.length}</strong>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 4,
+                }}
+              >
+                <span>Total Route Stops:</span>
+                <strong style={{ color: "#1f2e22" }}>
+                  {orderedTasks.length}
+                </strong>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 4,
+                }}
+              >
+                <span>Intermediate Pickups:</span>
+                <strong style={{ color: "#1f2e22" }}>
+                  {intermediatePickups.length}
+                </strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Estimated Distance:</span>
+                <span>Total Round Trip:</span>
                 <strong style={{ color: "#1e6b4e" }}>
                   {totalDistanceKm > 0 ? `~${totalDistanceKm} km` : "N/A"}
                 </strong>

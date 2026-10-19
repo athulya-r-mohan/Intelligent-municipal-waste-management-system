@@ -164,6 +164,12 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
     )
 
     # ========================================================
+    # CITIZEN ADDRESS
+    # ========================================================
+
+    address = serializers.SerializerMethodField()
+
+    # ========================================================
     # WARD
     # ========================================================
 
@@ -267,6 +273,7 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
             "user_name",
             "phone",
             "email",
+            "address",
 
             "ward",
             "ward_id",
@@ -325,6 +332,19 @@ class WastePickupRequestSerializer(serializers.ModelSerializer):
 
             pass
 
+        return ""
+
+    # ========================================================
+    # GET CITIZEN ADDRESS
+    # ========================================================
+
+    def get_address(self, obj):
+        try:
+            profile = getattr(obj.user, "userprofile", None)
+            if profile and profile.address:
+                return profile.address
+        except Exception:
+            pass
         return ""
 
     # ========================================================

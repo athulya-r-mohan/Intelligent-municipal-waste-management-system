@@ -1281,12 +1281,32 @@ class StaffAssignedTasksView(APIView):
     def get(self, request):
         user = request.user
 
-        staff = Staff.objects.filter(user=user).first()
+        staff = (
+            Staff.objects
+            .select_related("user", "user__userprofile", "user__userprofile__ward")
+            .filter(user=user)
+            .first()
+        )
         if not staff:
             return Response(
                 {"success": False, "error": "No Staff profile associated with the current user."},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+        # Retrieve authenticated staff's assigned ward details & saved MCF coordinates
+        staff_profile = getattr(staff.user, "userprofile", None)
+        staff_ward = getattr(staff_profile, "ward", None)
+        ward_data = None
+        if staff_ward:
+            ward_data = {
+                "ward_id": staff_ward.ward_id,
+                "ward_name": staff_ward.ward_name,
+                "ward_number": staff_ward.ward_number,
+                "location": staff_ward.location,
+                "mcf_location_name": staff_ward.mcf_location_name or "",
+                "mcf_latitude": float(staff_ward.mcf_latitude) if staff_ward.mcf_latitude is not None else None,
+                "mcf_longitude": float(staff_ward.mcf_longitude) if staff_ward.mcf_longitude is not None else None,
+            }
 
         # Return ONLY requests assigned to this specific staff member (excluding CANCELLED)
         tasks = (
@@ -1315,7 +1335,8 @@ class StaffAssignedTasksView(APIView):
             {
                 "success": True,
                 "count": tasks.count(),
-                "tasks": serializer.data
+                "tasks": serializer.data,
+                "staff_ward": ward_data,
             },
             status=status.HTTP_200_OK
         )
@@ -1647,6 +1668,131 @@ class StaffTaskUpdateView(APIView):
                 },
                 status=status.HTTP_200_OK
             )
+
+
+# ============================================================
+# STAFF BATCH START TODAY'S COLLECTION VIEW
+# ============================================================
+
+class StaffBatchStartCollectionView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            return Response(
+                {"success": False, "error": "Staff profile not found for logged-in user."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        date_str = request.data.get("scheduled_pickup_date") or request.data.get("date")
+        if not date_str:
+            return Response(
+                {"success": False, "error": "Scheduled pickup date is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            parsed_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+        except ValueError:
+            try:
+                parsed_date = datetime.strptime(str(date_str).strip(), "%d/%m/%Y").date()
+            except ValueError:
+                return Response(
+                    {"success": False, "error": "Invalid date format. Expected YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Validate date: Only today's scheduled collections may be started
+        today_dates = {timezone.now().date(), timezone.localdate()}
+        if parsed_date not in today_dates:
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Collection can only be started for today's scheduled date ({timezone.localdate().strftime('%Y-%m-%d')})."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Atomic database transaction to update only ASSIGNED tasks for this staff & date
+        with transaction.atomic():
+            eligible_pickups = list(
+                WastePickupRequest.objects
+                .select_for_update()
+                .filter(
+                    assigned_staff=staff,
+                    scheduled_pickup_date=parsed_date,
+                    status="ASSIGNED"
+                )
+                .select_related("user")
+            )
+
+            # Check all scheduled tasks for this date (excluding cancelled)
+            all_scheduled = (
+                WastePickupRequest.objects
+                .filter(
+                    assigned_staff=staff,
+                    scheduled_pickup_date=parsed_date
+                )
+                .exclude(status="CANCELLED")
+            )
+
+            if not all_scheduled.exists():
+                return Response(
+                    {"success": False, "error": "No pickup tasks scheduled for this date.", "updated_count": 0},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if not eligible_pickups:
+                # All active tasks are already IN_PROGRESS or COMPLETED
+                return Response(
+                    {
+                        "success": True,
+                        "message": "All eligible pickups for today have already been started.",
+                        "updated_count": 0,
+                        "all_started": True,
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+            for task in eligible_pickups:
+                task.status = "IN_PROGRESS"
+                task.staff_marked_pending = False
+                task.save(update_fields=["status", "staff_marked_pending", "updated_at"])
+
+        # Trigger notifications outside the atomic block
+        staff_user_profile = getattr(staff.user, "userprofile", None)
+        staff_display_name = (
+            staff_user_profile.name
+            if (staff_user_profile and staff_user_profile.name)
+            else staff.user.username
+        )
+
+        for task in eligible_pickups:
+            try:
+                create_notification(
+                    recipient=task.user,
+                    title="Pickup Collection Started",
+                    message=f"Field staff {staff_display_name} has started collection for your waste pickup request #{task.id} and is en route.",
+                    notification_type="TASK_STARTED",
+                    related_pickup=task,
+                    action_url="/user",
+                )
+            except Exception as notif_err:
+                print(f"Notification error on batch start for task #{task.id}:", notif_err)
+
+        count = len(eligible_pickups)
+        return Response(
+            {
+                "success": True,
+                "message": f"Successfully started collection for {count} pickup request{'s' if count != 1 else ''}.",
+                "updated_count": count,
+                "all_started": True,
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 # ============================================================

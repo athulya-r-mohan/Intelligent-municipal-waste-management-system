@@ -384,6 +384,8 @@ export function TaskTable({
   sortKey,
   sortDir,
   onSort,
+  showStartPickup = true,
+  showCitizenAddress = false,
 }) {
   return (
     <div
@@ -428,6 +430,23 @@ export function TaskTable({
             >
               Today's Pickup / Location
             </SortableTh>
+            {showCitizenAddress && (
+              <SortableTh
+                columnKey="address"
+                currentSortKey={sortKey}
+                currentSortDir={sortDir}
+                onSort={onSort}
+                style={{
+                  textAlign: "left",
+                  padding: "12px 16px",
+                  color: "#2f4a1c",
+                  fontWeight: 600,
+                  borderBottom: "1px solid #cfe7bb",
+                }}
+              >
+                Citizen Address
+              </SortableTh>
+            )}
             <SortableTh
               columnKey="ward"
               currentSortKey={sortKey}
@@ -494,7 +513,7 @@ export function TaskTable({
           {loading && (
             <tr>
               <td
-                colSpan="6"
+                colSpan={showCitizenAddress ? 7 : 6}
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -510,7 +529,7 @@ export function TaskTable({
           {!loading && error && (
             <tr>
               <td
-                colSpan="6"
+                colSpan={showCitizenAddress ? 7 : 6}
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -526,7 +545,7 @@ export function TaskTable({
           {!loading && !error && tasks.length === 0 && (
             <tr>
               <td
-                colSpan="6"
+                colSpan={showCitizenAddress ? 7 : 6}
                 style={{
                   textAlign: "center",
                   padding: "28px",
@@ -587,6 +606,56 @@ export function TaskTable({
                   </button>
                 </div>
               </td>
+              {showCitizenAddress && (
+                <td
+                  style={{
+                    padding: "14px 16px",
+                    fontSize: 13,
+                    lineHeight: 1.45,
+                    maxWidth: 240,
+                    wordBreak: "break-word",
+                    whiteSpace: "normal",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      color:
+                        (t.userName || t.user_name) &&
+                        String(t.userName || t.user_name).trim()
+                          ? "#1f2e22"
+                          : "#788f69",
+                      fontStyle:
+                        (t.userName || t.user_name) &&
+                        String(t.userName || t.user_name).trim()
+                          ? "normal"
+                          : "italic",
+                      marginBottom: 3,
+                    }}
+                  >
+                    {(t.userName || t.user_name) &&
+                    String(t.userName || t.user_name).trim()
+                      ? String(t.userName || t.user_name).trim()
+                      : "Name not provided"}
+                  </div>
+                  <div
+                    style={{
+                      color:
+                        t.address && String(t.address).trim()
+                          ? "#39511f"
+                          : "#788f69",
+                      fontStyle:
+                        t.address && String(t.address).trim()
+                          ? "normal"
+                          : "italic",
+                    }}
+                  >
+                    {t.address && String(t.address).trim()
+                      ? t.address
+                      : "Address not provided"}
+                  </div>
+                </td>
+              )}
               <td style={{ padding: "14px 16px", color: "#39511f" }}>{t.ward}</td>
               <td style={{ padding: "14px 16px", color: "#39511f" }}>
                 <span
@@ -633,7 +702,7 @@ export function TaskTable({
               </td>
               <td style={{ padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  {String(t.status || "").trim().toUpperCase() === "ASSIGNED" && (
+                  {showStartPickup && onStartPickup && String(t.status || "").trim().toUpperCase() === "ASSIGNED" && (
                     <button
                       type="button"
                       onClick={() => onStartPickup && onStartPickup(t)}
