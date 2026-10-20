@@ -12,7 +12,7 @@ import {
   ImageIcon,
   Eye,
 } from "lucide-react";
-import "../components/pickupassign.css";
+import "../components/Pickupassign.css";
 import NotificationBell from "../components/NotificationBell";
 import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
