@@ -703,37 +703,39 @@ def create_pickup_request(request):
 
 
             # =================================================
-            # BEST DETECTION
+            # ALL DETECTIONS & BEST DETECTION
             # =================================================
 
+            def get_confidence(detection):
+                try:
+                    val = float(detection.get("confidence", 0))
+                    if val > 1.0:
+                        val = val / 100.0
+                    return max(0.0, min(1.0, val))
+                except (ValueError, TypeError):
+                    return 0.0
+
+            formatted_detections = []
+            for d in image_detections:
+                if not isinstance(d, dict):
+                    continue
+                c_name = (
+                    d.get("class")
+                    or d.get("class_name")
+                    or d.get("name")
+                    or "Unknown"
+                )
+                c_conf = get_confidence(d)
+                formatted_detections.append({
+                    "class": str(c_name).strip() if str(c_name).strip() else "Unknown",
+                    "confidence": round(c_conf, 4),
+                })
+
             if image_detections:
-
-                def get_confidence(
-                    detection
-                ):
-
-                    try:
-
-                        return float(
-                            detection.get(
-                                "confidence",
-                                0
-                            )
-                        )
-
-                    except (
-                        ValueError,
-                        TypeError
-                    ):
-
-                        return 0.0
-
-
                 best_detection = max(
                     image_detections,
                     key=get_confidence
                 )
-
 
                 waste_type = (
                     best_detection.get(
@@ -751,25 +753,20 @@ def create_pickup_request(request):
                     "Unknown"
                 )
 
-
                 confidence = get_confidence(
                     best_detection
                 )
 
-
             else:
-
                 waste_type = "Unknown"
                 confidence = 0.0
 
-
             # =================================================
-            # SAVE IMAGE RECORD
+            # SAVE IMAGE RECORD (WITH ALL DETECTIONS)
             # =================================================
 
             image_record = (
                 WastePickupImage.objects.create(
-
                     pickup_request=
                         pickup_request,
 
@@ -781,9 +778,11 @@ def create_pickup_request(request):
 
                     confidence=
                         confidence,
+
+                    detections=
+                        formatted_detections,
                 )
             )
-
 
             saved_images.append(
                 {
@@ -803,6 +802,9 @@ def create_pickup_request(request):
 
                     "confidence":
                         confidence,
+
+                    "detections":
+                        formatted_detections,
 
                     "image_index":
                         current_image_index,
@@ -1322,6 +1324,7 @@ class StaffAssignedTasksView(APIView):
                 "assigned_staff__user__userprofile",
                 "collection",
             )
+            .prefetch_related("waste_images")
             .order_by("-updated_at", "-id")
         )
 
@@ -1372,6 +1375,7 @@ class StaffTaskUpdateView(APIView):
                     "assigned_staff__user__userprofile",
                     "collection",
                 )
+                .prefetch_related("waste_images")
                 .get(id=pk)
             )
         except WastePickupRequest.DoesNotExist:
@@ -3103,6 +3107,22 @@ class RecyclerCompleteTaskView(APIView):
         assignment.status = "COMPLETED"
         assignment.completed_at = timezone.now()
         assignment.save()
+
+        # Trigger Admin Notification
+        try:
+            recycler_name = (
+                getattr(recycler, "organization", None)
+                or (request.user.get_full_name() if request.user else "")
+                or (request.user.username if request.user else "Recycler")
+            )
+            notify_admins(
+                title="Recycling Task Completed",
+                message=f"Recycler {recycler_name} completed processing {recyclable_qty} kg of {assignment.waste_type} waste.",
+                notification_type="RECYCLER_ALERT",
+                action_url="/admin/recycled-history",
+            )
+        except Exception as notif_err:
+            print("Notification trigger error on recycler task completion:", notif_err)
 
         serializer = MCFRecyclerAssignmentSerializer(assignment, context={"request": request})
         return Response({

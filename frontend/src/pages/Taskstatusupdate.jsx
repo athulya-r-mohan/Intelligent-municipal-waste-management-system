@@ -15,6 +15,8 @@ import {
   User,
   AlertCircle,
   Truck,
+  Sparkles,
+  Recycle,
 } from "lucide-react";
 
 // ============================================================
@@ -435,6 +437,219 @@ export default function TaskStatusUpdate() {
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* AI-Detected Waste Objects */}
+        {task && (
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #dcede0",
+              borderRadius: 14,
+              padding: "14px 16px",
+              marginBottom: 16,
+              boxShadow: "0 2px 8px -2px rgba(44, 110, 66, 0.08)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+                borderBottom: "1px solid #f0f7f1",
+                paddingBottom: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <Sparkles size={15} color="#16a34a" />
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#166534",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.03em",
+                  }}
+                >
+                  AI-Detected Waste Objects
+                </span>
+              </div>
+              {task.images && task.images.length > 0 && (
+                <span style={{ fontSize: 11.5, color: "#6b8a53", fontWeight: 600 }}>
+                  {task.images.length} {task.images.length === 1 ? "Image" : "Images"} Uploaded
+                </span>
+              )}
+            </div>
+
+            {Array.isArray(task.images) && task.images.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {task.images.map((img, imgIdx) => {
+                  const imageDetections =
+                    Array.isArray(img?.detections) && img.detections.length > 0
+                      ? img.detections
+                      : img?.waste_type && img.waste_type !== "Unknown"
+                      ? [{ class: img.waste_type, confidence: img.confidence }]
+                      : [];
+
+                  const imgUrl = img.image
+                    ? img.image.startsWith("http://") || img.image.startsWith("https://")
+                      ? img.image
+                      : `${API_BASE_URL}${img.image.startsWith("/") ? "" : "/"}${img.image}`
+                    : null;
+
+                  return (
+                    <div
+                      key={img.id || imgIdx}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 14,
+                        padding: "10px 12px",
+                        background: "#f7fbf8",
+                        border: "1px solid #e1efe4",
+                        borderRadius: 10,
+                      }}
+                    >
+                      {/* Image Thumbnail */}
+                      {imgUrl ? (
+                        <a
+                          href={imgUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Click to view full photo"
+                          style={{ display: "block", flexShrink: 0 }}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={img.image_name || `Waste ${imgIdx + 1}`}
+                            style={{
+                              width: 72,
+                              height: 72,
+                              objectFit: "cover",
+                              borderRadius: 8,
+                              border: "1.5px solid #bde5c6",
+                              boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                              cursor: "pointer",
+                            }}
+                          />
+                        </a>
+                      ) : (
+                        <div
+                          style={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: 8,
+                            background: "#eaf5ec",
+                            border: "1.5px dashed #bde5c6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <ImageIcon size={22} color="#8fa896" />
+                        </div>
+                      )}
+
+                      {/* Detections Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#166534",
+                            marginBottom: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Image {imgIdx + 1}</span>
+                          {img.image_name && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "#8fa896",
+                                fontWeight: 400,
+                                maxWidth: 160,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {img.image_name}
+                            </span>
+                          )}
+                        </div>
+
+                        {imageDetections.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            {imageDetections.map((det, detIdx) => {
+                              const conf = Number(det?.confidence || 0);
+                              const className = det?.class || det?.class_name || det?.name || "Unknown";
+                              const confPercent = conf <= 1.0 ? conf * 100 : conf;
+
+                              return (
+                                <div
+                                  key={detIdx}
+                                  style={{
+                                    fontSize: 13,
+                                    color: "#1f2e22",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                  }}
+                                >
+                                  <span style={{ color: "#16a34a", fontWeight: 700 }}>•</span>
+                                  <span style={{ fontWeight: 600, color: "#166534" }}>{className}</span>
+                                  {conf > 0 && (
+                                    <span style={{ fontSize: 12, color: "#5f8a45", fontWeight: 500 }}>
+                                      ({confPercent.toFixed(2)}%)
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "#8fa896", fontStyle: "italic" }}>
+                            No specific waste category detected
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : task.waste_type && task.waste_type !== "Unknown" ? (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "#f2f8ec",
+                  color: "#4c7a2e",
+                  padding: "6px 12px",
+                  borderRadius: 20,
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <Recycle size={14} />
+                <span>{task.waste_type}</span>
+                {task.ai_confidence && (
+                  <span style={{ fontSize: 12, color: "#5f8a45" }}>
+                    ({Number(task.ai_confidence).toFixed(1)}%)
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12.5, color: "#8fa896", fontStyle: "italic" }}>
+                No detection data recorded for this pickup request.
+              </div>
+            )}
           </div>
         )}
 

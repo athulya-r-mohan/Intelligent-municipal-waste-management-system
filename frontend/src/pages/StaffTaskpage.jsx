@@ -658,20 +658,76 @@ export function TaskTable({
               )}
               <td style={{ padding: "14px 16px", color: "#39511f" }}>{t.ward}</td>
               <td style={{ padding: "14px 16px", color: "#39511f" }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "#f2f8ec",
-                    color: "#4c7a2e",
-                    padding: "3px 10px",
-                    borderRadius: 20,
-                    fontSize: 12.5,
-                  }}
-                >
-                  <Recycle size={13} /> {t.wasteType}
-                </span>
+                {Array.isArray(t.images) && t.images.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                    {t.images.map((img, imgIdx) => {
+                      const detections =
+                        Array.isArray(img?.detections) && img.detections.length > 0
+                          ? img.detections
+                          : img?.waste_type && img.waste_type !== "Unknown"
+                          ? [{ class: img.waste_type, confidence: img.confidence }]
+                          : [];
+
+                      return (
+                        <div
+                          key={img.id || imgIdx}
+                          style={{
+                            background: "#f4faf1",
+                            border: "1px solid #dceed0",
+                            borderRadius: 6,
+                            padding: "4px 8px",
+                            minWidth: 120,
+                          }}
+                        >
+                          {t.images.length > 1 && (
+                            <div style={{ fontSize: 10.5, fontWeight: 700, color: "#4c7a2e", marginBottom: 2 }}>
+                              Image {imgIdx + 1}
+                            </div>
+                          )}
+                          {detections.length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              {detections.map((d, dIdx) => {
+                                const conf = Number(d?.confidence || 0);
+                                const className = d?.class || d?.class_name || d?.name || "Unknown";
+                                const confPercent = conf <= 1.0 ? conf * 100 : conf;
+                                return (
+                                  <div key={dIdx} style={{ fontSize: 12, color: "#2f4a1c", display: "flex", alignItems: "center", gap: 4 }}>
+                                    <span style={{ color: "#16a34a", fontWeight: 700 }}>•</span>
+                                    <span style={{ fontWeight: 600 }}>{className}</span>
+                                    {conf > 0 && (
+                                      <span style={{ fontSize: 11, color: "#6b8a53" }}>
+                                        ({confPercent.toFixed(2)}%)
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 11.5, color: "#8a9a83", fontStyle: "italic" }}>
+                              No detection
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: "#f2f8ec",
+                      color: "#4c7a2e",
+                      padding: "3px 10px",
+                      borderRadius: 20,
+                      fontSize: 12.5,
+                    }}
+                  >
+                    <Recycle size={13} /> {t.wasteType}
+                  </span>
+                )}
               </td>
               <td style={{ padding: "14px 16px", color: "#39511f", fontSize: 12.5 }}>
                 {t.scheduledPickupDate ? (
@@ -2137,12 +2193,15 @@ export default function MyTaskDashboard() {
         latitude: item.latitude,
         longitude: item.longitude,
         ward: item.ward || (item.ward_id ? `Ward ${item.ward_id}` : "N/A"),
+        ward_id: item.ward_id ?? null,
         wasteType: item.waste_type || "Waste",
+        images: Array.isArray(item.images) ? item.images : [],
         status: item.status ? String(item.status).trim() : "PENDING",
         date: item.date || "",
         scheduledPickupDate: item.scheduled_pickup_date || null,
         userName: item.user_name || "",
         phone: item.phone || "",
+        address: item.address || "",
       }));
 
       setTasks(formatted);

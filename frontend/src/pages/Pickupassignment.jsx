@@ -322,12 +322,21 @@ function AssignModal({
 
   // Determine if AI successfully detected a valid waste type
   const validDetectedImages = (request?.imageResults || []).filter(
-    (image) =>
-      image?.waste_type &&
-      image.waste_type !== "Unknown" &&
-      image.waste_type !== "No detection" &&
-      image.waste_type !== "Not Detected" &&
-      String(image.waste_type).trim() !== ""
+    (image) => {
+      if (Array.isArray(image?.detections) && image.detections.length > 0) {
+        return image.detections.some((d) => {
+          const c = d?.class || d?.class_name || d?.name;
+          return c && c !== "Unknown" && c !== "No detection" && String(c).trim() !== "";
+        });
+      }
+      return (
+        image?.waste_type &&
+        image.waste_type !== "Unknown" &&
+        image.waste_type !== "No detection" &&
+        image.waste_type !== "Not Detected" &&
+        String(image.waste_type).trim() !== ""
+      );
+    }
   );
 
   const hasValidAiDetection =
@@ -682,52 +691,64 @@ function AssignModal({
 
               <div className="modal-value">
                 {request.imageResults?.length > 0 ? (
-                  request.imageResults.map(
-                    (image, index) => (
+                  request.imageResults.map((image, index) => {
+                    const imageDetections =
+                      Array.isArray(image?.detections) && image.detections.length > 0
+                        ? image.detections
+                        : image?.waste_type && image.waste_type !== "Unknown"
+                        ? [{ class: image.waste_type, confidence: image.confidence }]
+                        : [];
+
+                    return (
                       <div
-                        key={
-                          image.id ||
-                          image.image_index ||
-                          index
-                        }
+                        key={image.id || image.image_index || index}
                         style={{
-                          marginBottom:
-                            "8px",
+                          marginBottom: "8px",
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          background: "#f0fdf4",
+                          border: "1px solid #dcfce7",
                         }}
                       >
-                        {request.imageResults.length > 1 && (
-                          <strong>
-                            Image {index + 1}:{" "}
-                          </strong>
-                        )}
+                        <div
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            color: "#166534",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Image {index + 1}
+                          {image.image_name ? ` (${image.image_name})` : ""}:
+                        </div>
 
-                        {image.waste_type &&
-                        image.waste_type !==
-                          "Unknown" ? (
-                          <span style={{ fontWeight: 600, color: "#1f6b4e" }}>
-                            {image.waste_type}
+                        {imageDetections.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "3px", paddingLeft: "6px" }}>
+                            {imageDetections.map((det, detIdx) => {
+                              const conf = Number(det?.confidence || 0);
+                              const className = det?.class || det?.class_name || det?.name || "Unknown";
+                              const confPercent = conf <= 1.0 ? conf * 100 : conf;
 
-                            {Number(
-                              image.confidence
-                            ) > 0 && (
-                              <span style={{ fontSize: "12.5px", color: "#5f8a45", fontWeight: 500 }}>
-                                {" "}
-                                ({(
-                                  Number(
-                                    image.confidence
-                                  ) * 100
-                                ).toFixed(2)}%)
-                              </span>
-                            )}
-                          </span>
+                              return (
+                                <div key={detIdx} style={{ fontSize: "13px", color: "#1f2937" }}>
+                                  • <span style={{ fontWeight: 600, color: "#1f6b4e" }}>{className}</span>
+                                  {conf > 0 && (
+                                    <span style={{ fontSize: "12px", color: "#5f8a45", fontWeight: 500 }}>
+                                      {" "}({confPercent.toFixed(2)}%)
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         ) : (
-                          <span>
+                          <span style={{ fontSize: "12.5px", color: "#6b7280", fontStyle: "italic" }}>
                             {request.wasteType || "Detected"}
                           </span>
                         )}
                       </div>
-                    )
-                  )
+                    );
+                  })
                 ) : (
                   <span style={{ fontWeight: 600, color: "#1f6b4e" }}>
                     {request.wasteType || "Plastic"}
@@ -1074,48 +1095,66 @@ export default function PickupRequests() {
             // =================================================
             // IMAGE RESULTS
             // =================================================
-            const imageResults =
-              images.map(
-                (image, index) => ({
-                  ...image,
+            const imageResults = images.map((image, index) => {
+              let imageDetections = Array.isArray(image?.detections)
+                ? image.detections
+                : [];
 
-                  image_index:
-                    image?.image_index ??
-                    index + 1,
+              if (imageDetections.length === 0) {
+                const wt =
+                  image?.waste_type ||
+                  image?.wasteType ||
+                  image?.predicted_class ||
+                  image?.predictedClass;
+                if (
+                  wt &&
+                  wt !== "Unknown" &&
+                  wt !== "No detection" &&
+                  wt !== "None" &&
+                  String(wt).trim() !== ""
+                ) {
+                  imageDetections = [
+                    {
+                      class: wt,
+                      confidence: Number(image?.confidence ?? 0),
+                    },
+                  ];
+                }
+              }
 
-                  waste_type:
-                    image?.waste_type ||
-                    image?.wasteType ||
-                    image?.predicted_class ||
-                    image?.predictedClass ||
-                    "Unknown",
-
-                  confidence:
-                    Number(
-                      image?.confidence ?? 0
-                    ),
-                })
-              );
+              return {
+                ...image,
+                image_index: image?.image_index ?? index + 1,
+                waste_type:
+                  image?.waste_type ||
+                  image?.wasteType ||
+                  image?.predicted_class ||
+                  image?.predictedClass ||
+                  "Unknown",
+                confidence: Number(image?.confidence ?? 0),
+                detections: imageDetections,
+              };
+            });
 
             // =================================================
-            // WASTE TYPES FROM DETECTED IMAGES
+            // WASTE TYPES FROM DETECTED IMAGES (FOR FILTER / SUMMARY)
             // =================================================
-            let wasteTypes =
-              imageResults
-                .map(
-                  (image) =>
-                    image.waste_type
-                )
-                .filter(
-                  (type) =>
-                    type &&
-                    type !== "Unknown"
-                );
+            let allDetectedClasses = [];
+            imageResults.forEach((img) => {
+              if (Array.isArray(img.detections) && img.detections.length > 0) {
+                img.detections.forEach((d) => {
+                  const cName = d?.class || d?.class_name || d?.name;
+                  if (cName && cName !== "Unknown") {
+                    allDetectedClasses.push(cName);
+                  }
+                });
+              } else if (img.waste_type && img.waste_type !== "Unknown") {
+                allDetectedClasses.push(img.waste_type);
+              }
+            });
 
-            // Remove duplicates
-            wasteTypes = [
-              ...new Set(wasteTypes),
-            ];
+            // Unique categories for filtering / summary text
+            let uniqueWasteTypes = [...new Set(allDetectedClasses)];
 
             // =================================================
             // MAIN BACKEND WASTE TYPE
@@ -1130,21 +1169,17 @@ export default function PickupRequests() {
             if (
               mainWasteType &&
               mainWasteType !== "Unknown" &&
-              !wasteTypes.includes(
-                mainWasteType
-              )
+              !uniqueWasteTypes.includes(mainWasteType)
             ) {
-              wasteTypes.unshift(
-                mainWasteType
-              );
+              uniqueWasteTypes.unshift(mainWasteType);
             }
 
             // =================================================
-            // DISPLAY WASTE TYPE
+            // DISPLAY WASTE TYPE (SUMMARY STRING)
             // =================================================
             const wasteType =
-              wasteTypes.length > 0
-                ? wasteTypes.join(", ")
+              uniqueWasteTypes.length > 0
+                ? uniqueWasteTypes.join(", ")
                 : "No detection";
 
             // =================================================
@@ -1560,6 +1595,12 @@ export default function PickupRequests() {
                       imageResults: (request.imageResults || []).map((img) => ({
                         ...img,
                         waste_type: manualWasteType,
+                        detections: [
+                          {
+                            class: manualWasteType,
+                            confidence: img.confidence || 0,
+                          },
+                        ],
                       })),
                     }
                   : {}),
@@ -1969,17 +2010,19 @@ export default function PickupRequests() {
                                 image,
                                 index
                               ) => {
-
-                                const detected =
-                                  image?.waste_type &&
-                                  image.waste_type !==
-                                    "Unknown";
-
-                                const confidence =
-                                  Number(
-                                    image?.confidence ||
-                                      0
-                                  );
+                                const imageDetections =
+                                  Array.isArray(image?.detections) &&
+                                  image.detections.length > 0
+                                    ? image.detections
+                                    : image?.waste_type &&
+                                      image.waste_type !== "Unknown"
+                                    ? [
+                                        {
+                                          class: image.waste_type,
+                                          confidence: image.confidence,
+                                        },
+                                      ]
+                                    : [];
 
                                 return (
                                   <div
@@ -2004,40 +2047,62 @@ export default function PickupRequests() {
                                           "11px",
                                         color:
                                           "#666",
+                                        fontWeight: 600,
+                                        marginBottom: "2px",
                                       }}
                                     >
                                       Image{" "}
                                       {index + 1}
                                     </div>
 
-                                    {detected ? (
-                                      <div>
-                                        <strong>
-                                          {
-                                            image.waste_type
-                                          }
-                                        </strong>
+                                    {imageDetections.length > 0 ? (
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: "2px",
+                                        }}
+                                      >
+                                        {imageDetections.map((det, detIdx) => {
+                                          const conf = Number(
+                                            det?.confidence || 0
+                                          );
+                                          const className =
+                                            det?.class ||
+                                            det?.class_name ||
+                                            det?.name ||
+                                            "Unknown";
+                                          const confPercent =
+                                            conf <= 1.0 ? conf * 100 : conf;
 
-                                        {confidence >
-                                          0 && (
-                                          <span>
-                                            {" "}
-                                            (
-                                            {(
-                                              confidence *
-                                              100
-                                            ).toFixed(
-                                              2
-                                            )}
-                                            %)
-                                          </span>
-                                        )}
+                                          return (
+                                            <div
+                                              key={detIdx}
+                                              style={{
+                                                fontSize: "12.5px",
+                                              }}
+                                            >
+                                              • <strong>{className}</strong>
+                                              {conf > 0 && (
+                                                <span
+                                                  style={{
+                                                    color: "#374151",
+                                                  }}
+                                                >
+                                                  {" "}(
+                                                  {confPercent.toFixed(2)}%)
+                                                </span>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     ) : (
                                       <div
                                         style={{
                                           color:
                                             "#888",
+                                          fontSize: "12px",
                                         }}
                                       >
                                         No detection

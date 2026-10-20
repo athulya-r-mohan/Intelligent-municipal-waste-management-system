@@ -79,6 +79,7 @@ class WasteCollectionSerializer(serializers.ModelSerializer):
 class WastePickupImageSerializer(serializers.ModelSerializer):
 
     image_name = serializers.SerializerMethodField()
+    detections = serializers.SerializerMethodField()
 
     class Meta:
 
@@ -90,6 +91,7 @@ class WastePickupImageSerializer(serializers.ModelSerializer):
             "image_name",
             "waste_type",
             "confidence",
+            "detections",
         ]
 
     # ========================================================
@@ -108,6 +110,48 @@ class WastePickupImageSerializer(serializers.ModelSerializer):
             pass
 
         return ""
+
+    # ========================================================
+    # DETECTIONS (WITH HISTORICAL FALLBACK)
+    # ========================================================
+
+    def get_detections(self, obj):
+
+        try:
+            raw_detections = getattr(obj, "detections", None)
+            if isinstance(raw_detections, list) and len(raw_detections) > 0:
+                result = []
+                for d in raw_detections:
+                    if isinstance(d, dict):
+                        c_name = d.get("class") or d.get("class_name") or d.get("name") or "Unknown"
+                        try:
+                            conf = float(d.get("confidence", 0))
+                        except (ValueError, TypeError):
+                            conf = 0.0
+                        result.append({
+                            "class": str(c_name).strip() if str(c_name).strip() else "Unknown",
+                            "confidence": round(conf, 4),
+                        })
+                if result:
+                    return result
+
+            # Historical fallback: if detections is empty but valid waste_type exists
+            wt = getattr(obj, "waste_type", None)
+            if wt and str(wt).strip() and str(wt).strip().lower() not in ["unknown", "none", ""]:
+                try:
+                    conf = float(getattr(obj, "confidence", 0) or 0)
+                except (ValueError, TypeError):
+                    conf = 0.0
+                return [
+                    {
+                        "class": str(wt).strip(),
+                        "confidence": round(conf, 4),
+                    }
+                ]
+        except Exception:
+            pass
+
+        return []
 
 
 # ============================================================

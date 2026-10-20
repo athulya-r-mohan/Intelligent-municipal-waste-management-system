@@ -29,10 +29,11 @@ self.addEventListener("push", (event) => {
   }
 
   const title = data.title || "EcoPulse Smart Waste";
+  const defaultIcon = new URL("/favicon.svg", self.location.origin).href;
   const options = {
     body: data.body || data.message || "New municipal waste update received.",
-    icon: data.icon || "/vite.svg",
-    badge: data.badge || "/vite.svg",
+    icon: data.icon ? new URL(data.icon, self.location.origin).href : defaultIcon,
+    badge: data.badge ? new URL(data.badge, self.location.origin).href : defaultIcon,
     vibrate: [200, 100, 200],
     data: {
       url: data.action_url || data.url || "/notifications",
@@ -57,7 +58,13 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  const targetUrl = (event.notification.data && event.notification.data.url) || "/notifications";
+  const rawUrl = (event.notification.data && event.notification.data.url) || "/notifications";
+  let targetUrl;
+  try {
+    targetUrl = new URL(rawUrl, self.location.origin).href;
+  } catch (err) {
+    targetUrl = new URL("/notifications", self.location.origin).href;
+  }
 
   event.waitUntil(
     self.clients
@@ -73,7 +80,7 @@ self.addEventListener("notificationclick", (event) => {
             return;
           }
         }
-        // Otherwise, open a new browser window
+        // Otherwise, open a new browser window to the absolute target URL
         if (self.clients.openWindow) {
           return self.clients.openWindow(targetUrl);
         }

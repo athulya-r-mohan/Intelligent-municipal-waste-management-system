@@ -1,13 +1,48 @@
 import json
 import logging
+import os
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 from pywebpush import webpush, WebPushException
+from py_vapid import Vapid
 
 from .models import Notification, PushSubscription
 
 logger = logging.getLogger(__name__)
+
+
+def _get_vapid_key_object(raw_key):
+    """
+    Safely resolves the VAPID private key into a Vapid object or supported structure.
+    Handles PEM formatted strings ('-----BEGIN PRIVATE KEY-----...'), file paths,
+    and raw base64url strings without exposing key material.
+    """
+    if not raw_key:
+        return None
+    if isinstance(raw_key, Vapid):
+        return raw_key
+    if isinstance(raw_key, str):
+        stripped = raw_key.strip()
+        if stripped.startswith("-----BEGIN"):
+            try:
+                return Vapid.from_pem(stripped.encode("utf-8"))
+            except Exception as pem_err:
+                logger.error(f"Failed to parse VAPID private key from PEM: {pem_err}")
+                return None
+        elif os.path.exists(stripped):
+            try:
+                return Vapid.from_file(stripped)
+            except Exception as file_err:
+                logger.error(f"Failed to load VAPID private key file: {file_err}")
+                return None
+        else:
+            try:
+                return Vapid.from_string(stripped)
+            except Exception as str_err:
+                logger.error(f"Failed to parse VAPID private key string: {str_err}")
+                return None
+    return raw_key
 
 
 def send_web_push(subscription, payload_data):
@@ -25,6 +60,11 @@ def send_web_push(subscription, payload_data):
         logger.warning("VAPID_PRIVATE_KEY not configured. Skipping push delivery.")
         return False
 
+    vapid_key_obj = _get_vapid_key_object(vapid_private_key)
+    if not vapid_key_obj:
+        logger.warning("Invalid VAPID_PRIVATE_KEY format. Skipping push delivery.")
+        return False
+
     subscription_info = {
         "endpoint": subscription.endpoint,
         "keys": {
@@ -38,21 +78,22 @@ def send_web_push(subscription, payload_data):
         webpush(
             subscription_info=subscription_info,
             data=payload_json,
-            vapid_private_key=vapid_private_key,
+            vapid_private_key=vapid_key_obj,
             vapid_claims={"sub": vapid_admin_email},
             ttl=86400,
         )
         return True
     except WebPushException as ex:
-        logger.warning(f"WebPush delivery failed: {ex}")
-        # Response code 404 or 410 means subscription is no longer valid or user unsubscribed
-        if ex.response and ex.response.status_code in [404, 410]:
+        logger.warning(f"WebPush delivery failed for subscription #{subscription.id}: {ex}")
+        status_code = getattr(getattr(ex, "response", None), "status_code", None)
+        err_str = str(ex).lower()
+        if (status_code in [404, 410]) or ("410 gone" in err_str) or ("404 not found" in err_str):
             subscription.is_active = False
             subscription.save(update_fields=["is_active", "updated_at"])
             logger.info(f"Deactivated expired PushSubscription #{subscription.id}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error sending web push: {e}")
+        logger.error(f"Unexpected error sending web push for subscription #{subscription.id}: {e}")
         return False
 
 

@@ -124,6 +124,7 @@ export default function StaffScheduledPickupTasks() {
           ward: item.ward || (item.ward_id ? `Ward ${item.ward_id}` : "N/A"),
           ward_id: item.ward_id ?? null,
           wasteType: item.waste_type || "Waste",
+          images: Array.isArray(item.images) ? item.images : [],
           status: item.status ? String(item.status).trim() : "PENDING",
           date: item.date || "",
           scheduledPickupDate: item.scheduled_pickup_date || null,

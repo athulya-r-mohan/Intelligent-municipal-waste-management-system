@@ -102,6 +102,12 @@ class WastePickupImage(models.Model):
         default=0.0
     )
 
+    detections = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="All AI detected objects for this image"
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
