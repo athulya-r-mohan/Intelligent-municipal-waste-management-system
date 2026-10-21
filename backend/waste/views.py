@@ -165,21 +165,19 @@ def detect_waste(request):
     # ========================================================
     # MODEL CHECK
     # ========================================================
-
     model = get_yolo_model()
-
     if model is None:
+
         return JsonResponse(
-        {
-            "success": False,
-            "message": (
-                "YOLO model could not be loaded. "
-                "Check backend/ai_models/best.pt "
-                "and the server logs."
-            ),
-        },
-        status=500,
-    )
+            {
+                "success": False,
+                "message": (
+                    "YOLO model could not be loaded. "
+                    "Check backend/ai_models/best.pt"
+                ),
+            },
+            status=500,
+        )
 
 
     # ========================================================
