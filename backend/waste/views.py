@@ -1,6 +1,8 @@
+import logging
 import json
 import os
 import tempfile
+logger = logging.getLogger(__name__)
 
 from django.db import models, transaction
 from django.http import JsonResponse
@@ -1802,33 +1804,60 @@ class DashboardStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # ONLY tasks that were assigned and explicitly marked PENDING by staff
-        pending_count = WastePickupRequest.objects.filter(
-            staff_marked_pending=True,
-            status="PENDING"
-        ).count()
-        completed_count = WastePickupRequest.objects.filter(status="COMPLETED").count()
-        assigned_count = WastePickupRequest.objects.filter(status__in=["ASSIGNED", "IN_PROGRESS"]).count()
-        in_progress_count = WastePickupRequest.objects.filter(status="IN_PROGRESS").count()
-        cancelled_count = WastePickupRequest.objects.filter(status="CANCELLED").count()
-        total_requests = WastePickupRequest.objects.count()
-        recycled_count = MCFRecyclerAssignment.objects.filter(status="COMPLETED").count()
+        try:
+            pending_count = WastePickupRequest.objects.filter(
+                staff_marked_pending=True,
+                status="PENDING"
+            ).count()
 
-        return Response(
-            {
-                "success": True,
-                "stats": {
-                    "pending_count": pending_count,
-                    "completed_count": completed_count,
-                    "assigned_count": assigned_count,
-                    "in_progress_count": in_progress_count,
-                    "cancelled_count": cancelled_count,
-                    "total_requests": total_requests,
-                    "recycled_count": recycled_count,
-                }
-            },
-            status=status.HTTP_200_OK
-        )
+            completed_count = WastePickupRequest.objects.filter(
+                status="COMPLETED"
+            ).count()
+
+            assigned_count = WastePickupRequest.objects.filter(
+                status__in=["ASSIGNED", "IN_PROGRESS"]
+            ).count()
+
+            in_progress_count = WastePickupRequest.objects.filter(
+                status="IN_PROGRESS"
+            ).count()
+
+            cancelled_count = WastePickupRequest.objects.filter(
+                status="CANCELLED"
+            ).count()
+
+            total_requests = WastePickupRequest.objects.count()
+
+            recycled_count = MCFRecyclerAssignment.objects.filter(
+                status="COMPLETED"
+            ).count()
+
+            return Response(
+                {
+                    "success": True,
+                    "stats": {
+                        "pending_count": pending_count,
+                        "completed_count": completed_count,
+                        "assigned_count": assigned_count,
+                        "in_progress_count": in_progress_count,
+                        "cancelled_count": cancelled_count,
+                        "total_requests": total_requests,
+                        "recycled_count": recycled_count,
+                    }
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception:
+            logger.exception("DashboardStatsView failed")
+            return Response(
+                {
+                    "success": False,
+                    "message": "Unable to load dashboard statistics."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 
 # ============================================================
@@ -3128,7 +3157,7 @@ class RecyclerCompleteTaskView(APIView):
 
 
 # ============================================================
-# FIXED ₹50 PICKUP PAYMENT SYSTEM VIEWS
+# FIXED â‚¹50 PICKUP PAYMENT SYSTEM VIEWS
 # ============================================================
 
 class PaymentDetailByPickupView(APIView):
@@ -3258,7 +3287,7 @@ class PaymentVerifyView(APIView):
             create_notification(
                 recipient=payment.user,
                 title="Payment Successful",
-                message=f"Your ₹50 payment for Pickup #{pickup.id} has been successfully completed. Transaction ID: {tx_id}",
+                message=f"Your â‚¹50 payment for Pickup #{pickup.id} has been successfully completed. Transaction ID: {tx_id}",
                 notification_type="PAYMENT_UPDATE",
                 related_pickup=pickup,
                 action_url="/user",
@@ -3271,7 +3300,7 @@ class PaymentVerifyView(APIView):
             user_display = payment.user.get_full_name() or payment.user.username
             notify_admins(
                 title="Pickup Payment Received",
-                message=f"Payment received for Pickup #{pickup.id}.\nUser: {user_display}\nAmount: ₹50\nPayment ID: {payment.payment_id}\nDate: {payment.payment_date.strftime('%d %b %Y')}",
+                message=f"Payment received for Pickup #{pickup.id}.\nUser: {user_display}\nAmount: â‚¹50\nPayment ID: {payment.payment_id}\nDate: {payment.payment_date.strftime('%d %b %Y')}",
                 notification_type="PAYMENT_UPDATE",
                 related_pickup=pickup,
                 action_url="/admin/payments",
@@ -3377,7 +3406,7 @@ class AdminRequestPaymentReminderView(APIView):
             create_notification(
                 recipient=payment.user,
                 title="Payment Reminder",
-                message=f"Your payment of ₹50 for Pickup #{payment.pickup_request.id} is still pending. Please complete the payment.",
+                message=f"Your payment of â‚¹50 for Pickup #{payment.pickup_request.id} is still pending. Please complete the payment.",
                 notification_type="PAYMENT_UPDATE",
                 related_pickup=payment.pickup_request,
                 action_url=f"/payment/{payment.pickup_request.id}",
