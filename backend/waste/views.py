@@ -33,7 +33,7 @@ from .serializers import (
     RewardSubmissionSerializer,
 )
 
-from ultralytics import YOLO
+
 from accounts.models import UserProfile, Staff, Recycler
 
 
@@ -90,45 +90,40 @@ print(
 print("==========================================")
 
 
+
 # ============================================================
-# LOAD YOLO MODEL
+# LAZY YOLO MODEL LOADING
 # ============================================================
 
 model = None
 
-try:
 
-    if os.path.exists(MODEL_PATH):
+def get_yolo_model():
+    global model
+
+    if model is not None:
+        return model
+
+    if not os.path.exists(MODEL_PATH):
+        print("ERROR: YOLO model not found:", MODEL_PATH)
+        return None
+
+    try:
+        from ultralytics import YOLO
+
+        print("Loading YOLO model:", MODEL_PATH)
 
         model = YOLO(MODEL_PATH)
 
-        print(
-            "YOLO MODEL LOADED SUCCESSFULLY"
-        )
+        print("YOLO MODEL LOADED SUCCESSFULLY")
+        print("MODEL CLASSES:", model.names)
 
-        print(
-            "MODEL CLASSES:",
-            model.names
-        )
+        return model
 
-    else:
+    except Exception as e:
+        print("YOLO MODEL LOAD FAILED:", str(e))
+        return None
 
-        print(
-            "ERROR: YOLO model not found:"
-        )
-
-        print(
-            MODEL_PATH
-        )
-
-except Exception as e:
-
-    print(
-        "YOLO MODEL LOAD FAILED:",
-        str(e)
-    )
-
-    model = None
 
 
 # ============================================================
@@ -171,18 +166,20 @@ def detect_waste(request):
     # MODEL CHECK
     # ========================================================
 
-    if model is None:
+    model = get_yolo_model()
 
+    if model is None:
         return JsonResponse(
-            {
-                "success": False,
-                "message": (
-                    "YOLO model could not be loaded. "
-                    "Check backend/ai_models/best.pt"
-                ),
-            },
-            status=500,
-        )
+        {
+            "success": False,
+            "message": (
+                "YOLO model could not be loaded. "
+                "Check backend/ai_models/best.pt "
+                "and the server logs."
+            ),
+        },
+        status=500,
+    )
 
 
     # ========================================================
@@ -1238,7 +1235,7 @@ class AssignPickupView(APIView):
 
         staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
         date_str_formatted = parsed_scheduled_date.strftime("%d/%m/%Y")
-        
+
         # Trigger Notifications
         try:
             create_notification(
@@ -2368,7 +2365,7 @@ class AdminAssignComplaintView(APIView):
 
         staff_user_profile = getattr(staff.user, "userprofile", None)
         staff_name = staff_user_profile.name if staff_user_profile and staff_user_profile.name else staff.user.username
-        
+
         # Trigger Notifications
         try:
             create_notification(
@@ -2748,7 +2745,7 @@ class AdminMCFDailyListView(APIView):
             d = g["date"]
             assignments_count = MCFRecyclerAssignment.objects.filter(date=d).count()
             formatted_date = d.strftime("%d %b %Y")
-            
+
             results.append({
                 "date": str(d),
                 "date_formatted": formatted_date,
@@ -2827,7 +2824,7 @@ class AdminMCFDateDetailsView(APIView):
             w_type = cat["key"]
             qty = cat["total"]
             assignment_info = assignments.get(w_type, None)
-            
+
             categories_data.append({
                 "waste_type": w_type,
                 "total_quantity": qty,
@@ -2905,14 +2902,14 @@ class AdminMCFAssignRecyclerView(APIView):
             "Miscellaneous": "miscellaneous",
         }
         db_field = field_map.get(waste_type.capitalize(), "plastic")
-        
+
         sum_result = StaffMCFCollection.objects.filter(date=target_date).aggregate(
             total=models.Sum(db_field)
         )
         total_qty = float(sum_result["total"] or 0)
 
         assigned_user = request.user if request.user and request.user.is_authenticated else None
-        
+
         assignment, created = MCFRecyclerAssignment.objects.update_or_create(
             date=target_date,
             waste_type=waste_type,
@@ -3436,7 +3433,7 @@ class AdminRecyclingHistoryMonthsView(APIView):
 
     def get(self, request):
         qs = MCFRecyclerAssignment.objects.filter(status="COMPLETED")
-        
+
         months_dict = {}
         for item in qs:
             d = item.completed_at.date() if item.completed_at else item.date
@@ -3504,7 +3501,7 @@ class AdminRecyclingHistoryCategoriesView(APIView):
         for item in matched_items:
             cat_name = item.waste_type.capitalize() if item.waste_type else "Miscellaneous"
             matched_cat = next((c for c in ai_categories if c.lower() == cat_name.lower()), "Miscellaneous")
-            
+
             category_map[matched_cat]["count"] += 1
             qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else item.total_quantity or 0)
             category_map[matched_cat]["total_kg"] += qty
@@ -4587,4 +4584,4 @@ class RecyclerAnalyticsView(APIView):
         return results
 
 
-
+
