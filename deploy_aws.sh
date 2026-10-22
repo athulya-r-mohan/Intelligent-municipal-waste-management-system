@@ -160,7 +160,17 @@ fi
 # ------------------------------------------------------------------------------
 # 3. Build & Launch Containers
 # ------------------------------------------------------------------------------
-echo -e "\n${BLUE}[3/5] Building and launching Docker containers...${NC}"
+echo -e "\n${BLUE}[3/5] Checking disk space and building Docker containers...${NC}"
+
+# Free up previous failed build artifacts, build cache, and apt cache to prevent [Errno 28] No space left on device
+echo -e "${YELLOW}[*] Cleaning previous build cache and temp data to ensure free disk space...${NC}"
+sudo docker builder prune -af --filter "until=1h" 2>/dev/null || true
+sudo docker system prune -f 2>/dev/null || true
+sudo apt-get clean 2>/dev/null || true
+sudo journalctl --vacuum-size=50M 2>/dev/null || true
+
+echo -e "${BLUE}[i] Current Disk Space:${NC}"
+df -h /
 
 sudo $DOCKER_COMPOSE down --remove-orphans || true
 sudo $DOCKER_COMPOSE build --pull

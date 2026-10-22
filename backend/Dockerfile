@@ -21,9 +21,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies first for Docker caching
+# Install Python dependencies
+# IMPORTANT: Install CPU-only PyTorch first. The default PyTorch wheel includes ~3.5GB of CUDA
+# GPU runtime libraries which exhausts disk space on AWS EC2 (Errno 28: No space left on device).
+# The CPU wheel is only ~180MB.
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
