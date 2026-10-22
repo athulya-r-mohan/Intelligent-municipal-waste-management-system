@@ -15,7 +15,7 @@ import { TaskTable, PickupRouteModal } from "./StaffTaskpage";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import StaffOptimizedRouteModal from "../components/StaffOptimizedRouteModal";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const getAccessToken = () => {
   return (

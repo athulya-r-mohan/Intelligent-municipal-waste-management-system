@@ -71,7 +71,7 @@ export default function RecycledReportModal({ record, onClose }) {
     (record.recycling_image
       ? (record.recycling_image.startsWith("http")
           ? record.recycling_image
-          : `http://127.0.0.1:8000${record.recycling_image.startsWith("/") ? "" : "/"}${record.recycling_image}`)
+          : `https://intelligent-municipal-waste-management.onrender.com${record.recycling_image.startsWith("/") ? "" : "/"}${record.recycling_image}`)
       : null);
 
   return (

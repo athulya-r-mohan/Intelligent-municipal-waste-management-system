@@ -143,7 +143,7 @@ export default function AddRecyclerForm() {
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/add-recycler/",
+        "https://intelligent-municipal-waste-management.onrender.com/api/add-recycler/",
         {
           name: form.name,
           email: form.email,

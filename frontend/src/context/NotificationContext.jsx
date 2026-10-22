@@ -4,7 +4,7 @@ import { playNotificationSound, unlockAudio } from "../utils/sound";
 import { getAccessToken, getUserRole } from "../utils/auth";
 import { BellRing, X } from "lucide-react";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com/api";
 
 const NotificationContext = createContext(null);
 

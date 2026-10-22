@@ -23,7 +23,7 @@ import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminMCFDetails.css";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const CATEGORY_ICONS = {
   Paper: "📄",

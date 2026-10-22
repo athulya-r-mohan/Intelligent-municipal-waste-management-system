@@ -340,7 +340,7 @@ export default function EcoPulseLogin() {
 
   try {
     const response = await axios.post(
-      "http://127.0.0.1:8000/api/login/",
+      "https://intelligent-municipal-waste-management.onrender.com/api/login/",
       {
         email: formData.email,
         password: formData.password,

@@ -134,7 +134,7 @@ export default function AddStaffForm() {
 
   try {
     const response = await axios.post(
-      "http://127.0.0.1:8000/api/add-staff/",
+      "https://intelligent-municipal-waste-management.onrender.com/api/add-staff/",
       {
         name: form.name,
         email: form.email,

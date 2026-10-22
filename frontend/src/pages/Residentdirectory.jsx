@@ -229,7 +229,7 @@ export default function ResidentDirectory({ onBack }) {
 
   const fetchWards = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/wards/");
+      const response = await axios.get("https://intelligent-municipal-waste-management.onrender.com/api/wards/");
       if (Array.isArray(response.data) && response.data.length > 0) {
         const numbers = response.data.map((w) => `Ward ${w.ward_number}`);
         const set = new Set(["All Wards", ...numbers]);
@@ -245,7 +245,7 @@ export default function ResidentDirectory({ onBack }) {
       setLoading(true);
 
       const response = await axios.get(
-        "http://127.0.0.1:8000/api/resident-directory/"
+        "https://intelligent-municipal-waste-management.onrender.com/api/resident-directory/"
       );
 
       setResidents(response.data);

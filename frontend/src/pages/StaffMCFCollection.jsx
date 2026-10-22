@@ -15,7 +15,7 @@ import {
 import NotificationBell from "../components/NotificationBell";
 import "../components/StaffMCFCollection.css";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const CATEGORIES = [
   {
