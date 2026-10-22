@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import NotificationBell from "../components/NotificationBell";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import { performLogout } from "../utils/auth";
+import { getFullImageUrl } from "../utils/imageUrl";
 import {
   LayoutDashboard,
   Building2,
@@ -396,7 +397,7 @@ export default function EcoPulseAdmin() {
                           {rewardSubmissions.slice(0, 3).map((sub, idx) => (
                             <img
                               key={sub.id || idx}
-                              src={sub.photo_url || `${API_BASE_URL}${sub.photo}`}
+                              src={getFullImageUrl(sub.photo_url || sub.photo)}
                               alt={sub.user_name || "Submission"}
                               style={{
                                 width: "32px",
@@ -607,13 +608,13 @@ export default function EcoPulseAdmin() {
                         boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
                       }}
                       onClick={() => {
-                        const fullImg = selectedSubmission.photo_url || (selectedSubmission.photo ? `${API_BASE_URL}${selectedSubmission.photo}` : "");
+                        const fullImg = getFullImageUrl(selectedSubmission.photo_url || selectedSubmission.photo);
                         if (fullImg) setSelectedRewardPhoto(fullImg);
                       }}
                     >
                       {selectedSubmission.photo_url || selectedSubmission.photo ? (
                         <img
-                          src={selectedSubmission.photo_url || `${API_BASE_URL}${selectedSubmission.photo}`}
+                          src={getFullImageUrl(selectedSubmission.photo_url || selectedSubmission.photo)}
                           alt={`Submission proof by ${selectedSubmission.user_name}`}
                           style={{ width: "100%", height: "100%", objectFit: "contain", background: "#f8fafc" }}
                         />
@@ -1196,7 +1197,7 @@ export default function EcoPulseAdmin() {
                           return true;
                         })
                         .map((item) => {
-                          const imgUrl = item.photo_url || (item.photo ? `${API_BASE_URL}${item.photo}` : "");
+                          const imgUrl = getFullImageUrl(item.photo_url || item.photo);
                           const currentStatus = item.computed_status || item.status || "Pending";
                           const isAssigned = Boolean(item.points || currentStatus === "Active" || currentStatus === "Reward Assigned" || currentStatus === "Claimed" || currentStatus === "Expired");
                           const isClaimed = currentStatus === "Claimed";

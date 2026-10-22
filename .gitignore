@@ -18,7 +18,7 @@ env/
 
 # Django
 *.sqlite3
-backend/media/
+# backend/media/ (tracked so deployed backend on Render has uploaded media files)
 
 # VS Code
 .vscode/

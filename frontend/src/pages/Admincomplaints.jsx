@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getFullImageUrl } from "../utils/imageUrl";
 import {
   ArrowLeft,
   Activity,
@@ -506,13 +507,13 @@ export default function Admincomplaints() {
                           className="ac-thumb-box"
                           onClick={() =>
                             setPreviewImage({
-                              url: c.image_url || c.image,
+                              url: getFullImageUrl(c.image_url || c.image),
                               title: `Complaint #${c.id} Original Waste Photo`,
                             })
                           }
                           title="Click to zoom original waste photo"
                         >
-                          <img src={c.image_url || c.image} alt="Original Evidence" />
+                          <img src={getFullImageUrl(c.image_url || c.image)} alt="Original Evidence" />
                         </div>
                       ) : (
                         <div
@@ -532,13 +533,13 @@ export default function Admincomplaints() {
                           style={{ borderColor: "#86efac", background: "#f0fdf4" }}
                           onClick={() =>
                             setPreviewImage({
-                              url: c.proof_image_url || c.proof_image,
+                              url: getFullImageUrl(c.proof_image_url || c.proof_image),
                               title: `Complaint #${c.id} Waste Cleared Proof Photo`,
                             })
                           }
                           title="Click to zoom staff clearance proof"
                         >
-                          <img src={c.proof_image_url || c.proof_image} alt="Cleared Proof" />
+                          <img src={getFullImageUrl(c.proof_image_url || c.proof_image)} alt="Cleared Proof" />
                         </div>
                       ) : c.status === "RESOLVED" ? (
                         <span style={{ fontSize: 11.5, color: "#16a34a", fontWeight: 600 }}>Resolved</span>

@@ -7,6 +7,7 @@ import PaymentReceiptModal from "../components/PaymentReceiptModal";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import PickupInstructionModal from "../components/PickupInstructionModal";
 import { performLogout, getAccessToken } from "../utils/auth";
+import { getFullImageUrl } from "../utils/imageUrl";
 import { Receipt, Award, CheckCircle2, Clock, FileText } from "lucide-react";
  
 const WARD_DATA = [
@@ -1611,11 +1612,11 @@ export default function EcoPulseStaff() {
                           <button
                             type="button"
                             className="ep-image-thumb-btn"
-                            onClick={() => setPreviewImage(latestPickup.images[0].image)}
+                            onClick={() => setPreviewImage(getFullImageUrl(latestPickup.images[0].image))}
                             title="Click to view submitted waste photo"
                           >
                             <img
-                              src={latestPickup.images[0].image}
+                              src={getFullImageUrl(latestPickup.images[0].image)}
                               alt="Submitted waste"
                               className="ep-thumb-img"
                             />
@@ -1626,11 +1627,11 @@ export default function EcoPulseStaff() {
                           <button
                             type="button"
                             className="ep-image-thumb-btn"
-                            onClick={() => setPreviewImage(latestPickup.completion_image)}
+                            onClick={() => setPreviewImage(getFullImageUrl(latestPickup.completion_image))}
                             title="Click to view completion proof photo"
                           >
                             <img
-                              src={latestPickup.completion_image}
+                              src={getFullImageUrl(latestPickup.completion_image)}
                               alt="Completion proof"
                               className="ep-thumb-img"
                             />
@@ -2265,11 +2266,11 @@ export default function EcoPulseStaff() {
                               <button
                                 type="button"
                                 className="ep-image-thumb-btn"
-                                onClick={() => setPreviewImage(c.image_url || c.image)}
+                                onClick={() => setPreviewImage(getFullImageUrl(c.image_url || c.image))}
                                 title="Click to view original waste photo"
                               >
                                 <img
-                                  src={c.image_url || c.image}
+                                  src={getFullImageUrl(c.image_url || c.image)}
                                   alt="Reported waste"
                                   className="ep-thumb-img"
                                 />
@@ -2545,9 +2546,9 @@ export default function EcoPulseStaff() {
                     </div>
                     {selectedComplaintDetail.image_url || selectedComplaintDetail.image ? (
                       <img
-                        src={selectedComplaintDetail.image_url || selectedComplaintDetail.image}
+                        src={getFullImageUrl(selectedComplaintDetail.image_url || selectedComplaintDetail.image)}
                         alt="Original Waste"
-                        onClick={() => setPreviewImage(selectedComplaintDetail.image_url || selectedComplaintDetail.image)}
+                        onClick={() => setPreviewImage(getFullImageUrl(selectedComplaintDetail.image_url || selectedComplaintDetail.image))}
                         style={{
                           width: "100%",
                           height: 140,
@@ -2579,9 +2580,9 @@ export default function EcoPulseStaff() {
                     </div>
                     {selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image ? (
                       <img
-                        src={selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image}
+                        src={getFullImageUrl(selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image)}
                         alt="Cleared Waste Proof"
-                        onClick={() => setPreviewImage(selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image)}
+                        onClick={() => setPreviewImage(getFullImageUrl(selectedComplaintDetail.proof_image_url || selectedComplaintDetail.proof_image))}
                         style={{
                           width: "100%",
                           height: 140,

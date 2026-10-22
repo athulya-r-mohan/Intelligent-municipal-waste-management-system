@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getFullImageUrl } from "../utils/imageUrl";
 import {
   ChevronDown,
   Upload,
@@ -493,11 +494,7 @@ export default function TaskStatusUpdate() {
                       ? [{ class: img.waste_type, confidence: img.confidence }]
                       : [];
 
-                  const imgUrl = img.image
-                    ? img.image.startsWith("http://") || img.image.startsWith("https://")
-                      ? img.image
-                      : `${API_BASE_URL}${img.image.startsWith("/") ? "" : "/"}${img.image}`
-                    : null;
+                  const imgUrl = getFullImageUrl(img.image);
 
                   return (
                     <div

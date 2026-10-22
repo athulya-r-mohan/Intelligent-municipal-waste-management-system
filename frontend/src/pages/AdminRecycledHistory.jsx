@@ -5,6 +5,7 @@ import NotificationBell from "../components/NotificationBell";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import RecycledReportModal from "../components/RecycledReportModal";
 import { performLogout } from "../utils/auth";
+import { getFullImageUrl } from "../utils/imageUrl";
 import "../components/Adminpage.css";
 import {
   LayoutDashboard,
@@ -559,14 +560,14 @@ export default function AdminRecycledHistory() {
                         <td style={{ padding: "14px" }}>
                           {r.recycling_image_url || r.recycling_image ? (
                             <a
-                              href={r.recycling_image_url || (r.recycling_image?.startsWith("http") ? r.recycling_image : `${API_BASE_URL}${r.recycling_image}`)}
+                              href={getFullImageUrl(r.recycling_image_url || r.recycling_image)}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="View full recycling proof"
                               style={{ display: "inline-block", textDecoration: "none" }}
                             >
                               <img
-                                src={r.recycling_image_url || (r.recycling_image?.startsWith("http") ? r.recycling_image : `${API_BASE_URL}${r.recycling_image}`)}
+                                src={getFullImageUrl(r.recycling_image_url || r.recycling_image)}
                                 alt="Recycling Proof"
                                 style={{
                                   width: 44,

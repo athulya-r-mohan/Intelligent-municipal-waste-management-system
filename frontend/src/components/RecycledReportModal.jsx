@@ -1,6 +1,7 @@
 import React from "react";
 import { Printer, X, FileText, CheckCircle2, ShieldCheck, Building2, User, MapPin, Camera } from "lucide-react";
 import "./RecycledReportModal.css";
+import { getFullImageUrl } from "../utils/imageUrl";
 
 const formatDate = (dateString, includeTime = false) => {
   if (!dateString) return "N/A";
@@ -66,13 +67,7 @@ export default function RecycledReportModal({ record, onClose }) {
   const noteText =
     record.note && record.note.trim() ? record.note.trim() : "No note provided";
 
-  const imgSrc =
-    record.recycling_image_url ||
-    (record.recycling_image
-      ? (record.recycling_image.startsWith("http")
-          ? record.recycling_image
-          : `https://intelligent-municipal-waste-management.onrender.com${record.recycling_image.startsWith("/") ? "" : "/"}${record.recycling_image}`)
-      : null);
+  const imgSrc = getFullImageUrl(record.recycling_image_url || record.recycling_image);
 
   return (
     <div className="ep-report-overlay" onClick={onClose}>

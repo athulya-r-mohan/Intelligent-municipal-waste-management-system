@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getFullImageUrl } from "../utils/imageUrl";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -1672,9 +1673,9 @@ function ComplaintTaskTable({
               <td style={{ padding: "14px 16px" }}>
                 {c.image_url || c.image ? (
                   <img
-                    src={c.image_url || c.image}
+                    src={getFullImageUrl(c.image_url || c.image)}
                     alt="Waste"
-                    onClick={() => onPreviewImage(c.image_url || c.image)}
+                    onClick={() => onPreviewImage(getFullImageUrl(c.image_url || c.image))}
                     style={{
                       width: 44,
                       height: 44,

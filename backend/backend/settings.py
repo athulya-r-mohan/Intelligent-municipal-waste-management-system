@@ -32,8 +32,7 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
-    "https://ecopulse-nine-pi.vercel.app",
-    "localhost,127.0.0.1"
+    "ecopulse-nine-pi.vercel.app,localhost,127.0.0.1,.onrender.com"
 ).split(",")
 
 
@@ -145,6 +144,7 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
