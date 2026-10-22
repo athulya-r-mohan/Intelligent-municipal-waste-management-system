@@ -1,0 +1,91 @@
+services:
+  # ============================================================
+  # POSTGRESQL DATABASE SERVICE
+  # ============================================================
+  db:
+    image: postgres:16-alpine
+    container_name: ecopulse_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-waste_management}
+      POSTGRES_USER: ${DB_USER:-ecopulse_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecopulse_secure_password_123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ecopulse_user} -d $${POSTGRES_DB:-waste_management}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "5432:5432"
+    networks:
+      - ecopulse_net
+
+  # ============================================================
+  # DJANGO BACKEND WSGI SERVICE (GUNICORN + WHITENOISE)
+  # ============================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecopulse_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Database connection
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-waste_management}
+      DB_USER: ${DB_USER:-ecopulse_user}
+      DB_PASSWORD: ${DB_PASSWORD:-ecopulse_secure_password_123}
+      DB_SSL_REQUIRE: "False"
+
+      # Django configuration
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-production-key-replace-me-with-random-secret}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      
+      # CORS & CSRF
+      CORS_ALLOW_ALL_ORIGINS: ${CORS_ALLOW_ALL_ORIGINS:-True}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,https://ecopulse-nine-pi.vercel.app}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,https://ecopulse-nine-pi.vercel.app}
+
+      # Gunicorn worker settings
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+
+      # Web Push / VAPID Keys
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_ADMIN_EMAIL: ${VAPID_ADMIN_EMAIL:-admin@ecopulse.gov.in}
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    ports:
+      - "${PORT:-8000}:8000"
+    networks:
+      - ecopulse_net
+
+# ============================================================
+# PERSISTENT VOLUMES & NETWORKS
+# ============================================================
+volumes:
+  postgres_data:
+    name: ecopulse_postgres_data
+  media_data:
+    name: ecopulse_media_data
+  static_data:
+    name: ecopulse_static_data
+
+networks:
+  ecopulse_net:
+    name: ecopulse_network
+    driver: bridge

@@ -30,10 +30,14 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = os.environ.get(
-    "ALLOWED_HOSTS",
-    "ecopulse-nine-pi.vercel.app,localhost,127.0.0.1,.onrender.com"
-).split(",")
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get(
+        "ALLOWED_HOSTS",
+        "*"
+    ).split(",")
+    if h.strip()
+]
 
 
 # Application definition
@@ -55,6 +59,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -88,22 +93,39 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'waste-management',
-        'USER': 'postgres',
-        'PASSWORD': 'athulya123',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
+DB_SSL_REQUIRE = os.environ.get("DB_SSL_REQUIRE", "False").lower() in ("true", "1")
+
 if os.environ.get("DATABASE_URL"):
-    DATABASES["default"] = dj_database_url.config(
-        conn_max_age=600,
-        conn_health_checks=True,
-        ssl_require=True,
-    )
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get("DATABASE_URL"),
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=DB_SSL_REQUIRE,
+        )
+    }
+elif os.environ.get("DB_HOST"):
+    DATABASES = {
+        "default": {
+            "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.postgresql"),
+            "NAME": os.environ.get("DB_NAME", "waste-management"),
+            "USER": os.environ.get("DB_USER", "postgres"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "athulya123"),
+            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'waste-management',
+            'USER': 'postgres',
+            'PASSWORD': 'athulya123',
+            'HOST': 'localhost',
+            'PORT': '5432',
+        }
+    }
 
 
 # Password validation
@@ -140,17 +162,26 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://ecopulse-nine-pi.vercel.app",
-]
+CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "False").lower() in ("true", "1")
+cors_origins_env = os.environ.get(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,https://ecopulse-nine-pi.vercel.app"
+)
+CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
+csrf_trusted_env = os.environ.get(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,https://ecopulse-nine-pi.vercel.app"
+)
+CSRF_TRUSTED_ORIGINS = [c.strip() for c in csrf_trusted_env.split(",") if c.strip()]
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
