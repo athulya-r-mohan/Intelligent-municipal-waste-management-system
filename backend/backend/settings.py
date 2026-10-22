@@ -32,7 +32,7 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
-    "https://ecopulse-nine-pi.vercel.app/",
+    "https://ecopulse-nine-pi.vercel.app",
     "localhost,127.0.0.1"
 ).split(",")
 
