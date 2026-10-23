@@ -184,3 +184,20 @@ chmod +x add_domain.sh
 4. Recreates the backend Docker container so Django applies the new configuration immediately.
 5. *(Optional / Recommended)* Sets up **Nginx reverse proxy** (proxying port 80/443 to Gunicorn port 8000) and provisions an automated **Let's Encrypt SSL certificate** via Certbot.
 
+---
+
+## Continuous Deployment (CI/CD with GitHub Actions)
+
+An automated deployment pipeline is configured in [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml). Every time you push backend changes to the `main` branch, GitHub Actions automatically connects to your AWS EC2 instance, pulls the new code, rebuilds the container, and runs migrations without downtime.
+
+### Required GitHub Secrets:
+Go to **GitHub Repo** ➔ **Settings** ➔ **Secrets and variables** ➔ **Actions** ➔ **New repository secret**:
+
+| Secret Name | Value | Example |
+| :--- | :--- | :--- |
+| `EC2_HOST` | Your EC2 Public IP or Domain | `ecopulse.femsphere.me` or `18.60.39.148` |
+| `EC2_USER` | EC2 SSH username | `ubuntu` |
+| `EC2_SSH_KEY` | Entire content of your `.pem` private key | `-----BEGIN RSA PRIVATE KEY-----...` |
+| `EC2_PORT` *(Optional)* | SSH port (defaults to 22) | `22` |
+
+

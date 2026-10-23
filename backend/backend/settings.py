@@ -208,3 +208,5 @@ VAPID_ADMIN_EMAIL = os.environ.get(
     "mailto:admin@ecopulse.local"
 )
 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+

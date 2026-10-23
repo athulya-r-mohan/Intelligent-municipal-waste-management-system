@@ -1,0 +1,65 @@
+name: Deploy Backend to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  deploy:
+    name: Build & Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 Starting automated deployment on AWS EC2..."
+            
+            # Navigate to project repository
+            cd ~/Intelligent-municipal-waste-management-system
+            
+            # Pull latest changes from main branch
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Navigate to backend directory
+            cd backend
+            
+            # Build and recreate backend container
+            echo "📦 Building updated backend Docker image..."
+            sudo docker compose build backend
+            
+            echo "🔄 Restarting backend service..."
+            sudo docker compose up -d backend
+            
+            # Run database migrations
+            echo "🗄️ Running database migrations..."
+            sudo docker compose exec -T backend python manage.py migrate --noinput
+            
+            # Collect static files
+            echo "📁 Collecting static assets..."
+            sudo docker compose exec -T backend python manage.py collectstatic --noinput
+            
+            # Clean up old dangling images to preserve EC2 disk space
+            echo "🧹 Cleaning unused Docker images..."
+            sudo docker image prune -f
+            
+            # Verify status
+            echo "✅ Deployment verification:"
+            sudo docker compose ps backend
+            
+            echo "🎉 EcoPulse Backend successfully updated and running!"
