@@ -154,3 +154,33 @@ const API = axios.create({
 
 export default API;
 ```
+
+---
+
+## Adding a Custom Domain & SSL (`add_domain.sh`)
+
+When you want to connect a custom domain (e.g., `api.ecopulse.org` or `backend.yourdomain.com`) and secure it with free Let's Encrypt SSL (HTTPS):
+
+### Step 1: Point your DNS
+In your DNS provider (Route 53, Cloudflare, GoDaddy, Namecheap):
+- Create an **A Record** pointing `api.yourdomain.com` to your **AWS EC2 Public IP**.
+
+### Step 2: Run `add_domain.sh`
+On your AWS EC2 instance:
+```bash
+chmod +x add_domain.sh
+
+# Interactive Wizard:
+./add_domain.sh
+
+# Or 1-line command with SSL:
+./add_domain.sh -d api.ecopulse.org -f ecopulse.vercel.app --ssl -e admin@ecopulse.org
+```
+
+### What `add_domain.sh` does automatically:
+1. Safely backs up `.env` to `.env.bak.<timestamp>`.
+2. Appends your domain to `ALLOWED_HOSTS` in `.env`.
+3. Adds `https://` and `http://` variants to `CSRF_TRUSTED_ORIGINS` and `CORS_ALLOWED_ORIGINS`.
+4. Recreates the backend Docker container so Django applies the new configuration immediately.
+5. *(Optional / Recommended)* Sets up **Nginx reverse proxy** (proxying port 80/443 to Gunicorn port 8000) and provisions an automated **Let's Encrypt SSL certificate** via Certbot.
+

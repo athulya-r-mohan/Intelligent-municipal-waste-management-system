@@ -25,8 +25,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
 import "../components/ProfilePage.css";
-
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 
 export default function ProfilePage() {
   const navigate = useNavigate();

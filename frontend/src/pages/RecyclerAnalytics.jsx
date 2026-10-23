@@ -40,8 +40,8 @@ import NotificationBell from "../components/NotificationBell";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import RecyclerMonthlyReportModal from "../components/RecyclerMonthlyReportModal";
 import { performLogout, getUserName } from "../utils/auth";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/recycler" },
@@ -141,20 +141,20 @@ export default function RecyclerAnalytics() {
     });
   }, []);
 
-  // Prepare Waste Assigned / Came for Recycling Chart Data
+  // Prepare Waste Collected / Assigned for Recycling Chart Data (Graph 1)
   const wasteAssignedData = useMemo(() => {
     if (!analyticsData?.waste_assigned?.categories) return [];
     return analyticsData.waste_assigned.categories.map((c) => ({
       category: c.category,
-      "Received Waste (kg)": Number(c.assigned_kg || 0),
+      "Collected Waste (kg)": Number(c.assigned_kg != null ? c.assigned_kg : c.collected_kg || 0),
     }));
   }, [analyticsData]);
 
   const hasAssignedData = useMemo(() => {
-    return wasteAssignedData.some((c) => c["Received Waste (kg)"] > 0);
+    return wasteAssignedData.some((c) => c["Collected Waste (kg)"] > 0);
   }, [wasteAssignedData]);
 
-  // Prepare Recycled Waste Chart Data
+  // Prepare Waste Recycled by Category Chart Data (Graph 2)
   const recycledWasteData = useMemo(() => {
     if (!analyticsData?.recycled_waste?.categories) return [];
     return analyticsData.recycled_waste.categories.map((c) => ({
@@ -167,25 +167,28 @@ export default function RecyclerAnalytics() {
     return recycledWasteData.some((c) => c["Recycled (kg)"] > 0);
   }, [recycledWasteData]);
 
-  // Prepare Previous Month vs Current Month Comparison Data (Received vs Recycled)
+  // Prepare Previous Month vs Current Month Recycling Comparison Data (Graph 3)
   const comparisonData = useMemo(() => {
-    if (!analyticsData?.recycler_comparison) return [];
+    const list = analyticsData?.recycling_comparison || analyticsData?.recycler_comparison;
+    if (!list || !Array.isArray(list)) return [];
     const prevLabel = analyticsData?.previous_month?.label || "Previous Month";
     const currLabel = analyticsData?.current_month?.label || "Current Month";
 
-    return analyticsData.recycler_comparison.map((item) => ({
-      metric: item.metric,
-      [prevLabel]: Number(item.prev_month || 0),
-      [currLabel]: Number(item.curr_month || 0),
+    return list.map((item) => ({
+      category: item.category || item.metric || "Other",
+      [prevLabel]: Number(item.prev_month_kg != null ? item.prev_month_kg : item.prev_month || 0),
+      [currLabel]: Number(item.curr_month_kg != null ? item.curr_month_kg : item.curr_month || 0),
     }));
   }, [analyticsData]);
 
   const hasComparisonData = useMemo(() => {
-    if (!analyticsData?.recycler_comparison) return false;
-    return analyticsData.recycler_comparison.some(
-      (c) => Number(c.prev_month || 0) > 0 || Number(c.curr_month || 0) > 0
+    if (!comparisonData || comparisonData.length === 0) return false;
+    const prevLabel = analyticsData?.previous_month?.label || "Previous Month";
+    const currLabel = analyticsData?.current_month?.label || "Current Month";
+    return comparisonData.some(
+      (c) => Number(c[prevLabel] || 0) > 0 || Number(c[currLabel] || 0) > 0
     );
-  }, [analyticsData]);
+  }, [comparisonData, analyticsData]);
 
   const orgDisplayName =
     analyticsData?.organization || getUserName() || "Industrial Recycler";
@@ -352,25 +355,39 @@ export default function RecyclerAnalytics() {
                 <div className="analytics-kpi-sub">
                   <span>Dynamic baseline comparison</span>
                 </div>
+                {analyticsData.previous_month && (
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      className="analytics-btn-download"
+                      style={{ width: "100%", justifyContent: "center", padding: "7px 10px", fontSize: "12px", gap: 6 }}
+                      onClick={() => handleOpenReport(analyticsData.previous_month)}
+                      disabled={reportLoading}
+                      title={`Download official report for ${analyticsData.previous_month.label}`}
+                    >
+                      <Download size={13} />
+                      Download Previous Month Report
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* CHARTS GRID: 2 COLUMNS */}
             <div className="analytics-charts-grid">
-              {/* CHART 1: WASTE CAME FOR RECYCLING GRAPH */}
+              {/* CHART 1: WASTE COLLECTED BY CATEGORY (GRAPH 1) */}
               <div className="analytics-chart-card">
                 <div className="analytics-chart-header">
                   <div>
                     <h3>
                       <Inbox size={18} color="#1E6B4E" />
-                      Waste Came for Recycling
+                      Waste Collected by Category
                     </h3>
                     <p>
-                      {analyticsData.current_month?.label} &bull; Material Assigned by Category
+                      {analyticsData.current_month?.label} &bull; Assigned Intake by Waste Category
                     </p>
                   </div>
                   <span className="analytics-chart-badge">
-                    Total Assigned: {analyticsData.waste_assigned?.total_assigned_kg || 0} kg
+                    Total Collected: {analyticsData.waste_assigned?.total_assigned_kg || 0} kg
                   </span>
                 </div>
 
@@ -378,7 +395,7 @@ export default function RecyclerAnalytics() {
                   {!hasAssignedData ? (
                     <div className="analytics-empty-chart">
                       <Inbox size={28} opacity={0.4} />
-                      <div>No waste assigned for recycling in {analyticsData.current_month?.label}.</div>
+                      <div>No waste collected/assigned for recycling in {analyticsData.current_month?.label}.</div>
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={260}>
@@ -396,7 +413,7 @@ export default function RecyclerAnalytics() {
                         />
                         <YAxis tick={{ fill: "#64748B", fontSize: 11 }} unit=" kg" />
                         <Tooltip
-                          formatter={(value) => [`${value} kg`, "Received Waste"]}
+                          formatter={(value) => [`${value} kg`, "Collected Waste"]}
                           contentStyle={{
                             backgroundColor: "#FFFFFF",
                             borderRadius: "10px",
@@ -405,7 +422,7 @@ export default function RecyclerAnalytics() {
                           }}
                         />
                         <Bar
-                          dataKey="Received Waste (kg)"
+                          dataKey="Collected Waste (kg)"
                           fill="#1E6B4E"
                           radius={[6, 6, 0, 0]}
                         />
@@ -415,16 +432,16 @@ export default function RecyclerAnalytics() {
                 </div>
               </div>
 
-              {/* CHART 2: RECYCLED WASTE GRAPH */}
+              {/* CHART 2: WASTE RECYCLED BY CATEGORY (GRAPH 2) */}
               <div className="analytics-chart-card">
                 <div className="analytics-chart-header">
                   <div>
                     <h3>
                       <Recycle size={18} color="#059669" />
-                      Recycled Waste
+                      Waste Recycled by Category
                     </h3>
                     <p>
-                      {analyticsData.current_month?.label} &bull; Processed Output by Category
+                      {analyticsData.current_month?.label} &bull; Verified Completed Output by Category
                     </p>
                   </div>
                   <span className="analytics-chart-badge" style={{ background: "#ecfdf5", color: "#059669" }}>
@@ -436,7 +453,7 @@ export default function RecyclerAnalytics() {
                   {!hasRecycledData ? (
                     <div className="analytics-empty-chart">
                       <Recycle size={28} opacity={0.4} />
-                      <div>No recycling activity completed yet in {analyticsData.current_month?.label}.</div>
+                      <div>No completed recycling activity fulfilled yet in {analyticsData.current_month?.label}.</div>
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={260}>
@@ -454,7 +471,7 @@ export default function RecyclerAnalytics() {
                         />
                         <YAxis tick={{ fill: "#64748B", fontSize: 11 }} unit=" kg" />
                         <Tooltip
-                          formatter={(value) => [`${value} kg`, "Recycled Material"]}
+                          formatter={(value) => [`${value} kg`, "Actually Recycled"]}
                           contentStyle={{
                             backgroundColor: "#FFFFFF",
                             borderRadius: "10px",
@@ -473,20 +490,20 @@ export default function RecyclerAnalytics() {
                 </div>
               </div>
 
-              {/* CHART 3: RECYCLER COMPARISON GRAPH (FULL WIDTH) */}
+              {/* CHART 3: PREVIOUS MONTH VS CURRENT MONTH RECYCLING (GRAPH 3) */}
               <div className="analytics-chart-card full-width">
                 <div className="analytics-chart-header">
                   <div>
                     <h3>
                       <TrendingUp size={18} color="#1E6B4E" />
-                      Previous Month vs Current Month
+                      Previous Month vs Current Month Recycling
                     </h3>
                     <p>
-                      {analyticsData.previous_month?.label} vs {analyticsData.current_month?.label} &bull; Waste Received vs Waste Recycled
+                      {analyticsData.previous_month?.label} vs {analyticsData.current_month?.label} &bull; Recycled Waste Comparison by Category
                     </p>
                   </div>
                   <span className="analytics-chart-badge" style={{ background: "#f8fafc", color: "#475569" }}>
-                    Grouped Comparison
+                    Grouped Category Comparison
                   </span>
                 </div>
 
@@ -494,18 +511,21 @@ export default function RecyclerAnalytics() {
                   {!hasComparisonData ? (
                     <div className="analytics-empty-chart">
                       <TrendingUp size={28} opacity={0.4} />
-                      <div>No recycling comparison data available between these months.</div>
+                      <div>No completed recycling records found to compare between {analyticsData.previous_month?.label} and {analyticsData.current_month?.label}.</div>
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={260}>
                       <BarChart
                         data={comparisonData}
-                        margin={{ top: 10, right: 10, left: -10, bottom: 10 }}
+                        margin={{ top: 10, right: 10, left: -10, bottom: 20 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                         <XAxis
-                          dataKey="metric"
-                          tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }}
+                          dataKey="category"
+                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
                         />
                         <YAxis tick={{ fill: "#64748B", fontSize: 11 }} unit=" kg" />
                         <Tooltip
@@ -525,7 +545,7 @@ export default function RecyclerAnalytics() {
                         />
                         <Bar
                           dataKey={analyticsData.current_month?.label || "Current Month"}
-                          fill="#1E6B4E"
+                          fill="#059669"
                           radius={[4, 4, 0, 0]}
                         />
                       </BarChart>
@@ -537,7 +557,7 @@ export default function RecyclerAnalytics() {
 
             {/* MONTHLY REPORTS SECTION */}
             <div className="analytics-reports-section">
-              <div className="analytics-reports-header">
+              <div className="analytics-reports-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                 <div>
                   <h3>
                     <FileText size={18} color="#1E6B4E" />
@@ -545,6 +565,17 @@ export default function RecyclerAnalytics() {
                   </h3>
                   <p>Access and download certified historical monthly municipal waste analytics reports</p>
                 </div>
+                {analyticsData?.previous_month && (
+                  <button
+                    className="analytics-btn-download"
+                    style={{ background: "#1E6B4E", color: "#ffffff", border: "none", padding: "8px 14px", fontWeight: 600 }}
+                    onClick={() => handleOpenReport(analyticsData.previous_month)}
+                    disabled={reportLoading}
+                  >
+                    <Download size={14} />
+                    Download Previous Month Report ({analyticsData.previous_month.label})
+                  </button>
+                )}
               </div>
 
               {!analyticsData.monthly_reports || analyticsData.monthly_reports.length === 0 ? (

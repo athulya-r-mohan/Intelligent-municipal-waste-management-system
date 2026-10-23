@@ -4429,8 +4429,9 @@ class RecyclerAnalyticsView(APIView):
         curr_month = now.month
 
         # Query param for specific historical month report
-        req_year = request.query_params.get("year")
-        req_month = request.query_params.get("month")
+        query_params = getattr(request, "query_params", getattr(request, "GET", {}))
+        req_year = query_params.get("year")
+        req_month = query_params.get("month")
 
         if req_year and req_month:
             try:
@@ -4462,9 +4463,23 @@ class RecyclerAnalyticsView(APIView):
         prev_month_data = self._calculate_month_analytics(recycler, prev_year, prev_month)
 
         prev_label = date(prev_year, prev_month, 1).strftime("%B %Y")
-        curr_label = now.strftime("%B %Y")
+        curr_label = date(curr_year, curr_month, 1).strftime("%B %Y")
 
-        comparison = [
+        # Category-wise recycling comparison (Graph 3: Previous vs Current Month Recycled Waste by Category)
+        categories = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+        curr_recycled_map = {c["category"]: c["recycled_kg"] for c in curr_month_data["recycled_waste"]["categories"]}
+        prev_recycled_map = {c["category"]: c["recycled_kg"] for c in prev_month_data["recycled_waste"]["categories"]}
+
+        recycled_comparison = []
+        for cat in categories:
+            recycled_comparison.append({
+                "category": cat,
+                "prev_month_kg": prev_recycled_map.get(cat, 0.0),
+                "curr_month_kg": curr_recycled_map.get(cat, 0.0),
+            })
+
+        # Metric-level summary comparison (for backward compatibility)
+        metric_comparison = [
             {
                 "metric": "Waste Received",
                 "prev_month": prev_month_data["waste_assigned"]["total_assigned_kg"],
@@ -4499,7 +4514,9 @@ class RecyclerAnalyticsView(APIView):
             },
             "waste_assigned": curr_month_data["waste_assigned"],
             "recycled_waste": curr_month_data["recycled_waste"],
-            "recycler_comparison": comparison,
+            "recycling_comparison": recycled_comparison,
+            "recycler_comparison": recycled_comparison,
+            "metric_comparison": metric_comparison,
             "task_status": curr_month_data["task_status"],
             "monthly_reports": available_months,
         }, status=status.HTTP_200_OK)
@@ -4509,12 +4526,12 @@ class RecyclerAnalyticsView(APIView):
         month_label = month_date.strftime("%B %Y")
         categories = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
 
-        # Waste Came for Recycling (Assigned to this recycler in date__year, date__month)
+        # Waste Collected / Assigned for Recycling (Intake by assignment date)
         assigned_qs = MCFRecyclerAssignment.objects.filter(
             recycler=recycler,
             date__year=year,
             date__month=month
-        )
+        ).order_by("-date", "-id")
 
         assigned_map = {cat: 0.0 for cat in categories}
         total_assigned_kg = 0.0
@@ -4526,27 +4543,58 @@ class RecyclerAnalyticsView(APIView):
             total_assigned_kg += qty
 
         assigned_cat_list = [
-            {"category": cat, "assigned_kg": round(assigned_map[cat], 2)}
+            {
+                "category": cat,
+                "assigned_kg": round(assigned_map[cat], 2),
+                "collected_kg": round(assigned_map[cat], 2)
+            }
             for cat in categories
         ]
 
-        # Recycled Waste (Completed by this recycler in completed_at or date)
+        # Recycled Waste (Only COMPLETED assignments, evaluated by completed_at)
         completed_qs = MCFRecyclerAssignment.objects.filter(
             recycler=recycler,
             status="COMPLETED"
         ).filter(
             models.Q(completed_at__year=year, completed_at__month=month) |
             models.Q(completed_at__isnull=True, date__year=year, date__month=month)
-        )
+        ).order_by("-completed_at", "-date", "-id")
 
         recycled_map = {cat: 0.0 for cat in categories}
         total_recycled_kg = 0.0
+        record_list = []
+
         for item in completed_qs:
             cat_name = item.waste_type.capitalize() if item.waste_type else "Miscellaneous"
             matched_cat = next((c for c in categories if c.lower() == cat_name.lower()), "Miscellaneous")
-            qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else item.total_quantity or 0)
-            recycled_map[matched_cat] += qty
-            total_recycled_kg += qty
+            # Strictly use recyclable_quantity for verified recycled output
+            rec_qty = float(item.recyclable_quantity if item.recyclable_quantity is not None else 0.0)
+            total_qty = float(item.total_quantity if item.total_quantity is not None else 0.0)
+            recycled_map[matched_cat] += rec_qty
+            total_recycled_kg += rec_qty
+
+            comp_dt = item.completed_at
+            if comp_dt:
+                if timezone.is_aware(comp_dt):
+                    comp_dt = timezone.localtime(comp_dt)
+                comp_str = comp_dt.strftime("%Y-%m-%d %H:%M")
+            elif item.date:
+                comp_str = item.date.strftime("%Y-%m-%d")
+            else:
+                comp_str = "N/A"
+
+            record_list.append({
+                "id": item.id,
+                "record_id": f"REC-{item.id:04d}",
+                "date": item.date.strftime("%Y-%m-%d") if item.date else "N/A",
+                "completed_at": comp_str,
+                "waste_type": matched_cat,
+                "category": matched_cat,
+                "assigned_quantity_kg": round(total_qty, 2),
+                "recycled_quantity_kg": round(rec_qty, 2),
+                "note": item.note or "",
+                "status": item.status,
+            })
 
         recycled_cat_list = [
             {"category": cat, "recycled_kg": round(recycled_map[cat], 2)}
@@ -4570,7 +4618,9 @@ class RecyclerAnalyticsView(APIView):
                 "total_recycled_kg": round(total_recycled_kg, 2),
                 "categories": recycled_cat_list,
                 "completed_count": completed_tasks_count,
+                "records": record_list,
             },
+            "records": record_list,
             "task_status": {
                 "completed": completed_tasks_count,
                 "pending": pending_tasks_count,
@@ -4586,6 +4636,8 @@ class RecyclerAnalyticsView(APIView):
             if d:
                 distinct_months.add((d.year, d.month))
             if comp_at:
+                if timezone.is_aware(comp_at):
+                    comp_at = timezone.localtime(comp_at)
                 distinct_months.add((comp_at.year, comp_at.month))
 
         sorted_keys = sorted(distinct_months, key=lambda x: (x[0], x[1]), reverse=True)
@@ -4609,6 +4661,5 @@ class RecyclerAnalyticsView(APIView):
                     "pending_tasks": data["task_status"]["pending"],
                 })
         return results
-
 
 

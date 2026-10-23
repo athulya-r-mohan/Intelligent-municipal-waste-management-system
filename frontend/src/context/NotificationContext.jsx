@@ -3,8 +3,8 @@ import axios from "axios";
 import { playNotificationSound, unlockAudio } from "../utils/sound";
 import { getAccessToken, getUserRole } from "../utils/auth";
 import { BellRing, X } from "lucide-react";
+import { API_BASE_URL } from "../api/api";
 
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com/api";
 
 const NotificationContext = createContext(null);
 

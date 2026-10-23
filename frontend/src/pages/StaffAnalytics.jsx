@@ -40,8 +40,8 @@ import NotificationBell from "../components/NotificationBell";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import StaffMonthlyReportModal from "../components/StaffMonthlyReportModal";
 import { performLogout, getUserName } from "../utils/auth";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/staff" },

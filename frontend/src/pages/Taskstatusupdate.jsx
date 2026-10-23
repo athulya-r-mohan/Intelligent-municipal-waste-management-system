@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 import { getFullImageUrl } from "../utils/imageUrl";
 import {
   ChevronDown,
@@ -21,9 +22,8 @@ import {
 } from "lucide-react";
 
 // ============================================================
-// API BASE URL & AUTH HELPER
+// AUTH HELPER
 // ============================================================
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const getAccessToken = () => {
   return (

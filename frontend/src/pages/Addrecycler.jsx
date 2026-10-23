@@ -4,6 +4,7 @@ import {
   Activity,
 } from "lucide-react";
 import axios from "axios";
+import { BASE_URL } from "../api/api";
 import "../components/Addrecycler.css";
 
 const WASTE_TYPES = [
@@ -143,7 +144,7 @@ export default function AddRecyclerForm() {
 
     try {
       const response = await axios.post(
-        "https://intelligent-municipal-waste-management.onrender.com/api/add-recycler/",
+        `${BASE_URL}/api/add-recycler/`,
         {
           name: form.name,
           email: form.email,

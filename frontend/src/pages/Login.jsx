@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import React, { useState } from 'react';
 import axios from "axios";
+import { API_BASE_URL } from "../api/api";
 import LOGO_IMG from "../assets/logo.png";
 import BIN_IMG from "../assets/bin.png";
 
@@ -340,7 +341,7 @@ export default function EcoPulseLogin() {
 
   try {
     const response = await axios.post(
-      "https://intelligent-municipal-waste-management.onrender.com/api/login/",
+      `${API_BASE_URL}/login/`,
       {
         email: formData.email,
         password: formData.password,

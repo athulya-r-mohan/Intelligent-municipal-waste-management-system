@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 import "../components/wastecomplaintform.css";
 
 import {
@@ -65,9 +66,8 @@ function MapClickHandler({ onLocationSelect }) {
 
 
 // ============================================================
-// API BASE URL & AUTH HELPER
+// AUTH HELPER
 // ============================================================
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const getAccessToken = () => {
   return (

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import axios from "axios";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../components/NotificationBell";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
@@ -27,8 +28,6 @@ import {
   Activity,
   CheckCircle2,
 } from "lucide-react";
-
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },

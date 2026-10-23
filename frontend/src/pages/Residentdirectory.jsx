@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
+import axios from "axios";
+import { BASE_URL } from "../api/api";
 import {
   ArrowLeft,
   Search,
@@ -229,7 +231,7 @@ export default function ResidentDirectory({ onBack }) {
 
   const fetchWards = async () => {
     try {
-      const response = await axios.get("https://intelligent-municipal-waste-management.onrender.com/api/wards/");
+      const response = await axios.get(`${BASE_URL}/api/wards/`);
       if (Array.isArray(response.data) && response.data.length > 0) {
         const numbers = response.data.map((w) => `Ward ${w.ward_number}`);
         const set = new Set(["All Wards", ...numbers]);
@@ -245,7 +247,7 @@ export default function ResidentDirectory({ onBack }) {
       setLoading(true);
 
       const response = await axios.get(
-        "https://intelligent-municipal-waste-management.onrender.com/api/resident-directory/"
+        `${BASE_URL}/api/resident-directory/`
       );
 
       setResidents(response.data);

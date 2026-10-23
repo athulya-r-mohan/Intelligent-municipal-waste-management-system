@@ -11,6 +11,7 @@ import {
   Recycle,
   CheckSquare,
   Building2,
+  ClipboardList,
 } from "lucide-react";
 import "./AdminMonthlyReportModal.css";
 
@@ -45,6 +46,9 @@ export default function RecyclerMonthlyReportModal({ report, organization, onClo
     totalAssignedKg > 0 ? ((totalRecycledKg / totalAssignedKg) * 100).toFixed(1) : "0.0";
   const taskCompletionRate =
     totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : "0.0";
+
+  // Individual completed recycling records list
+  const records = report.records || report.recycled_waste?.records || [];
 
   // Map categories side-by-side
   const categoryMap = {};
@@ -192,11 +196,81 @@ export default function RecyclerMonthlyReportModal({ report, organization, onClo
             )}
           </div>
 
-          {/* SECTION 2: TASK COMPLETION STATUS */}
+          {/* SECTION 2: INDIVIDUAL RECYCLING RECORDS AUDIT TABLE */}
+          <div className="ep-analytics-report-section">
+            <div className="ep-analytics-report-section-title">
+              <ClipboardList size={16} color="#064e3b" />
+              2. Individual Completed Recycling Records ({records.length} {records.length === 1 ? "Record" : "Records"})
+            </div>
+            {records.length === 0 ? (
+              <div className="ep-analytics-empty-note">
+                No individual completed recycling records recorded for this calendar month.
+              </div>
+            ) : (
+              <table className="ep-analytics-report-table">
+                <thead>
+                  <tr>
+                    <th>Record ID</th>
+                    <th>Completion Date</th>
+                    <th>Category</th>
+                    <th style={{ textAlign: "right" }}>Assigned (kg)</th>
+                    <th style={{ textAlign: "right" }}>Recycled (kg)</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((rec) => (
+                    <tr key={rec.id}>
+                      <td>
+                        <strong>{rec.record_id || `REC-${String(rec.id).padStart(4, "0")}`}</strong>
+                      </td>
+                      <td style={{ color: "#475569" }}>{rec.completed_at || rec.date || "N/A"}</td>
+                      <td>
+                        <span style={{ fontWeight: 600 }}>{rec.waste_type || rec.category}</span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {Number(rec.assigned_quantity_kg || 0).toFixed(2)} kg
+                      </td>
+                      <td style={{ textAlign: "right", color: "#059669", fontWeight: 600 }}>
+                        {Number(rec.recycled_quantity_kg || 0).toFixed(2)} kg
+                      </td>
+                      <td style={{ color: "#64748b", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {rec.note && rec.note.trim() ? rec.note.trim() : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="ep-analytics-table-total-row">
+                    <td colSpan={3}>
+                      <strong>Total Verified Output</strong>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <strong>
+                        {records
+                          .reduce((acc, r) => acc + Number(r.assigned_quantity_kg || 0), 0)
+                          .toFixed(2)}{" "}
+                        kg
+                      </strong>
+                    </td>
+                    <td style={{ textAlign: "right", color: "#059669" }}>
+                      <strong>
+                        {records
+                          .reduce((acc, r) => acc + Number(r.recycled_quantity_kg || 0), 0)
+                          .toFixed(2)}{" "}
+                        kg
+                      </strong>
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* SECTION 3: TASK COMPLETION STATUS */}
           <div className="ep-analytics-report-section" style={{ pageBreakInside: "avoid" }}>
             <div className="ep-analytics-report-section-title">
               <CheckSquare size={16} color="#064e3b" />
-              2. Recycling Assignment Task Status
+              3. Recycling Assignment Task Status
             </div>
             <div className="ep-analytics-grid-2">
               <div className="ep-analytics-field-box">

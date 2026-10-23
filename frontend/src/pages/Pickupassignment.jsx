@@ -16,11 +16,7 @@ import "../components/Pickupassign.css";
 import NotificationBell from "../components/NotificationBell";
 import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
-
-// ============================================================
-// API BASE URL
-// ============================================================
-const API_BASE_URL = "https://intelligent-municipal-waste-management.onrender.com";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 
 // ============================================================
 // LOGO

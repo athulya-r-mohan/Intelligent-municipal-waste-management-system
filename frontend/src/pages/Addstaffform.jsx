@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { UserPlus, CheckCircle2, Truck, Activity } from "lucide-react";
 import axios from "axios";
+import { BASE_URL } from "../api/api";
 
 const WARDS = [
   { id: 1, name: "Ward 1" },
@@ -134,7 +135,7 @@ export default function AddStaffForm() {
 
   try {
     const response = await axios.post(
-      "https://intelligent-municipal-waste-management.onrender.com/api/add-staff/",
+      `${BASE_URL}/api/add-staff/`,
       {
         name: form.name,
         email: form.email,

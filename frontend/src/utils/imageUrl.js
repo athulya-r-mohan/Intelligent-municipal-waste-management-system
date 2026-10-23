@@ -1,6 +1,6 @@
 import { BASE_URL } from "../api/api";
 
-const BACKEND_BASE = (BASE_URL || "https://intelligent-municipal-waste-management.onrender.com").replace(/\/+$/, "");
+const BACKEND_BASE = BASE_URL;
 
 /**
  * Returns a fully-qualified URL for any image path or URL returned from the backend.
