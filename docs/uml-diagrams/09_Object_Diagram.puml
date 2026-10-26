@@ -1,0 +1,210 @@
+@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\nObject Diagram (Runtime Instance Model - End-to-End Collection & MCF Transfer)
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 12
+skinparam roundCorner 6
+skinparam nodesep 28
+skinparam ranksep 35
+
+skinparam object {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 12
+  FontStyle normal
+  AttributeFontColor #000000
+  AttributeFontSize 11
+  ArrowColor #000000
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+}
+
+' ==========================================
+' SUBSYSTEM 1 (LEFT): CITIZEN & COMMUNITY
+' ==========================================
+package "Citizen & Community Subsystem" {
+  object "citizenUser : User" as u1 {
+    id = 101
+    username = "rahul_sharma"
+    email = "rahul@ecopulse.in"
+    is_active = True
+  }
+
+  object "citizenProfile : UserProfile" as up1 {
+    id = 101
+    name = "Rahul Sharma"
+    phone = "+91 98765 43210"
+    address = "42 Green Park, Ward 4"
+    role = "CITIZEN"
+  }
+
+  object "notif_77 : Notification" as notif1 {
+    id = 77
+    title = "Pickup Completed"
+    message = "Request #802 collected successfully"
+    notification_type = "PICKUP_COMPLETED"
+    is_read = True
+  }
+
+  object "ward04 : Ward" as w4 {
+    ward_id = 4
+    ward_number = 4
+    ward_name = "Central Ward"
+    location = "Kochi Central"
+    mcf_location_name = "Central MCF Hub #4"
+  }
+
+  object "complaint_24 : WasteComplaint" as comp1 {
+    id = 24
+    location_name = "Green Park Market Corner"
+    description = "Bin overflow near market gate"
+    priority = "HIGH"
+    status = "RESOLVED"
+  }
+
+  object "reward_108 : RewardSubmission" as rwd1 {
+    id = 108
+    bin_location = "Ward 4 Smart Drop Bin"
+    waste_type = "PLASTIC_BOTTLE"
+    points = 50
+    status = "APPROVED"
+    valid_till = 2026-11-25
+  }
+
+  u1 -- up1 : has
+  up1 -- w4 : resides in
+  u1 -- notif1 : receives
+  u1 -- comp1 : lodges
+  u1 -- rwd1 : submits
+
+  u1 -[hidden]down-> up1
+  up1 -[hidden]down-> w4
+  notif1 -[hidden]down-> comp1
+  comp1 -[hidden]down-> rwd1
+}
+
+' ==========================================
+' SUBSYSTEM 2 (CENTER): PICKUP & FULFILLMENT
+' ==========================================
+package "Doorstep Pickup & Fulfillment Subsystem" {
+  object "staffUser : User" as su1 {
+    id = 202
+    username = "anand_kumar"
+    email = "anand.k@ecopulse.in"
+    is_active = True
+  }
+
+  object "staff_07 : Staff" as s1 {
+    staff_id = 7
+    phone = "+91 94471 22334"
+    designation = "Sanitation Field Officer"
+    date_of_joining = 2024-03-15
+  }
+
+  object "pickupReq_802 : WastePickupRequest" as req1 {
+    id = 802
+    location_name = "42 Green Park Gate"
+    latitude = 9.9820
+    longitude = 76.3015
+    status = "COMPLETED"
+    scheduled_pickup_date = 2026-10-25
+  }
+
+  object "wasteImg_12 : WastePickupImage" as img1 {
+    id = 12
+    waste_type = "PLASTIC"
+    confidence = 0.94
+    detections = "{'bottles': 8, 'covers': 12}"
+  }
+
+  object "payment_401 : Payment" as pay1 {
+    id = 401
+    amount = 50.00
+    payment_status = "SUCCESS"
+    payment_id = "PAY_ECO_8921"
+    transaction_id = "TXN_UPI_99210"
+    payment_date = "2026-10-25 09:15"
+  }
+
+  object "collection_55 : WasteCollection" as col1 {
+    id = 55
+    estimated_weight = "14.50 kg"
+    completed_at = "2026-10-25 14:30"
+  }
+
+  su1 -- s1 : extends
+  req1 *-- img1 : includes
+  req1 -- pay1 : requires
+  req1 -- col1 : fulfilled by
+  s1 -- req1 : assigned to
+  s1 -- col1 : executes
+
+  su1 -[hidden]down-> s1
+  s1 -[hidden]down-> req1
+}
+
+' ==========================================
+' SUBSYSTEM 3 (RIGHT): MCF & RECYCLER
+' ==========================================
+package "MCF Facility & Recycler Subsystem" {
+  object "mcfCol_33 : StaffMCFCollection" as mcf1 {
+    id = 33
+    date = 2026-10-25
+    plastic = "85.50 kg"
+    paper = "42.00 kg"
+    glass = "18.00 kg"
+    total_quantity = "278.00 kg"
+  }
+
+  object "mcfAssign_19 : MCFRecyclerAssignment" as mcfA1 {
+    id = 19
+    date = 2026-10-25
+    waste_type = "PLASTIC"
+    total_quantity = "85.50 kg"
+    recyclable_quantity = "82.00 kg"
+    status = "IN_TRANSIT"
+  }
+
+  object "recycler_03 : Recycler" as rc1 {
+    recycler_id = 3
+    organization = "CleanEarth Polymers Ltd"
+    waste_type = "PLASTIC"
+    date_of_registration = 2024-01-10
+  }
+
+  mcf1 -- mcfA1 : segregated to
+  rc1 -- mcfA1 : fulfills
+
+  mcf1 -[hidden]down-> mcfA1
+  mcfA1 -[hidden]down-> rc1
+}
+
+' ==========================================
+' SUBSYSTEM ALIGNMENT (LEFT TO RIGHT FLOW)
+' ==========================================
+"Citizen & Community Subsystem" -[hidden]right-> "Doorstep Pickup & Fulfillment Subsystem"
+"Doorstep Pickup & Fulfillment Subsystem" -[hidden]right-> "MCF Facility & Recycler Subsystem"
+
+' ==========================================
+' CROSS-SUBSYSTEM ASSOCIATIONS (ADJACENT ONLY)
+' ==========================================
+' Subsystem 1 <--> Subsystem 2:
+u1 -- req1 : requests
+s1 -- w4 : assigned ward
+s1 -- comp1 : resolves
+
+' Subsystem 2 <--> Subsystem 3:
+s1 -- mcf1 : logs to MCF
+
+@enduml

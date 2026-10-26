@@ -1,0 +1,55 @@
+@startuml
+title EcoPulse - Collaboration Diagram (UML Communication Diagram for Waste Pickup & Collection)
+
+skinparam dpi 300
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 14
+skinparam roundCorner 8
+skinparam nodesep 50
+skinparam ranksep 60
+
+skinparam object {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  HeaderBackgroundColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+  ArrowColor #000000
+}
+
+object ":CitizenClient" as Citizen
+object ":AdminClient" as Admin
+object ":StaffClient" as Staff
+object ":APIGateway" as Gateway
+object ":YOLOEngine" as YOLO
+object ":PaymentService" as Payment
+object ":Database" as DB
+object ":NotificationService" as Notif
+object ":RoutingEngine" as OSRM
+
+' Layout positioning: 3 tiers
+Citizen -[hidden]right-> Admin
+Admin -[hidden]right-> Staff
+
+Gateway -[hidden]down-> DB
+
+' Links and Numbered Messages
+Citizen -- Gateway : 1: POST /detect-waste/\n3: POST /create-pickup/
+Gateway -- YOLO : 1.1: runInference(image)
+Gateway -- Payment : 2: createPaymentOrder(Rs. 50)\n2.1: verifyPayment(signature)
+Payment -- DB : 2.2: savePaymentRecord()
+
+Admin -- Gateway : 4: GET /pickup-requests/\n5: POST /assign-pickup/
+
+Staff -- Gateway : 6: GET /staff/my-tasks/\n7: POST /start-today-collection/\n8: POST /task-update/<id>/
+Staff -- OSRM : 6.2: GET /route/v1/driving/
+
+Gateway -- DB : 3.1: insertPickupRequest(status='PENDING')\n3.2: savePickupImages()\n4.1: queryPendingRequests()\n5.1: updateRequestStatus('ASSIGNED')\n6.1: queryAssignedTasks()\n7.1: updateStatus('IN_PROGRESS')\n8.1: saveWasteCollection() & updateStatus('COMPLETED')
+
+Gateway -- Notif : 3.3: notifyAdminNewPickup()\n5.2: notifyStaffAssignment()\n5.3: notifyCitizenScheduled()\n7.2: notifyCitizenEnRoute()\n8.2: notifyCitizenCompletion()
+
+@enduml

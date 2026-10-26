@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import { performLogout, getUserName } from "../utils/auth";
+import { BASE_URL as API_BASE_URL } from "../api/api";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -31,9 +33,9 @@ const LINKS = {
   municipal: "#",
   logout: "#",
   calendar: "#",
-  scheduled: "#",
+  scheduled: "/StaffTask?tab=scheduled",
   mcf: "/staff/mcf",
-  completed: "#",
+  completed: "/StaffTask?tab=completed",
   analytics: "/staff/analytics",
 };
  
@@ -73,38 +75,18 @@ const NAV_ITEMS = [
   { key: "municipal", label: "View municipal", icon: Building2 },
 ];
  
-const CARDS = [
-  {
-    key: "myTasks",
-    title: "My tasks",
-    subtitle: "Assigned to you today",
-    count: 8,
-    icon: ClipboardList,
-  },
-  {
-    key: "scheduled",
-    title: "Scheduled tasks",
-    subtitle: "Upcoming collection rounds",
-    count: 5,
-    icon: CalendarClock,
-  },
-  {
-    key: "mcf",
-    title: "MCF collection",
-    subtitle: "Material collection facility",
-    count: 12,
-    icon: Recycle,
-  },
-  {
-    key: "completed",
-    title: "Completed tasks",
-    subtitle: "Closed out this week",
-    count: 24,
-    icon: CheckCircle2,
-  },
-];
+const getAccessToken = () => {
+  return (
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token") ||
+    ""
+  );
+};
  
 function Sidebar({ onLogout }) {
+  const navigate = useNavigate();
   const staffName = getUserName() || "Staff Member";
   const initial = staffName.charAt(0).toUpperCase() || "S";
   return (
@@ -120,7 +102,11 @@ function Sidebar({ onLogout }) {
         boxSizing: "border-box",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 24px" }}>
+      <div
+        onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); navigate("/staff"); }}
+        style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 24px", cursor: "pointer" }}
+        title="EcoPulse Staff Dashboard"
+      >
         <div
           style={{
             width: 34,
@@ -367,9 +353,10 @@ function DashboardCard({ card }) {
           fontWeight: 700,
           fontSize: 26,
           color: COLORS.primaryDark,
+          minHeight: 32,
         }}
       >
-        {card.count}
+        {card.count !== null && card.count !== undefined ? card.count : ""}
       </div>
     </a>
   );
@@ -469,7 +456,38 @@ function CollectionRouteBanner() {
   );
 }
  
-function DashboardPage() {
+function DashboardPage({ counts }) {
+  const cards = [
+    {
+      key: "myTasks",
+      title: "My tasks",
+      subtitle: "Assigned to you today",
+      count: counts.myTasks,
+      icon: ClipboardList,
+    },
+    {
+      key: "scheduled",
+      title: "Scheduled tasks",
+      subtitle: "Upcoming collection rounds",
+      count: counts.scheduled,
+      icon: CalendarClock,
+    },
+    {
+      key: "mcf",
+      title: "MCF collection",
+      subtitle: "Material collection facility",
+      count: null, // No count or demo number displayed
+      icon: Recycle,
+    },
+    {
+      key: "completed",
+      title: "Completed tasks",
+      subtitle: "Closed out this week",
+      count: counts.completed,
+      icon: CheckCircle2,
+    },
+  ];
+
   return (
     <div>
       <div
@@ -479,7 +497,7 @@ function DashboardPage() {
           gap: 16,
         }}
       >
-        {CARDS.map((card) => (
+        {cards.map((card) => (
           <DashboardCard key={card.key} card={card} />
         ))}
       </div>
@@ -491,9 +509,78 @@ function DashboardPage() {
 export default function EcoPulseDashboard() {
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [counts, setCounts] = useState({
+    myTasks: 0,
+    scheduled: 0,
+    completed: 0,
+  });
 
-  React.useEffect(() => {
+  useEffect(() => {
     ensureFonts();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStaffCounts = async () => {
+      try {
+        const token = getAccessToken();
+        const config = token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : {};
+
+        const res = await axios.get(
+          `${API_BASE_URL}/api/waste/staff/my-tasks/`,
+          config
+        );
+
+        const raw = res.data;
+        const data = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.tasks)
+          ? raw.tasks
+          : Array.isArray(raw?.results)
+          ? raw.results
+          : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+
+        // 1. My Tasks: Active tasks assigned to logged-in staff, excluding completed and cancelled
+        const activeCount = data.filter((t) => {
+          const s = String(t.status || "").trim().toUpperCase();
+          return s !== "COMPLETED" && s !== "CANCELLED";
+        }).length;
+
+        // 2. Scheduled Tasks: Active scheduled tasks assigned to logged-in staff
+        const scheduledCount = data.filter((t) => {
+          const s = String(t.status || "").trim().toUpperCase();
+          const hasScheduledDate = Boolean(
+            t.scheduled_pickup_date || t.scheduledPickupDate
+          );
+          return hasScheduledDate && s !== "COMPLETED" && s !== "CANCELLED";
+        }).length;
+
+        // 4. Completed Tasks: Completed tasks assigned to logged-in staff
+        const completedCount = data.filter((t) => {
+          const s = String(t.status || "").trim().toUpperCase();
+          return s === "COMPLETED";
+        }).length;
+
+        if (isMounted) {
+          setCounts({
+            myTasks: activeCount,
+            scheduled: scheduledCount,
+            completed: completedCount,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load staff dashboard counts:", err);
+      }
+    };
+
+    fetchStaffCounts();
+    return () => {
+      isMounted = false;
+    };
   }, []);
  
   return (
@@ -508,7 +595,7 @@ export default function EcoPulseDashboard() {
       <Sidebar onLogout={() => setShowLogoutModal(true)} />
       <main style={{ flex: 1, padding: "26px 32px", boxSizing: "border-box" }}>
         <TopBar />
-        <DashboardPage />
+        <DashboardPage counts={counts} />
       </main>
 
       <LogoutConfirmModal

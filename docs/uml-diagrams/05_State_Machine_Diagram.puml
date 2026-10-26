@@ -1,0 +1,82 @@
+@startuml
+title EcoPulse - State Machine Diagram (WastePickupRequest Lifecycle)
+
+skinparam dpi 300
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 14
+skinparam roundCorner 8
+
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+}
+
+skinparam note {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+[*] --> PENDING : Citizen submits pickup request\nand completes Rs. 50 fee payment
+
+state PENDING {
+  PENDING : Entry / Payment verified (Rs. 50)
+  PENDING : Request queued for administrative review
+  PENDING : Citizen cancellation permitted
+}
+
+PENDING --> ASSIGNED : Admin assigns staff member\nand scheduled pickup date
+PENDING --> CANCELLED : Citizen cancels request\nbefore assignment
+
+state ASSIGNED {
+  ASSIGNED : Linked to designated field staff
+  ASSIGNED : Calendar pickup date scheduled
+  ASSIGNED : Eligible for route optimization
+  ASSIGNED : Citizen cancellation still permitted
+}
+
+ASSIGNED --> IN_PROGRESS : Staff starts collection batch\non/before scheduled date
+ASSIGNED --> CANCELLED : Citizen cancels request\nbefore collection starts
+
+state IN_PROGRESS {
+  IN_PROGRESS : Field staff en route to location
+  IN_PROGRESS : Cancellation locked (cannot be cancelled)
+  IN_PROGRESS : Citizen receives active tracking alert
+}
+
+IN_PROGRESS --> COMPLETED : Staff collects waste, uploads\ncompletion photo & weight (kg)
+
+IN_PROGRESS --> PENDING : Staff reports issue (inaccessible/absent)\n[staff_marked_pending=True, reason logged]
+
+state COMPLETED {
+  COMPLETED : WasteCollection record persisted
+  COMPLETED : Completion image stored
+  COMPLETED : Final weight (kg) recorded
+  COMPLETED : Terminal success state
+}
+
+state CANCELLED {
+  CANCELLED : Cancelled by Citizen
+  CANCELLED : Terminal cancellation state
+}
+
+COMPLETED --> [*]
+CANCELLED --> [*]
+
+note right of IN_PROGRESS
+  <b>Guaranteed Constraints:</b>
+  * Once IN_PROGRESS, citizen cancellation is disabled.
+  * COMPLETED and CANCELLED cannot be restarted.
+  * Start Collection is idempotent.
+end note
+
+@enduml

@@ -1,0 +1,74 @@
+@startuml
+title EcoPulse - Use Case Subdiagram\nMunicipal Administration & Recycling Partner Subsystem
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+  ArrowFontSize 11
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "Municipal Administration & Recycling Subsystem" {
+  
+  ' Admin Use Cases (Top Group)
+  usecase "Admin Login (JWT Authentication)" as UA1
+  usecase "Assign Pickup to Staff & Set Date" as UA2
+  usecase "Assign Complaint to Staff" as UA3
+  usecase "Review & Allocate Reward Points" as UA4
+  usecase "View System Analytics & Reports" as UA5
+  usecase "Manage MCF Totals & Assign Recycler" as UA6
+
+  ' Recycler Use Cases (Bottom Group)
+  usecase "View Assigned Recycling Batches" as UR1
+  usecase "Partner Login (JWT Authentication)" as UR2
+  usecase "Complete Recycling & Upload Proof" as UR3
+}
+
+' Admin Connections (on left)
+admin --> UA1
+admin --> UA2
+admin --> UA3
+admin --> UA4
+admin --> UA5
+admin --> UA6
+
+' Recycler Connections (on right)
+UR1 <-- recycler
+UR2 <-- recycler
+UR3 <-- recycler
+
+' Coordination Link
+UA6 ..> UR1 : allocates batch
+
+@enduml

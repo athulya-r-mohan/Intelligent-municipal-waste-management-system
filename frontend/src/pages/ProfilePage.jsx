@@ -331,7 +331,12 @@ export default function ProfilePage() {
             <span>Back to Dashboard</span>
           </button>
 
-          <div className="ep-profile-brand">
+          <div
+            className="ep-profile-brand"
+            onClick={handleBack}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             <div className="ep-profile-brand-icon">
               <Activity size={18} strokeWidth={2.5} color="#ffffff" />
             </div>

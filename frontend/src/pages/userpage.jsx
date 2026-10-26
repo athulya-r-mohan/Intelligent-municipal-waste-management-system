@@ -8,7 +8,7 @@ import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import PickupInstructionModal from "../components/PickupInstructionModal";
 import { performLogout, getAccessToken } from "../utils/auth";
 import { getFullImageUrl } from "../utils/imageUrl";
-import { Receipt, Award, CheckCircle2, Clock, FileText } from "lucide-react";
+import { Receipt, Award, CheckCircle2, Clock, FileText, LogOut } from "lucide-react";
  
 const WARD_DATA = [
   { name: "Rosewood", code: "W1" },
@@ -1069,15 +1069,22 @@ export default function EcoPulseStaff() {
 
       <header className="staff-header">
         <div className="staff-header-left">
-          <button className="staff-back-btn" aria-label="Back">
-            <ChevronLeft />
-          </button>
-          <div className="staff-logo-mark">
+          <div
+            className="staff-logo-mark"
+            onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); navigate("/user"); }}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M2 12h5l2-6 4 12 2-6h7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div className="staff-brand">
+          <div
+            className="staff-brand"
+            onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); navigate("/user"); }}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             Eco <span className="staff-accent">Pulse</span>
           </div>
         </div>
@@ -1104,6 +1111,15 @@ export default function EcoPulseStaff() {
           </button>
           <button className="staff-btn staff-btn-solid" onClick={() => setDrawerOpen(true)}>
             my profile
+          </button>
+          <button
+            className="staff-btn staff-btn-ghost"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            onClick={handleLogout}
+            title="Log out of EcoPulse"
+          >
+            <LogOut size={15} strokeWidth={2} />
+            Logout
           </button>
         </div>
       </header>
@@ -2911,7 +2927,7 @@ export default function EcoPulseStaff() {
                                 </span>
                               </div>
                               <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                                Activity Date: {item.date || "N/A"} · Quantity: {item.estimated_quantity ? `${item.estimated_quantity} kg` : "N/A"}
+                                Activity Date: {item.date || "N/A"} · {item.waste_type === "Plastic Bottles" ? "Bottle Count" : "Quantity"}: {item.estimated_quantity ? (item.waste_type === "Plastic Bottles" ? `${Math.floor(Number(item.estimated_quantity))} bottles` : `${item.estimated_quantity} kg`) : "N/A"}
                               </span>
                             </div>
 

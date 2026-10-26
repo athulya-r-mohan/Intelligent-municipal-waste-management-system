@@ -1,5 +1,8 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import LOGO from "../assets/logo.png";
+import { isAuthenticated } from "../utils/auth";
+import { getRoleDashboard } from "../utils/navigation";
  
 const styles = `
   .ep-root{
@@ -148,6 +151,7 @@ function PulseIcon() {
 }
  
 export default function EcoPulse() {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
  
   return (
@@ -161,9 +165,18 @@ export default function EcoPulse() {
       <header className="ep-header">
         <div className="ep-container">
           <nav className="ep-nav">
-           <a href="#top" className="ep-logo">
+           <a
+             href={isAuthenticated() ? getRoleDashboard() : "#top"}
+             className="ep-logo"
+             onClick={(e) => {
+               if (isAuthenticated()) {
+                 e.preventDefault();
+                 navigate(getRoleDashboard());
+               }
+             }}
+           >
               <img src={LOGO} alt="Eco Pulse Logo" className="ep-logo-img" />
-        </a>
+           </a>
  
            
  

@@ -1,0 +1,119 @@
+@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\nSystem Use Case Diagram
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 14
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Citizen" as citizen
+actor "Collection Staff" as staff
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "EcoPulse Intelligent Municipal Waste Management System" {
+  
+  package "Citizen Services & AI Subsystem" as P_Cit {
+    usecase "Register & Login (JWT)" as C1
+    usecase "Submit Waste Pickup Request" as C2
+    usecase "Track Pickup Request Status" as C3
+    usecase "Register Waste Complaint" as C4
+    usecase "Submit Recyclables for Rewards" as C5
+  }
+
+  package "Field Collection & Operations" as P_Stf {
+    usecase "Staff Authentication" as S1
+    usecase "View Assigned Tasks & Schedule" as S2
+    usecase "Execute Route & Record Waste Weight" as S3
+    usecase "Resolve Complaint with Proof Photo" as S4
+    usecase "Log Daily Segregated MCF Waste" as S5
+  }
+
+  package "Municipal Administration Subsystem" as P_Adm {
+    usecase "Admin Authentication" as A1
+    usecase "Assign Pickup to Staff & Set Date" as A2
+    usecase "Assign Complaint to Staff" as A3
+    usecase "Manage MCF & Allocate Recycler" as A4
+    usecase "Review & Allocate Reward Points" as A5
+    usecase "Monitor Analytics & Municipal Reports" as A6
+  }
+
+  package "Recycling Partner Subsystem" as P_Rec {
+    usecase "Partner Authentication" as R1
+    usecase "View Assigned Recyclable Batches" as R2
+    usecase "Complete Recycling & Submit Proof" as R3
+  }
+}
+
+' Layout alignment: Citizen top-left, Staff bottom-left, Admin top-right, Recycler bottom-right
+P_Cit -[hidden]down-> P_Stf
+P_Adm -[hidden]down-> P_Rec
+P_Cit -[hidden]right-> P_Adm
+P_Stf -[hidden]right-> P_Rec
+
+citizen -[hidden]down-> staff
+admin -[hidden]down-> recycler
+
+' Left side connections
+citizen --> C1
+citizen --> C2
+citizen --> C3
+citizen --> C4
+citizen --> C5
+
+staff --> S1
+staff --> S2
+staff --> S3
+staff --> S4
+staff --> S5
+
+' Right side connections (arrow points FROM right actor TO use case)
+A1 <-- admin
+A2 <-- admin
+A3 <-- admin
+A4 <-- admin
+A5 <-- admin
+A6 <-- admin
+
+R1 <-- recycler
+R2 <-- recycler
+R3 <-- recycler
+
+@enduml

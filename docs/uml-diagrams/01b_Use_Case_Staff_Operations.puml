@@ -1,0 +1,64 @@
+@startuml
+title EcoPulse - Use Case Subdiagram\nField Collection & Operations Subsystem
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+  ArrowFontSize 11
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Collection Staff" as staff
+actor "Municipal Ward MCF\n(Facility Node)" as mcf_facility
+
+rectangle "Field Collection & Operations Subsystem" {
+  usecase "Staff Login (JWT Authentication)" as US1
+  usecase "View Assigned Tasks & Date Schedule" as US2
+  usecase "Start Scheduled Collection Route" as US3
+  usecase "View Optimized Route Preview" as US4
+  usecase "Update Status & Record Waste Weight" as US5
+  usecase "Resolve Complaint with Proof Photo" as US6
+  usecase "Log Daily Segregated MCF Waste" as US7
+}
+
+staff --> US1
+staff --> US2
+staff --> US3
+staff --> US5
+staff --> US6
+staff --> US7
+
+US3 ..> US4 : <<include>>
+
+US7 --> mcf_facility : <<deposit tonnage>>
+US4 -[hidden]down-> mcf_facility
+
+@enduml

@@ -5,6 +5,7 @@ import NotificationBell from "../components/NotificationBell";
 import InstructionsContent from "../components/InstructionsContent";
 import "../components/userpage.css";
 import "../components/Instructions.css";
+import { getRoleDashboard, safeNavigateBack } from "../utils/navigation";
 
 const ChevronLeft = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -67,15 +68,25 @@ export default function InstructionsPage() {
       {/* HEADER IDENTICAL TO USERPAGE */}
       <header className="staff-header">
         <div className="staff-header-left">
-          <button className="staff-back-btn" onClick={() => navigate("/user")} aria-label="Back">
+          <button className="staff-back-btn" onClick={() => safeNavigateBack(navigate, getRoleDashboard())} aria-label="Back">
             <ChevronLeft />
           </button>
-          <div className="staff-logo-mark" onClick={() => navigate("/user")}>
+          <div
+            className="staff-logo-mark"
+            onClick={() => navigate(getRoleDashboard())}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M2 12h5l2-6 4 12 2-6h7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div className="staff-brand" onClick={() => navigate("/user")}>
+          <div
+            className="staff-brand"
+            onClick={() => navigate(getRoleDashboard())}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             Eco <span className="staff-accent">Pulse</span>
           </div>
         </div>

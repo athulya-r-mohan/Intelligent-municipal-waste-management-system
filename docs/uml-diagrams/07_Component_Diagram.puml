@@ -1,0 +1,142 @@
+@startuml
+title EcoPulse - Component Diagram (System Architecture & Subsystem Interfaces)
+
+skinparam dpi 300
+skinparam monochrome true
+skinparam componentStyle uml2
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 14
+skinparam roundCorner 6
+skinparam nodesep 45
+skinparam ranksep 55
+
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  ArrowColor #000000
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+skinparam folder {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+skinparam cloud {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+package "Presentation Tier (React.js SPA / Vite)" {
+  [Citizen Portal UI] as FE_Citizen
+  [Admin Dashboard UI] as FE_Admin
+  [Staff Mobile UI] as FE_Staff
+  [Recycler Portal UI] as FE_Recycler
+  [WebPush Service Worker] as FE_Worker
+}
+
+package "Application Tier (Django REST Framework)" {
+  [REST API Gateway & URL Router] as GW_Router
+
+  package "Core & Security" {
+    [JWT Auth & User Profile Service] as SVC_Auth
+    [Notification Dispatcher] as SVC_Notif
+  }
+
+  package "Waste & Field Operations" {
+    [Pickup Management API] as SVC_Pickup
+    [Staff Collection API] as SVC_Staff
+    [MCF & Recycling API] as SVC_MCF
+  }
+
+  package "AI & Citizen Engagement" {
+    [AI Detection API] as SVC_AI
+    [Grievance Management API] as SVC_Grievance
+    [Reward & Loyalty API] as SVC_Reward
+  }
+}
+
+package "AI Engine" {
+  [Ultralytics YOLOv8 Runtime] as COMP_YOLO
+  file "best.pt (PyTorch Weights)" as FILE_Model
+}
+
+package "Data Tier" {
+  database "PostgreSQL 16 Engine" as DB_Postgres {
+    [Relational Schema (11 Tables)] as DB_Tables
+  }
+  folder "Local Media Storage" {
+    [Uploaded Images (/media/)] as STORE_Media
+    [Static Files (WhiteNoise)] as STORE_Static
+  }
+}
+
+cloud "External Services" {
+  [OSRM Road Routing Engine] as EXT_OSRM
+  [Razorpay / UPI Payment API] as EXT_Payment
+  [Browser Push Service (VAPID)] as EXT_Push
+}
+
+' Client to Gateway Routing
+FE_Citizen ..> GW_Router : HTTPS / REST & Multipart
+FE_Admin ..> GW_Router : HTTPS / REST & JWT
+FE_Staff ..> GW_Router : HTTPS / REST & JWT
+FE_Recycler ..> GW_Router : HTTPS / REST & JWT
+FE_Staff ..> EXT_OSRM : HTTPS / Driving Polyline
+
+' Internal Dispatching
+GW_Router ..> SVC_Auth : Route /api/auth/
+GW_Router ..> SVC_Pickup : Route /api/waste/
+GW_Router ..> SVC_Staff : Route /api/waste/staff/
+GW_Router ..> SVC_MCF : Route /api/waste/mcf/
+GW_Router ..> SVC_AI : Route /api/waste/detect-waste/
+GW_Router ..> SVC_Grievance : Route /api/complaints/
+GW_Router ..> SVC_Reward : Route /api/rewards/
+
+' AI Integration
+SVC_AI ..> COMP_YOLO : PyTorch Tensor
+COMP_YOLO ..> FILE_Model : Loads weights
+
+' External Integrations
+SVC_Pickup ..> EXT_Payment : Order & Verification
+SVC_Pickup ..> SVC_Notif : Event Triggers
+SVC_Staff ..> SVC_Notif : Status Event Triggers
+SVC_Grievance ..> SVC_Notif : Grievance Triggers
+SVC_Notif ..> EXT_Push : WebPush VAPID
+FE_Worker <.. EXT_Push : Push Events
+
+' Data Access
+SVC_Auth ..> DB_Tables : SQL
+SVC_Pickup ..> DB_Tables : SQL
+SVC_Staff ..> DB_Tables : SQL
+SVC_MCF ..> DB_Tables : SQL
+SVC_Grievance ..> DB_Tables : SQL
+SVC_Reward ..> DB_Tables : SQL
+SVC_Notif ..> DB_Tables : SQL
+
+SVC_AI ..> STORE_Media : Save Upload
+SVC_Staff ..> STORE_Media : Save Proof
+
+@enduml

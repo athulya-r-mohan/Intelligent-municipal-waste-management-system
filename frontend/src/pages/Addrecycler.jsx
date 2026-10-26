@@ -1,11 +1,14 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
   Activity,
+  ArrowLeft,
 } from "lucide-react";
 import axios from "axios";
 import { BASE_URL } from "../api/api";
 import "../components/Addrecycler.css";
+import { safeNavigateBack } from "../utils/navigation";
 
 const WASTE_TYPES = [
   "Plastic",
@@ -17,9 +20,14 @@ const WASTE_TYPES = [
   "Mixed Waste",
 ];
 
-function EcoPulseLogo() {
+function EcoPulseLogo({ onClick }) {
   return (
-    <div className="eco-logo">
+    <div
+      className="eco-logo"
+      onClick={onClick}
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      title={onClick ? "EcoPulse Admin Dashboard" : undefined}
+    >
       <div className="logo-circle">
         <span className="pulse-ring"></span>
 
@@ -71,6 +79,7 @@ function PulseDivider() {
 }
 
 export default function AddRecyclerForm() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -188,7 +197,29 @@ export default function AddRecyclerForm() {
     <div className="add-recycler-page">
       <div className="recycler-card">
 
-        <EcoPulseLogo />
+        <button
+          type="button"
+          onClick={() => safeNavigateBack(navigate, "/admin")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            color: "#166534",
+            borderRadius: 8,
+            padding: "6px 12px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            marginBottom: 14,
+          }}
+          aria-label="Back to Admin Dashboard"
+        >
+          <ArrowLeft size={15} /> Dashboard
+        </button>
+
+        <EcoPulseLogo onClick={() => navigate("/admin")} />
 
         <div className="heading-section">
           <h1>Add Recycler</h1>

@@ -1,0 +1,201 @@
+@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\nClass Diagram (Domain Model & Relational Architecture)
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 12
+skinparam roundCorner 6
+skinparam nodesep 28
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 12
+  HeaderBackgroundColor #FFFFFF
+  ArrowColor #000000
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+}
+
+package "Accounts & Authorization" {
+  class User {
+    + id : Integer [PK]
+    + username : String
+    + email : String
+    + is_active : Boolean
+    + check_password(password) : Boolean
+  }
+
+  class Staff {
+    + staff_id : Integer [PK]
+    + phone : String
+    + designation : String
+    + date_of_joining : Date
+  }
+
+  class Ward {
+    + ward_id : Integer [PK]
+    + ward_number : Integer
+    + ward_name : String
+    + location : String
+    + mcf_location_name : String
+    + mcf_latitude : Decimal
+    + mcf_longitude : Decimal
+  }
+
+  class UserProfile {
+    + id : Integer [PK]
+    + name : String
+    + phone : String
+    + address : Text
+    + role : String = "CITIZEN"
+  }
+
+  class Recycler {
+    + recycler_id : Integer [PK]
+    + organization : String
+    + waste_type : String
+    + date_of_registration : Date
+  }
+
+  Staff -[hidden]right-> Ward
+  Ward -[hidden]right-> UserProfile
+  UserProfile -[hidden]right-> Recycler
+}
+
+package "Waste Pickup & Collection" {
+  class WastePickupRequest {
+    + id : Integer [PK]
+    + location_name : String
+    + latitude : Decimal
+    + longitude : Decimal
+    + status : String = "PENDING"
+    + scheduled_pickup_date : Date
+    + can_be_cancelled() : Boolean
+  }
+
+  class WastePickupImage {
+    + id : Integer [PK]
+    + image : ImageField
+    + waste_type : String
+    + confidence : Float
+    + detections : JSONField
+  }
+
+  class Payment {
+    + id : Integer [PK]
+    + amount : Decimal = 50.00
+    + payment_status : String = "PENDING"
+    + payment_id : String
+    + transaction_id : String
+    + payment_date : DateTime
+  }
+
+  class WasteCollection {
+    + id : Integer [PK]
+    + completion_image : ImageField
+    + estimated_weight : Decimal
+    + completed_at : DateTime
+  }
+}
+
+package "Complaints & Community Rewards" {
+  class WasteComplaint {
+    + id : Integer [PK]
+    + location_name : String
+    + latitude : Decimal
+    + longitude : Decimal
+    + description : Text
+    + priority : String = "LOW"
+    + status : String = "NEW"
+    + proof_image : ImageField
+    + resolved_at : DateTime
+  }
+
+  class RewardSubmission {
+    + id : Integer [PK]
+    + photo : ImageField
+    + bin_location : String
+    + waste_type : String
+    + estimated_quantity : Decimal
+    + points : Integer
+    + status : String = "Pending"
+    + valid_till : DateTime
+  }
+
+  class Notification {
+    + id : Integer [PK]
+    + title : String
+    + message : Text
+    + notification_type : String
+    + is_read : Boolean
+    + created_at : DateTime
+  }
+}
+
+package "Facility & Recycling Operations" {
+  class StaffMCFCollection {
+    + id : Integer [PK]
+    + date : Date
+    + paper : Decimal
+    + plastic : Decimal
+    + glass : Decimal
+    + metal : Decimal
+    + organic : Decimal
+    + total_quantity : Decimal
+  }
+
+  class MCFRecyclerAssignment {
+    + id : Integer [PK]
+    + date : Date
+    + waste_type : String
+    + total_quantity : Decimal
+    + status : String = "PENDING"
+    + recyclable_quantity : Decimal
+    + completed_at : DateTime
+  }
+}
+
+' Positioning anchors
+UserProfile -[hidden]down-> WasteComplaint
+WasteCollection -[hidden]down-> StaffMCFCollection
+
+' Accounts Internal:
+User "1" -- "1" UserProfile : has
+User "1" -- "0..1" Staff : extends
+User "1" -- "0..1" Recycler : extends
+UserProfile "*" -- "0..1" Ward : resides in
+Staff "*" -- "0..1" Ward : assigned to
+
+' Pickup Internal:
+WastePickupRequest "1" *-- "1..*" WastePickupImage : includes
+WastePickupRequest "1" -- "1" Payment : requires
+WastePickupRequest "1" -- "0..1" WasteCollection : fulfills
+
+' Inter-package relationships:
+User "1" -- "*" WastePickupRequest : requests
+Staff "0..1" -- "*" WastePickupRequest : assigned
+Staff "1" -- "*" WasteCollection : collects
+
+User "1" -- "*" WasteComplaint : lodges
+Staff "0..1" -- "*" WasteComplaint : assigned
+User "1" -- "*" RewardSubmission : submits
+User "1" -- "*" Notification : receives
+
+Staff "1" -- "*" StaffMCFCollection : logs
+Recycler "1" -- "*" MCFRecyclerAssignment : assigned
+User "0..1" -- "*" MCFRecyclerAssignment : assigns
+
+@enduml

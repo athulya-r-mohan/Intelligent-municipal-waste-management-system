@@ -15,6 +15,7 @@ import {
 import NotificationBell from "../components/NotificationBell";
 import "../components/StaffMCFCollection.css";
 import { BASE_URL as API_BASE_URL } from "../api/api";
+import { safeNavigateBack } from "../utils/navigation";
 
 const CATEGORIES = [
   {
@@ -246,11 +247,16 @@ export default function StaffMCFCollection() {
       {/* TOPBAR */}
       <header className="mcf-staff-topbar">
         <div className="mcf-topbar-left">
-          <button className="mcf-back-btn" onClick={() => navigate("/staff")}>
+          <button className="mcf-back-btn" onClick={() => safeNavigateBack(navigate, "/staff")}>
             <ArrowLeft size={16} />
             Dashboard
           </button>
-          <div className="mcf-brand-logo">
+          <div
+            className="mcf-brand-logo"
+            onClick={() => navigate("/staff")}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Staff Dashboard"
+          >
             Eco <span>Pulse</span>
           </div>
         </div>

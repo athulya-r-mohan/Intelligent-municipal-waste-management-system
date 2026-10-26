@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL as API_BASE_URL } from "../api/api";
 import "../components/wastecomplaintform.css";
+import { safeNavigateBack } from "../utils/navigation";
 
 import {
   ArrowLeft,
@@ -90,7 +91,7 @@ export default function ComplaintForm({ onBack }) {
     if (typeof onBack === "function") {
       onBack();
     } else {
-      navigate("/user");
+      safeNavigateBack(navigate, "/user");
     }
   };
 
@@ -462,7 +463,12 @@ export default function ComplaintForm({ onBack }) {
 
       <div className="cf-header">
 
-        <div className="cf-logo">
+        <div
+          className="cf-logo"
+          onClick={() => navigate("/user")}
+          style={{ cursor: "pointer" }}
+          title="EcoPulse Dashboard"
+        >
 
           <div className="cf-logo-badge">
 

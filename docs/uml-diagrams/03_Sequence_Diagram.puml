@@ -1,0 +1,139 @@
+@startuml
+title EcoPulse - Sequence Diagram (Waste Pickup Request, Route Optimization & Collection)
+
+autonumber
+skinparam dpi 300
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 14
+skinparam roundCorner 6
+
+skinparam sequence {
+  ArrowColor #000000
+  ArrowFontSize 13
+  ActorBorderColor #000000
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #000000
+  ActorFontSize 14
+  LifeLineBorderColor #000000
+  LifeLineBackgroundColor #FFFFFF
+  ParticipantBorderColor #000000
+  ParticipantBackgroundColor #FFFFFF
+  ParticipantFontColor #000000
+  ParticipantFontSize 14
+  BoxBorderColor #000000
+  BoxBackgroundColor #FFFFFF
+  BoxFontColor #000000
+  DividerBackgroundColor #FFFFFF
+  DividerBorderColor #000000
+  DividerFontColor #000000
+  DividerFontSize 14
+}
+
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 14
+}
+
+actor "Citizen" as citizen
+participant "React Frontend\n(Vite Client)" as fe
+participant "Django REST API\n(Gunicorn WSGI)" as api
+participant "YOLOv8 Engine\n(best.pt)" as yolo
+database "PostgreSQL DB\n(Relational Store)" as db
+actor "Administrator" as admin
+actor "Field Staff" as staff
+participant "OSRM Routing API\n(Road Geometry)" as osrm
+participant "WebPush Service\n(VAPID)" as push
+
+== Phase 1: AI Waste Classification & Request Submission ==
+citizen -> fe : Upload waste photos & enter address
+activate fe
+fe -> api : POST /api/waste/detect-waste/ (Multipart Images)
+activate api
+api -> yolo : run_inference(image)
+activate yolo
+yolo --> api : Detected categories (e.g. Plastic, 94.2%)
+deactivate yolo
+api --> fe : Detection results JSON
+deactivate api
+fe --> citizen : Display AI detection summary popup
+
+citizen -> fe : Confirm request & initiate fee payment
+fe -> api : POST /api/waste/payments/create-order/
+activate api
+api -> db : Create Payment record (Rs. 50, status="PENDING")
+api --> fe : Order details & Razorpay/UPI payload
+deactivate api
+
+citizen -> fe : Complete payment transaction
+fe -> api : POST /api/waste/create-pickup/ (Location, Coords, PaymentId)
+activate api
+api -> db : Insert WastePickupRequest (status="PENDING")
+api -> db : Link WastePickupImage records
+api -> push : send_push_notification(Admin, "New Pickup Created")
+api --> fe : HTTP 201 Created (Pickup Request ID)
+deactivate api
+fe --> citizen : Display success confirmation & Tracking ID
+deactivate fe
+
+== Phase 2: Administrative Ward Assignment & Scheduling ==
+admin -> fe : Open Admin Pickup Assignment Dashboard
+activate fe
+fe -> api : GET /api/waste/pickup-requests/ (status="PENDING")
+activate api
+api -> db : Fetch pending pickup requests
+api --> fe : List of pending pickups with coordinates & ward
+deactivate api
+fe --> admin : Display pending pickups table & map markers
+
+admin -> fe : Select staff member & scheduled pickup date
+fe -> api : POST /api/waste/assign-pickup/ (requestId, staffId, date)
+activate api
+api -> db : Update request: status="ASSIGNED", scheduled_pickup_date
+api -> push : notify_staff("New Task Assigned", staffId)
+api -> push : notify_citizen("Pickup Scheduled", citizenId)
+api --> fe : HTTP 200 OK (Assignment successful)
+deactivate api
+fe --> admin : Refresh assignment board & show success toast
+deactivate fe
+
+== Phase 3: Route Optimization & Collection Execution ==
+staff -> fe : Login & open Staff Scheduled Pickups for Date
+activate fe
+fe -> api : GET /api/waste/staff/my-tasks/
+activate api
+api -> db : Fetch ASSIGNED tasks for staff & selected date
+api --> fe : Tasks list with pickup GPS coordinates & Ward MCF
+deactivate api
+
+staff -> fe : Click "Optimize Today's Route"
+fe -> osrm : GET /route/v1/driving/ (MCF coords -> pickup waypoints)
+activate osrm
+osrm --> fe : Optimized driving order & road polyline geometry
+deactivate osrm
+fe --> staff : Display interactive Leaflet route map & sequenced stops
+
+staff -> fe : Click "Start Collection"
+fe -> api : POST /api/waste/staff/start-today-collection/ (scheduled_pickup_date)
+activate api
+api -> db : Atomic update: status="IN_PROGRESS" for eligible pickups
+api -> push : notify_citizen("Staff En Route for Collection", citizenId)
+api --> fe : HTTP 200 OK (Collection Started)
+deactivate api
+
+staff -> fe : Arrive at site, collect waste, take photo & enter weight (kg)
+fe -> api : POST /api/waste/staff/task-update/<id>/ (completion_image, weight)
+activate api
+api -> db : Insert WasteCollection record (completion_image, weight)
+api -> db : Update WastePickupRequest status="COMPLETED"
+api -> push : notify_citizen("Waste Collection Completed Successfully", citizenId)
+api --> fe : HTTP 200 OK (Task Completed)
+deactivate api
+fe --> staff : Show task resolved banner & update dashboard counts
+deactivate fe
+
+@enduml

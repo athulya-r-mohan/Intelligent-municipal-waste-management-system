@@ -1,0 +1,70 @@
+@startuml
+title EcoPulse - Use Case Subdiagram\nCitizen Services & AI Subsystem
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+  ArrowFontSize 11
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Citizen" as citizen
+actor "External AI &\nPayment Gateway" as ext_gateway
+
+rectangle "Citizen Services & AI Subsystem" {
+  usecase "Register & Login (JWT)" as UC1
+  usecase "Submit Waste Pickup Request" as UC2
+  usecase "Detect Waste via YOLO AI" as UC3
+  usecase "Pay Pickup Fee (Rs. 50 via Razorpay)" as UC4
+  usecase "Track Pickup Request Status" as UC5
+  usecase "Cancel Active Pickup Request" as UC6
+  usecase "Register Waste Complaint" as UC7
+  usecase "Track Waste Complaint Status" as UC8
+  usecase "Submit Item for Reward Points" as UC9
+  usecase "Claim Reward Coupon" as UC10
+}
+
+citizen --> UC1
+citizen --> UC2
+citizen --> UC5
+citizen --> UC7
+citizen --> UC8
+citizen --> UC9
+citizen --> UC10
+
+UC2 ..> UC3 : <<include>>
+UC2 ..> UC4 : <<include>>
+UC6 ..> UC5 : <<extend>>
+
+UC3 --> ext_gateway : YOLOv8 Inference
+UC4 --> ext_gateway : Razorpay API
+
+@enduml

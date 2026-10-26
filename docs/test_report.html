@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Execution Report - EcoPulse Intelligent Waste Management System</title>
+  <style>
+    /* Document & Page Setup */
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm 12mm 15mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Times New Roman", Times, Georgia, serif;
+      background-color: #f1f3f5;
+      color: #000000;
+      line-height: 1.35;
+      padding: 24px;
+    }
+
+    .report-container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 36px 42px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.09);
+      border-radius: 4px;
+    }
+
+    /* Interactive Toolbar (hidden on print) */
+    .no-print-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 14px 20px;
+      border-radius: 6px;
+      margin-bottom: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+    }
+
+    .toolbar-title {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: #1d4ed8;
+    }
+
+    /* Executive Document Header */
+    .document-header {
+      border-bottom: 2px solid #000000;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .doc-main-title {
+      font-size: 22px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .doc-sub-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #111111;
+      margin-bottom: 4px;
+    }
+
+    .doc-meta {
+      font-size: 12px;
+      color: #444444;
+      font-style: italic;
+    }
+
+    /* Summary KPI Box */
+    .summary-card {
+      border: 1.5px solid #000000;
+      padding: 10px 14px;
+      margin-bottom: 26px;
+      background-color: #fafafa;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .summary-item .label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .summary-item .value {
+      font-size: 15px;
+      font-weight: bold;
+    }
+
+    .value-pass {
+      color: #006600;
+    }
+
+    /* Individual Test Case Block */
+    .test-case-wrapper {
+      margin-bottom: 36px;
+      page-break-inside: avoid;
+    }
+
+    .test-case-number-badge {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Exact Test Case Table Formatting Matching Reference Image */
+    table.test-case-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1.5px solid #000000;
+      font-size: 13px;
+      color: #000000;
+      background-color: #ffffff;
+    }
+
+    table.test-case-table th,
+    table.test-case-table td {
+      border: 1px solid #000000;
+      padding: 5px 8px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    /* Labels */
+    .field-label {
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .field-val {
+      font-weight: normal;
+    }
+
+    /* Step Header Row */
+    tr.step-header-row th {
+      font-weight: bold;
+      background-color: #f7f7f7;
+      border-top: 1.5px solid #000000;
+      border-bottom: 1.5px solid #000000;
+      text-align: left;
+      padding: 5px 8px;
+    }
+
+    /* Column Widths */
+    .col-step {
+      width: 6%;
+      text-align: center !important;
+    }
+
+    .col-test-step {
+      width: 25%;
+    }
+
+    .col-test-data {
+      width: 18%;
+    }
+
+    .col-expected {
+      width: 23%;
+    }
+
+    .col-actual {
+      width: 20%;
+    }
+
+    .col-status {
+      width: 8%;
+      text-align: center !important;
+      font-weight: bold;
+    }
+
+    .status-pass {
+      color: #006600;
+      font-weight: bold;
+    }
+
+    .status-fail {
+      color: #cc0000;
+      font-weight: bold;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background-color: #ffffff;
+        padding: 0;
+      }
+
+      .report-container {
+        max-width: 100%;
+        padding: 0;
+        box-shadow: none;
+      }
+
+      .no-print-toolbar {
+        display: none !important;
+      }
+
+      .test-case-wrapper {
+        page-break-after: always;
+        margin-bottom: 0;
+        padding-top: 8px;
+      }
+
+      .test-case-wrapper:last-child {
+        page-break-after: auto;
+      }
+
+      table.test-case-table {
+        border: 1.5px solid #000000 !important;
+      }
+
+      table.test-case-table th,
+      table.test-case-table td {
+        border: 1px solid #000000 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="report-container">
+
+    <!-- Interactive Top Toolbar (Screen Only) -->
+    <div class="no-print-toolbar">
+      <div class="toolbar-title">
+        <span>📄</span>
+        <span>EcoPulse Waste Management System &mdash; Test Execution Report (5 Test Cases)</span>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn" onclick="window.print()">
+          <span>🖨️</span> Print / Save as PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Document Header -->
+    <header class="document-header">
+      <h1 class="doc-main-title">Software Test Execution Report</h1>
+      <h2 class="doc-sub-title">EcoPulse: Intelligent Municipal Waste Management System</h2>
+      <div class="doc-meta">
+        Standard Test Case Specification & Execution Log &bull; Environment: QA Staging / v1.4.0 &bull; Date: October 26, 2026
+      </div>
+    </header>
+
+    <!-- Executive Summary Box -->
+    <section class="summary-card">
+      <div class="summary-item">
+        <span class="label">Total Test Cases:</span>
+        <span class="value">5</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Tests Passed:</span>
+        <span class="value value-pass">5 (100%)</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Tests Failed:</span>
+        <span class="value">0 (0%)</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">Execution Status:</span>
+        <span class="value value-pass">PASSED</span>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TEST CASE 1 -->
+    <!-- ========================================================================= -->
+    <article class="test-case-wrapper" id="tc-01">
+      <div class="test-case-number-badge">Test Case #01: Authentication Module</div>
+      <table class="test-case-table">
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Priority(Low/Medium/High):</span>
+              <span class="field-val">High</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Designed Date:</span>
+              <span class="field-val">15-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Module Name:</span>
+              <span class="field-val">User Authentication & Access Control</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Executed By :</span>
+              <span class="field-val">QA Lead Engineer</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Title :</span>
+              <span class="field-val">Verify Citizen Login and Role-Based Redirection</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Execution Date:</span>
+              <span class="field-val">26-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Description:</span>
+              <span class="field-val">Validate that a registered citizen can successfully authenticate using valid credentials, receive a JWT token, and be routed to the Citizen Portal Dashboard.</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Pre-Condition :</span>
+              <span class="field-val">User has valid username and password registered with role 'Citizen'; backend auth service is running.</span>
+            </td>
+          </tr>
+
+          <!-- Steps Header Row -->
+          <tr class="step-header-row">
+            <th class="col-step">Step</th>
+            <th class="col-test-step">Test Step</th>
+            <th class="col-test-data">Test Data</th>
+            <th class="col-expected">Expected Result</th>
+            <th class="col-actual">Actual Result</th>
+            <th class="col-status">Status(Pass/Fail)</th>
+          </tr>
+
+          <!-- Steps -->
+          <tr>
+            <td class="col-step">1</td>
+            <td class="col-test-step">Open web browser and navigate to the application login URL.</td>
+            <td class="col-test-data">URL: /login</td>
+            <td class="col-expected">Login page loads with Email, Password input fields, and 'Sign In' button.</td>
+            <td class="col-actual">Login page rendered with all required fields visible and enabled.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">2</td>
+            <td class="col-test-step">Enter valid registered email address in Email field.</td>
+            <td class="col-test-data">Email: citizen.john@ecopulse.local</td>
+            <td class="col-expected">Email entered and accepted without format validation error.</td>
+            <td class="col-actual">Email string displayed correctly in input box.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">3</td>
+            <td class="col-test-step">Enter matching valid password in Password field.</td>
+            <td class="col-test-data">Password: EcoCitizen#2026</td>
+            <td class="col-expected">Password characters are masked for security.</td>
+            <td class="col-actual">Password entered and masked with bullet symbols.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">4</td>
+            <td class="col-test-step">Click on the "Sign In" button.</td>
+            <td class="col-test-data">Click Action</td>
+            <td class="col-expected">API sends POST to /api/token/; returns HTTP 200 with JWT access token.</td>
+            <td class="col-actual">HTTP 200 OK received; token stored securely in browser storage.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">5</td>
+            <td class="col-test-step">Verify user redirection and home view.</td>
+            <td class="col-test-data">Route: /citizen/dashboard</td>
+            <td class="col-expected">Browser navigates to Citizen Dashboard displaying welcome banner and pickup stats.</td>
+            <td class="col-actual">Citizen Dashboard rendered successfully; user name and widgets loaded.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+
+          <!-- Post-Condition -->
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Post-Condition:</span>
+              <span class="field-val">User session established; auth state set to authenticated; citizen menu items available in navigation.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+
+    <!-- ========================================================================= -->
+    <!-- TEST CASE 2 -->
+    <!-- ========================================================================= -->
+    <article class="test-case-wrapper" id="tc-02">
+      <div class="test-case-number-badge">Test Case #02: Waste Pickup Request Module</div>
+      <table class="test-case-table">
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Priority(Low/Medium/High):</span>
+              <span class="field-val">High</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Designed Date:</span>
+              <span class="field-val">16-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Module Name:</span>
+              <span class="field-val">Waste Pickup Scheduling & AI Detection</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Executed By :</span>
+              <span class="field-val">Senior QA Tester</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Title :</span>
+              <span class="field-val">Verify Waste Pickup Request with AI Image Detection</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Execution Date:</span>
+              <span class="field-val">26-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Description:</span>
+              <span class="field-val">Verify that a logged-in citizen can upload a waste image, obtain automatic waste classification via AI model, select pickup slot, and submit the pickup request.</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Pre-Condition :</span>
+              <span class="field-val">User is authenticated as Citizen; AI waste classification service endpoint /api/detect_waste is online.</span>
+            </td>
+          </tr>
+
+          <!-- Steps Header Row -->
+          <tr class="step-header-row">
+            <th class="col-step">Step</th>
+            <th class="col-test-step">Test Step</th>
+            <th class="col-test-data">Test Data</th>
+            <th class="col-expected">Expected Result</th>
+            <th class="col-actual">Actual Result</th>
+            <th class="col-status">Status(Pass/Fail)</th>
+          </tr>
+
+          <!-- Steps -->
+          <tr>
+            <td class="col-step">1</td>
+            <td class="col-test-step">Click on "Book Waste Pickup" from the Citizen dashboard.</td>
+            <td class="col-test-data">Click Action</td>
+            <td class="col-expected">Pickup request form displays with image uploader, category picker, and slot options.</td>
+            <td class="col-actual">Form loaded with empty inputs and drag-and-drop file upload zone.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">2</td>
+            <td class="col-test-step">Upload waste sample image for classification.</td>
+            <td class="col-test-data">File: plastic_waste_sample.jpg (1.8 MB)</td>
+            <td class="col-expected">Image preview displays; thumbnail renders correctly.</td>
+            <td class="col-actual">Image uploaded and rendered in preview box.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">3</td>
+            <td class="col-test-step">Click "Detect Waste Category" to trigger AI analysis.</td>
+            <td class="col-test-data">Click 'AI Detect'</td>
+            <td class="col-expected">AI model detects material and auto-selects 'Plastic / Recyclable' category with confidence score.</td>
+            <td class="col-actual">Category auto-selected as 'Plastic Recyclable' (Confidence: 96.2%).</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">4</td>
+            <td class="col-test-step">Select pickup date, preferred time slot, and enter address.</td>
+            <td class="col-test-data">Ward: 5, Date: 28-10-2026, Slot: 10:00 AM - 01:00 PM</td>
+            <td class="col-expected">All inputs validated without errors; submit button becomes enabled.</td>
+            <td class="col-actual">Inputs entered and validated; button turned active.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">5</td>
+            <td class="col-test-step">Click "Submit Pickup Request" button.</td>
+            <td class="col-test-data">Click 'Submit'</td>
+            <td class="col-expected">POST request succeeds with HTTP 201; Pickup ID generated; success message shown.</td>
+            <td class="col-actual">HTTP 201 Created; generated Request ID #PK-2026-1049; success dialog shown.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+
+          <!-- Post-Condition -->
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Post-Condition:</span>
+              <span class="field-val">Pickup request status stored as 'PENDING'; request visible in Citizen's 'My Pickups' list.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+
+    <!-- ========================================================================= -->
+    <!-- TEST CASE 3 -->
+    <!-- ========================================================================= -->
+    <article class="test-case-wrapper" id="tc-03">
+      <div class="test-case-number-badge">Test Case #03: Waste Complaint Management Module</div>
+      <table class="test-case-table">
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Priority(Low/Medium/High):</span>
+              <span class="field-val">High</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Designed Date:</span>
+              <span class="field-val">17-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Module Name:</span>
+              <span class="field-val">Public Grievance & Waste Complaint</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Executed By :</span>
+              <span class="field-val">QA Engineer</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Title :</span>
+              <span class="field-val">Verify Waste Complaint Registration with Geo-tagging & Photo</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Execution Date:</span>
+              <span class="field-val">26-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Description:</span>
+              <span class="field-val">Verify that a citizen can report overflowing waste or illegal garbage dumping by providing incident details, GPS location coordinates, and photographic proof.</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Pre-Condition :</span>
+              <span class="field-val">User is logged into citizen account; device browser location permission is granted.</span>
+            </td>
+          </tr>
+
+          <!-- Steps Header Row -->
+          <tr class="step-header-row">
+            <th class="col-step">Step</th>
+            <th class="col-test-step">Test Step</th>
+            <th class="col-test-data">Test Data</th>
+            <th class="col-expected">Expected Result</th>
+            <th class="col-actual">Actual Result</th>
+            <th class="col-status">Status(Pass/Fail)</th>
+          </tr>
+
+          <!-- Steps -->
+          <tr>
+            <td class="col-step">1</td>
+            <td class="col-test-step">Navigate to the "File Complaint" page from the main menu.</td>
+            <td class="col-test-data">URL: /complaints/new</td>
+            <td class="col-expected">Complaint registration form renders with category, location, and upload controls.</td>
+            <td class="col-actual">Complaint form loaded with all standard grievance fields.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">2</td>
+            <td class="col-test-step">Select complaint category from the dropdown.</td>
+            <td class="col-test-data">Category: "Overflowing Public Bin / Dumping"</td>
+            <td class="col-expected">Selected category highlighted; priority level assigned automatically.</td>
+            <td class="col-actual">Category selected and default priority 'High' assigned.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">3</td>
+            <td class="col-test-step">Click "Get Current Location" to fetch device GPS coordinates.</td>
+            <td class="col-test-data">Geolocation API</td>
+            <td class="col-expected">Latitude and longitude captured and auto-populated into address fields.</td>
+            <td class="col-actual">Coordinates captured (Lat: 9.9816, Lng: 76.2999); Ward 8 assigned.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">4</td>
+            <td class="col-test-step">Attach photograph of the overflowing waste dump.</td>
+            <td class="col-test-data">File: overflow_bin_evidence.jpg</td>
+            <td class="col-expected">Image file uploaded and thumbnail preview displayed.</td>
+            <td class="col-actual">Image file attached and preview displayed with remove option.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">5</td>
+            <td class="col-test-step">Enter detailed complaint description and click "Submit Complaint".</td>
+            <td class="col-test-data">Description: "Public bin overflowing near bus stop for 3 days."</td>
+            <td class="col-expected">HTTP 201 response received; unique complaint ticket ID generated.</td>
+            <td class="col-actual">Complaint submitted with Ticket ID #CMP-8942; confirmation toast shown.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+
+          <!-- Post-Condition -->
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Post-Condition:</span>
+              <span class="field-val">Complaint record created with status 'PENDING'; complaint ticket listed under Municipal Admin dashboard.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+
+    <!-- ========================================================================= -->
+    <!-- TEST CASE 4 -->
+    <!-- ========================================================================= -->
+    <article class="test-case-wrapper" id="tc-04">
+      <div class="test-case-number-badge">Test Case #04: Staff Task Dispatch Module</div>
+      <table class="test-case-table">
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Priority(Low/Medium/High):</span>
+              <span class="field-val">Medium</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Designed Date:</span>
+              <span class="field-val">18-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Module Name:</span>
+              <span class="field-val">Admin Dispatch & Field Staff Task Assignment</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Executed By :</span>
+              <span class="field-val">Senior QA Tester</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Title :</span>
+              <span class="field-val">Verify Admin Task Assignment to Ward Field Worker</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Execution Date:</span>
+              <span class="field-val">26-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Description:</span>
+              <span class="field-val">Verify that a municipal administrator can view unassigned pending pickup requests and assign them to an active field worker belonging to the designated ward.</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Pre-Condition :</span>
+              <span class="field-val">Admin is logged in; pickup request #PK-2026-1049 is in 'PENDING' status; active staff exist in Ward 5.</span>
+            </td>
+          </tr>
+
+          <!-- Steps Header Row -->
+          <tr class="step-header-row">
+            <th class="col-step">Step</th>
+            <th class="col-test-step">Test Step</th>
+            <th class="col-test-data">Test Data</th>
+            <th class="col-expected">Expected Result</th>
+            <th class="col-actual">Actual Result</th>
+            <th class="col-status">Status(Pass/Fail)</th>
+          </tr>
+
+          <!-- Steps -->
+          <tr>
+            <td class="col-step">1</td>
+            <td class="col-test-step">Log in to Admin Portal and navigate to "Pickup Management".</td>
+            <td class="col-test-data">URL: /admin/pickup-requests</td>
+            <td class="col-expected">List of all citizen pickup requests displayed with status badges.</td>
+            <td class="col-actual">Table rendered with filterable columns and current request counts.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">2</td>
+            <td class="col-test-step">Filter list by Status = "PENDING" and select request #PK-2026-1049.</td>
+            <td class="col-test-data">Filter: Status = 'PENDING'</td>
+            <td class="col-expected">Pending requests filtered; request #PK-2026-1049 row displayed.</td>
+            <td class="col-actual">Target request displayed with 'Assign Staff' action button.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">3</td>
+            <td class="col-test-step">Click "Assign Staff" button to open the dispatch modal.</td>
+            <td class="col-test-data">Click Action</td>
+            <td class="col-expected">Staff assignment modal opens with list of workers registered under Ward 5.</td>
+            <td class="col-actual">Modal opened; workers filtered by ward with current workload indicators.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">4</td>
+            <td class="col-test-step">Select available staff member and confirm assignment.</td>
+            <td class="col-test-data">Staff: Rajesh Kumar (ID: STF-08)</td>
+            <td class="col-expected">POST /api/admin/assign-pickup/ succeeds with HTTP 200; status changes to 'ASSIGNED'.</td>
+            <td class="col-actual">HTTP 200 OK received; status badge updated to 'ASSIGNED'.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">5</td>
+            <td class="col-test-step">Verify staff notification and task queue sync.</td>
+            <td class="col-test-data">Query /api/staff/assigned-tasks/</td>
+            <td class="col-expected">Assigned task appears in the designated staff member's active collection queue.</td>
+            <td class="col-actual">Task #PK-2026-1049 visible in staff portal under 'Today Tasks'.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+
+          <!-- Post-Condition -->
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Post-Condition:</span>
+              <span class="field-val">Pickup request status updated to 'ASSIGNED'; staff workload incremented; push notification sent to worker app.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+
+    <!-- ========================================================================= -->
+    <!-- TEST CASE 5 -->
+    <!-- ========================================================================= -->
+    <article class="test-case-wrapper" id="tc-05">
+      <div class="test-case-number-badge">Test Case #05: Online Payment & Invoice Module</div>
+      <table class="test-case-table">
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Priority(Low/Medium/High):</span>
+              <span class="field-val">Medium</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Designed Date:</span>
+              <span class="field-val">19-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Module Name:</span>
+              <span class="field-val">Disposal Fee Billing & Online Payment Gateway</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Executed By :</span>
+              <span class="field-val">QA Lead Engineer</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <span class="field-label">Test Title :</span>
+              <span class="field-val">Verify Online Payment Processing and Receipt Generation</span>
+            </td>
+            <td colspan="3">
+              <span class="field-label">Test Execution Date:</span>
+              <span class="field-val">26-10-2026</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Description:</span>
+              <span class="field-val">Verify that a citizen can process online payment for commercial or bulk waste disposal charges, verify transaction signature, and download payment receipt.</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Pre-Condition :</span>
+              <span class="field-val">Pickup request completed with billable disposal fee of ₹250; payment gateway sandbox active.</span>
+            </td>
+          </tr>
+
+          <!-- Steps Header Row -->
+          <tr class="step-header-row">
+            <th class="col-step">Step</th>
+            <th class="col-test-step">Test Step</th>
+            <th class="col-test-data">Test Data</th>
+            <th class="col-expected">Expected Result</th>
+            <th class="col-actual">Actual Result</th>
+            <th class="col-status">Status(Pass/Fail)</th>
+          </tr>
+
+          <!-- Steps -->
+          <tr>
+            <td class="col-step">1</td>
+            <td class="col-test-step">Navigate to "Payments & Invoices" tab in Citizen Portal.</td>
+            <td class="col-test-data">URL: /citizen/payments</td>
+            <td class="col-expected">Invoice list displays invoice #INV-2026-077 with status 'UNPAID' and amount ₹250.</td>
+            <td class="col-actual">Invoice #INV-2026-077 displayed with 'Pay Now' action button.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">2</td>
+            <td class="col-test-step">Click on "Pay Now" button on pending invoice.</td>
+            <td class="col-test-data">Click Action</td>
+            <td class="col-expected">System initiates /api/payments/create-order/ and launches secure payment modal.</td>
+            <td class="col-actual">Payment gateway popup launched showing exact order amount ₹250.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">3</td>
+            <td class="col-test-step">Select payment method (UPI / Card) and input sandbox test credentials.</td>
+            <td class="col-test-data">UPI ID: success@razorpay</td>
+            <td class="col-expected">Payment processing succeeds; gateway returns transaction ID & signature.</td>
+            <td class="col-actual">Transaction processed successfully; transaction ID pay_Ok9123847 generated.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">4</td>
+            <td class="col-test-step">Trigger backend verification via /api/payments/verify/.</td>
+            <td class="col-test-data">Payload: {payment_id, order_id, signature}</td>
+            <td class="col-expected">Backend verifies HMAC signature, marks invoice as 'PAID', and updates ledger.</td>
+            <td class="col-actual">Verification returned HTTP 200 OK; status updated to 'PAID' in DB.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td class="col-step">5</td>
+            <td class="col-test-step">Verify invoice status update and click "Download Receipt".</td>
+            <td class="col-test-data">Click 'Download Receipt'</td>
+            <td class="col-expected">Invoice displays green 'PAID' badge; receipt PDF downloads with transaction ref.</td>
+            <td class="col-actual">Badge updated to 'PAID'; PDF receipt downloaded with timestamp & Txn ID.</td>
+            <td class="col-status status-pass">Pass</td>
+          </tr>
+
+          <!-- Post-Condition -->
+          <tr>
+            <td colspan="6">
+              <span class="field-label">Post-Condition:</span>
+              <span class="field-val">Payment marked as 'PAID'; transaction logged in municipal accounting records; pickup process closed.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+
+    <!-- Sign-off Section -->
+    <div style="margin-top: 32px; border-top: 1px solid #000000; padding-top: 18px; font-size: 13px; display: flex; justify-content: space-between;">
+      <div>
+        <strong>Prepared By:</strong> QA Engineering Team<br>
+        <strong>Signature:</strong> <em>Athulya R. Mohan / QA Lead</em>
+      </div>
+      <div>
+        <strong>Approved By:</strong> Project Manager & Tech Lead<br>
+        <strong>Sign-off Date:</strong> 26-10-2026
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

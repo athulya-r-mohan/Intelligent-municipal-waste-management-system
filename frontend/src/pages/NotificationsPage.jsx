@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../context/NotificationContext";
 import "../components/NotificationsPage.css";
+import { getRoleDashboard, safeNavigateBack } from "../utils/navigation";
 import {
   ArrowLeft,
   Bell,
@@ -105,12 +107,17 @@ export default function NotificationsPage() {
       {/* Top Header */}
       <header className="ep-page-header">
         <div className="ep-page-header-inner">
-          <button className="ep-page-back-btn" onClick={() => navigate(-1)}>
+          <button className="ep-page-back-btn" onClick={() => safeNavigateBack(navigate, getRoleDashboard())}>
             <ArrowLeft size={16} strokeWidth={2.2} />
             <span>Back to Dashboard</span>
           </button>
 
-          <div className="ep-page-brand">
+          <div
+            className="ep-page-brand"
+            onClick={() => navigate(getRoleDashboard())}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             <div className="ep-page-brand-icon">
               <Activity size={18} strokeWidth={2.5} />
             </div>

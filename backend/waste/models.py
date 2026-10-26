@@ -486,6 +486,8 @@ class RewardSubmission(models.Model):
     WASTE_TYPE_CHOICES = [
         ("Paper", "Paper"),
         ("Plastic", "Plastic"),
+        ("Plastic Bottles", "Plastic Bottles"),
+        ("Plastic Covers", "Plastic Covers"),
         ("Glass", "Glass"),
         ("Metal", "Metal"),
         ("Organic", "Organic"),

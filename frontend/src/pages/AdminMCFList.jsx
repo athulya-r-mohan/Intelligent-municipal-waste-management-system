@@ -21,6 +21,7 @@ import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminMCFList.css";
 import { BASE_URL as API_BASE_URL } from "../api/api";
+import { safeNavigateBack } from "../utils/navigation";
 
 export default function AdminMCFList() {
   const navigate = useNavigate();
@@ -103,12 +104,17 @@ export default function AdminMCFList() {
           <button
             type="button"
             className="mcf-back-btn"
-            onClick={() => navigate("/admin")}
+            onClick={() => safeNavigateBack(navigate, "/admin")}
           >
             <ArrowLeft size={16} />
             Dashboard
           </button>
-          <div className="mcf-brand-logo">
+          <div
+            className="mcf-brand-logo"
+            onClick={() => navigate("/admin")}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Admin Dashboard"
+          >
             Eco <span>Pulse</span> · Admin MCF
           </div>
         </div>

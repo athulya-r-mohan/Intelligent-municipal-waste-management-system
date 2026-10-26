@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL } from "../api/api";
+import { safeNavigateBack } from "../utils/navigation";
 import {
   ArrowLeft,
   Search,
@@ -170,9 +172,14 @@ function statusMeta(status) {
   };
 }
 
-function EcoPulseLogo() {
+function EcoPulseLogo({ onClick }) {
   return (
-    <div className="rd-logo">
+    <div
+      className="rd-logo"
+      onClick={onClick}
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      title={onClick ? "EcoPulse Admin Dashboard" : undefined}
+    >
       <div className="rd-logo-mark">
         <svg
           viewBox="0 0 24 24"
@@ -198,6 +205,16 @@ function EcoPulseLogo() {
 }
 
 export default function ResidentDirectory({ onBack }) {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (typeof onBack === "function") {
+      onBack();
+    } else {
+      safeNavigateBack(navigate, "/admin");
+    }
+  };
+
   const [ward, setWard] = useState("All Wards");
   const [wardOptions, setWardOptions] = useState(WARDS);
   const [nameQuery, setNameQuery] = useState("");
@@ -350,13 +367,13 @@ export default function ResidentDirectory({ onBack }) {
 
         <button
           className="rd-back-btn"
-          onClick={goBack}
+          onClick={handleBack}
           aria-label="Go back"
         >
           <ArrowLeft />
         </button>
 
-        <EcoPulseLogo />
+        <EcoPulseLogo onClick={() => navigate("/admin")} />
 
         <span className="rd-page-heading">
           Resident Directory

@@ -16,14 +16,21 @@ import "../components/Pickupassign.css";
 import NotificationBell from "../components/NotificationBell";
 import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
+import { safeNavigateBack } from "../utils/navigation";
 import { BASE_URL as API_BASE_URL } from "../api/api";
+import { getFullImageUrl } from "../utils/imageUrl";
 
 // ============================================================
 // LOGO
 // ============================================================
-function EcoPulseLogo() {
+function EcoPulseLogo({ onClick }) {
   return (
-    <div className="ecopulse-logo">
+    <div
+      className="ecopulse-logo"
+      onClick={onClick}
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      title={onClick ? "EcoPulse Admin Dashboard" : undefined}
+    >
       <div className="logo-circle">
         <svg
           width="27"
@@ -345,6 +352,44 @@ function AssignModal({
 
   const [manualWasteType, setManualWasteType] = useState("");
   const [wasteTypeError, setWasteTypeError] = useState("");
+  const [modalPreviewImage, setModalPreviewImage] = useState(null);
+  const [brokenImages, setBrokenImages] = useState({});
+
+  // Citizen-uploaded photos extraction
+  const uploadedPhotos = useMemo(() => {
+    const rawList =
+      (Array.isArray(request?.images) && request.images.length > 0)
+        ? request.images
+        : (Array.isArray(request?.imageResults) && request.imageResults.length > 0)
+        ? request.imageResults
+        : [];
+
+    return rawList
+      .map((img, idx) => {
+        const rawPath =
+          img?.image ||
+          img?.photo ||
+          img?.file ||
+          (typeof img === "string" ? img : "");
+        const url = getFullImageUrl(rawPath);
+        const name =
+          img?.image_name ||
+          img?.file_name ||
+          img?.name ||
+          `Photo ${idx + 1}`;
+        return {
+          id: img?.id || idx,
+          url,
+          name,
+          rawPath,
+        };
+      })
+      .filter((item) => Boolean(item.url));
+  }, [request]);
+
+  const handleImageError = (imgKey) => {
+    setBrokenImages((prev) => ({ ...prev, [imgKey]: true }));
+  };
 
   // ==========================================================
   // FETCH STAFF BY WARD
@@ -639,296 +684,447 @@ function AssignModal({
           >
             ×
           </button>
-        </div>
-
-        {/* BODY */}
+        </div>        {/* BODY */}
         <div className="modal-body">
 
           {/* PENDING REASON DISPLAY */}
           {request.pendingReason && (
-            <div className="modal-field">
-              <div
-                style={{
-                  background: request.status === "PENDING" ? "#fff7ed" : "#f8fafc",
-                  border: request.status === "PENDING" ? "1px solid #fed7aa" : "1px solid #e2e8f0",
-                  color: request.status === "PENDING" ? "#9a3412" : "#475569",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  fontSize: "12.5px",
-                  lineHeight: 1.4,
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: 2 }}>
-                  ⚠️ {request.status === "PENDING" ? "Staff Pending Reason:" : "Previous Pending Reason:"}
-                </div>
-                <div>{request.pendingReason}</div>
-              </div>
+            <div
+              style={{
+                background: request.status === "PENDING" ? "#fff7ed" : "#f8fafc",
+                border: request.status === "PENDING" ? "1px solid #fed7aa" : "1px solid #e2e8f0",
+                color: request.status === "PENDING" ? "#9a3412" : "#475569",
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: "12px",
+                lineHeight: 1.35,
+              }}
+            >
+              <strong style={{ display: "inline-block", marginRight: 4 }}>
+                ⚠️ {request.status === "PENDING" ? "Staff Pending Reason:" : "Previous Pending Reason:"}
+              </strong>
+              <span>{request.pendingReason}</span>
             </div>
           )}
 
-          {/* LOCATION */}
-          <div className="modal-field">
-            <label>
-              Pickup Location
-            </label>
-
-            <div className="modal-value">
-              {request.pickupLocation ||
-                "Not available"}
-            </div>
-          </div>
-
-          {/* WASTE TYPE: AI SUCCESS VS AI FAILURE FALLBACK */}
-          {hasValidAiDetection ? (
+          {/* ROW 1: PHOTO & AI DETECTED WASTE TYPE */}
+          <div className="modal-grid-row">
+            {/* CITIZEN UPLOADED PHOTO */}
             <div className="modal-field">
-              <label>
-                AI Detected Waste Type
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>Citizen-Uploaded Photo {uploadedPhotos.length > 1 ? `(${uploadedPhotos.length})` : ""}</span>
+                {uploadedPhotos.length > 0 && (
+                  <span style={{ fontSize: "11px", color: "#2fa66d", fontWeight: 500 }}>
+                    Click to enlarge
+                  </span>
+                )}
               </label>
 
-              <div className="modal-value">
-                {request.imageResults?.length > 0 ? (
-                  request.imageResults.map((image, index) => {
-                    const imageDetections =
-                      Array.isArray(image?.detections) && image.detections.length > 0
-                        ? image.detections
-                        : image?.waste_type && image.waste_type !== "Unknown"
-                        ? [{ class: image.waste_type, confidence: image.confidence }]
-                        : [];
-
+              {uploadedPhotos.length > 0 ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: uploadedPhotos.length === 1 ? "1fr" : "repeat(auto-fill, minmax(70px, 1fr))",
+                    gap: "8px",
+                  }}
+                >
+                  {uploadedPhotos.map((item, idx) => {
+                    const isBroken = brokenImages[item.id || idx];
                     return (
                       <div
-                        key={image.id || image.image_index || index}
+                        key={item.id || idx}
                         style={{
-                          marginBottom: "8px",
-                          padding: "6px 8px",
-                          borderRadius: "6px",
-                          background: "#f0fdf4",
-                          border: "1px solid #dcfce7",
+                          position: "relative",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          border: "1px solid #dce9e2",
+                          background: "#f4f8f6",
+                          height: "92px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: isBroken ? "default" : "pointer",
+                          transition: "transform 0.15s ease, box-shadow 0.15s ease",
                         }}
+                        onClick={() => {
+                          if (!isBroken) {
+                            setModalPreviewImage({
+                              url: item.url,
+                              title: `Request #${request.requestId} — ${item.name}`,
+                            });
+                          }
+                        }}
+                        title={isBroken ? "Image unavailable" : "Click to view full image"}
                       >
-                        <div
-                          style={{
-                            fontWeight: 700,
-                            fontSize: "12px",
-                            color: "#166534",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          Image {index + 1}
-                          {image.image_name ? ` (${image.image_name})` : ""}:
-                        </div>
-
-                        {imageDetections.length > 0 ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "3px", paddingLeft: "6px" }}>
-                            {imageDetections.map((det, detIdx) => {
-                              const conf = Number(det?.confidence || 0);
-                              const className = det?.class || det?.class_name || det?.name || "Unknown";
-                              const confPercent = conf <= 1.0 ? conf * 100 : conf;
-
-                              return (
-                                <div key={detIdx} style={{ fontSize: "13px", color: "#1f2937" }}>
-                                  • <span style={{ fontWeight: 600, color: "#1f6b4e" }}>{className}</span>
-                                  {conf > 0 && (
-                                    <span style={{ fontSize: "12px", color: "#5f8a45", fontWeight: 500 }}>
-                                      {" "}({confPercent.toFixed(2)}%)
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
+                        {isBroken ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: "4px",
+                              color: "#9ca3af",
+                              fontSize: "11px",
+                              padding: "6px",
+                              textAlign: "center",
+                            }}
+                          >
+                            <ImageIcon size={20} />
+                            <span>Image unavailable</span>
                           </div>
                         ) : (
-                          <span style={{ fontSize: "12.5px", color: "#6b7280", fontStyle: "italic" }}>
-                            {request.wasteType || "Detected"}
-                          </span>
+                          <>
+                            <img
+                              src={item.url}
+                              alt={item.name}
+                              onError={() => handleImageError(item.id || idx)}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: "block",
+                              }}
+                            />
+                            <div
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                background: "rgba(0, 0, 0, 0.25)",
+                                opacity: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#ffffff",
+                                gap: "4px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                transition: "opacity 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = 1;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = 0;
+                              }}
+                            >
+                              <Eye size={16} />
+                              <span>Enlarge</span>
+                            </div>
+                          </>
                         )}
                       </div>
                     );
-                  })
-                ) : (
-                  <span style={{ fontWeight: 600, color: "#1f6b4e" }}>
-                    {request.wasteType || "Plastic"}
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="modal-field">
-              <div
-                style={{
-                  background: "#fff2f0",
-                  border: "1px solid #ffccc7",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  marginBottom: "12px",
-                  color: "#cf1322",
-                  fontSize: "12.5px",
-                  lineHeight: "1.4",
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: 2 }}>
-                  ⚠️ AI Detection Failed
+                  })}
                 </div>
-                <div>
-                  No waste type was automatically detected. Please enter or select the waste type manually before assigning staff.
-                </div>
-              </div>
-
-              <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>
-                Waste Type <span style={{ color: "#cf1322" }}>*</span>
-              </label>
-
-              <select
-                value={manualWasteType}
-                onChange={(e) => {
-                  setManualWasteType(e.target.value);
-                  if (wasteTypeError) setWasteTypeError("");
-                }}
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  borderRadius: 8,
-                  border: wasteTypeError ? "1.5px solid #cf1322" : "1px solid #cfe7bb",
-                  background: "#ffffff",
-                  color: manualWasteType ? "#243515" : "#6c8479",
-                  fontSize: "13.5px",
-                  fontWeight: 500,
-                  outline: "none",
-                }}
-              >
-                <option value="" disabled>
-                  -- Select Waste Type ▼ --
-                </option>
-                {WASTE_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-
-              {wasteTypeError && (
+              ) : (
                 <div
+                  className="modal-value"
                   style={{
-                    color: "#cf1322",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    color: "#9ca3af",
+                    fontStyle: "italic",
                     fontSize: "12px",
-                    marginTop: 5,
-                    fontWeight: 600,
+                    height: "92px",
+                    boxSizing: "border-box",
                   }}
                 >
-                  {wasteTypeError}
+                  <ImageIcon size={18} />
+                  <span>No image uploaded for this request</span>
                 </div>
               )}
             </div>
-          )}
 
-          {/* WARD */}
-          <div className="modal-field">
-            <label>
-              Ward
-            </label>
+            {/* WASTE TYPE: AI SUCCESS VS AI FAILURE FALLBACK */}
+            {hasValidAiDetection ? (
+              <div className="modal-field">
+                <label>
+                  AI Detected Waste Type
+                </label>
 
-            <div className="modal-value">
-              {request.ward ||
-                "Not available"}
+                <div
+                  className="modal-value"
+                  style={{
+                    minHeight: "92px",
+                    padding: "6px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "flex-start",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {request.imageResults?.length > 0 ? (
+                    request.imageResults.map((image, index) => {
+                      const imageDetections =
+                        Array.isArray(image?.detections) && image.detections.length > 0
+                          ? image.detections
+                          : image?.waste_type && image.waste_type !== "Unknown"
+                          ? [{ class: image.waste_type, confidence: image.confidence }]
+                          : [];
+
+                      return (
+                        <div
+                          key={image.id || image.image_index || index}
+                          style={{
+                            width: "100%",
+                            marginBottom: index < request.imageResults.length - 1 ? "4px" : "0",
+                            padding: "4px 6px",
+                            borderRadius: "6px",
+                            background: "#f0fdf4",
+                            border: "1px solid #dcfce7",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "11px",
+                              color: "#166534",
+                              marginBottom: "2px",
+                            }}
+                          >
+                            Image {index + 1}
+                            {image.image_name ? ` (${image.image_name})` : ""}:
+                          </div>
+
+                          {imageDetections.length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingLeft: "4px" }}>
+                              {imageDetections.map((det, detIdx) => {
+                                const conf = Number(det?.confidence || 0);
+                                const className = det?.class || det?.class_name || det?.name || "Unknown";
+                                const confPercent = conf <= 1.0 ? conf * 100 : conf;
+
+                                return (
+                                  <div key={detIdx} style={{ fontSize: "12px", color: "#1f2937" }}>
+                                    • <span style={{ fontWeight: 600, color: "#1f6b4e" }}>{className}</span>
+                                    {conf > 0 && (
+                                      <span style={{ fontSize: "11px", color: "#5f8a45", fontWeight: 500 }}>
+                                        {" "}({confPercent.toFixed(2)}%)
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "11.5px", color: "#6b7280", fontStyle: "italic" }}>
+                              {request.wasteType || "Detected"}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <span style={{ fontWeight: 600, color: "#1f6b4e", fontSize: "13px" }}>
+                      {request.wasteType || "Plastic"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="modal-field">
+                <div
+                  style={{
+                    background: "#fff2f0",
+                    border: "1px solid #ffccc7",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    marginBottom: "6px",
+                    color: "#cf1322",
+                    fontSize: "11px",
+                    lineHeight: "1.3",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 1 }}>
+                    ⚠️ AI Detection Unavailable
+                  </div>
+                  <div>
+                    AI detection unavailable — please review the uploaded image manually.
+                  </div>
+                </div>
+
+                <label style={{ display: "block", marginBottom: 4, fontWeight: 600, fontSize: "11.5px" }}>
+                  Waste Type <span style={{ color: "#cf1322" }}>*</span>
+                </label>
+
+                <select
+                  value={manualWasteType}
+                  onChange={(e) => {
+                    setManualWasteType(e.target.value);
+                    if (wasteTypeError) setWasteTypeError("");
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "36px",
+                    padding: "0 8px",
+                    borderRadius: 8,
+                    border: wasteTypeError ? "1.5px solid #cf1322" : "1px solid #cfe7bb",
+                    background: "#ffffff",
+                    color: manualWasteType ? "#243515" : "#6c8479",
+                    fontSize: "12.5px",
+                    fontWeight: 500,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <option value="" disabled>
+                    -- Select Waste Type ▼ --
+                  </option>
+                  {WASTE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+
+                {wasteTypeError && (
+                  <div
+                    style={{
+                      color: "#cf1322",
+                      fontSize: "11px",
+                      marginTop: 3,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {wasteTypeError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ROW 2: LOCATION & WARD */}
+          <div className="modal-grid-row">
+            {/* LOCATION */}
+            <div className="modal-field">
+              <label>
+                Pickup Location
+              </label>
+
+              <div
+                className="modal-value"
+                title={request.pickupLocation || "Not available"}
+              >
+                {request.pickupLocation ||
+                  "Not available"}
+              </div>
+            </div>
+
+            {/* WARD */}
+            <div className="modal-field">
+              <label>
+                Ward
+              </label>
+
+              <div className="modal-value">
+                {request.ward ||
+                  "Not available"}
+              </div>
             </div>
           </div>
 
-          {/* STAFF */}
-          <div className="modal-field">
-            <label>
-              Assign Staff
-            </label>
+          {/* ROW 3: STAFF & PICKUP SCHEDULED DATE */}
+          <div className="modal-grid-row">
+            {/* STAFF */}
+            <div className="modal-field">
+              <label>
+                Assign Staff
+              </label>
 
-            {staffLoading ? (
-              <div className="modal-value">
-                Loading staff...
-              </div>
+              {staffLoading ? (
+                <div className="modal-value">
+                  Loading staff...
+                </div>
 
-            ) : staffError ? (
-              <div className="modal-value">
-                {staffError}
-              </div>
+              ) : staffError ? (
+                <div className="modal-value" style={{ color: "#e11d48", fontSize: "12px" }}>
+                  {staffError}
+                </div>
 
-            ) : (
-              <>
-                <select
-                  value={staff}
-                  onChange={(e) =>
-                    setStaff(e.target.value)
-                  }
-                >
-                  <option
-                    value=""
-                    disabled
-                  >
-                    Select staff
-                  </option>
-
-                  {staffList.map(
-                    (person, index) => {
-                      const value =
-                        getStaffValue(person);
-
-                      const name =
-                        getStaffName(person);
-
-                      return (
-                        <option
-                          key={
-                            person?.id ||
-                            person?.staff_id ||
-                            person?.staffId ||
-                            index
-                          }
-                          value={value}
-                        >
-                          {name}
-                        </option>
-                      );
+              ) : (
+                <>
+                  <select
+                    value={staff}
+                    onChange={(e) =>
+                      setStaff(e.target.value)
                     }
+                  >
+                    <option
+                      value=""
+                      disabled
+                    >
+                      Select staff
+                    </option>
+
+                    {staffList.map(
+                      (person, index) => {
+                        const value =
+                          getStaffValue(person);
+
+                        const name =
+                          getStaffName(person);
+
+                        return (
+                          <option
+                            key={
+                              person?.id ||
+                              person?.staff_id ||
+                              person?.staffId ||
+                              index
+                            }
+                            value={value}
+                          >
+                            {name}
+                          </option>
+                        );
+                      }
+                    )}
+                  </select>
+
+                  {staffList.length === 0 && (
+                    <div className="modal-value" style={{ fontSize: "12px", color: "#6b7280" }}>
+                      No staff found.
+                    </div>
                   )}
-                </select>
+                </>
+              )}
+            </div>
 
-                {staffList.length === 0 && (
-                  <div className="modal-value">
-                    No staff found.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* PICKUP SCHEDULED DATE */}
-          <div className="modal-field">
-            <label>
-              Pickup Scheduled Date <span style={{ color: "#e11d48" }}>*</span>
-            </label>
-            <input
-              type="date"
-              value={scheduledDate}
-              min={minScheduledDate}
-              onChange={(e) => {
-                setScheduledDate(e.target.value);
-                setScheduledDateError("");
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: scheduledDateError ? "1px solid #e11d48" : "1px solid #dcede0",
-                fontSize: "14px",
-                color: "#1e293b",
-                outline: "none",
-                background: "#f7fbf8",
-                boxSizing: "border-box",
-              }}
-              required
-            />
-            {scheduledDateError && (
-              <div style={{ color: "#e11d48", fontSize: "12px", marginTop: "4px" }}>
-                {scheduledDateError}
-              </div>
-            )}
+            {/* PICKUP SCHEDULED DATE */}
+            <div className="modal-field">
+              <label>
+                Pickup Scheduled Date <span style={{ color: "#e11d48" }}>*</span>
+              </label>
+              <input
+                type="date"
+                value={scheduledDate}
+                min={minScheduledDate}
+                onChange={(e) => {
+                  setScheduledDate(e.target.value);
+                  setScheduledDateError("");
+                }}
+                style={{
+                  width: "100%",
+                  height: "36px",
+                  padding: "0 10px",
+                  borderRadius: "8px",
+                  border: scheduledDateError ? "1px solid #e11d48" : "1px solid #cfe1d8",
+                  fontSize: "13px",
+                  color: "#1e293b",
+                  outline: "none",
+                  background: "#ffffff",
+                  boxSizing: "border-box",
+                }}
+                required
+              />
+              {scheduledDateError && (
+                <div style={{ color: "#e11d48", fontSize: "11px", marginTop: "2px" }}>
+                  {scheduledDateError}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -959,6 +1155,84 @@ function AssignModal({
         </div>
 
       </div>
+
+      {/* ENLARGED IMAGE LIGHTBOX MODAL */}
+      {modalPreviewImage && (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 1100, background: "rgba(10, 25, 18, 0.75)" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setModalPreviewImage(null);
+          }}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "680px",
+              width: "90%",
+              background: "#12251c",
+              borderRadius: "16px",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 20px",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                color: "#ffffff",
+              }}
+            >
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>
+                {modalPreviewImage.title || "Citizen-Uploaded Photo"}
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalPreviewImage(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#ffffff",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div
+              style={{
+                padding: "16px",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                background: "#0a1711",
+              }}
+            >
+              <img
+                src={modalPreviewImage.url}
+                alt={modalPreviewImage.title || "Enlarged view"}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "70vh",
+                  objectFit: "contain",
+                  borderRadius: "8px",
+                  display: "block",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1645,7 +1919,7 @@ export default function PickupRequests() {
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <button
             type="button"
-            onClick={() => navigate("/admin")}
+            onClick={() => safeNavigateBack(navigate, "/admin")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1663,7 +1937,7 @@ export default function PickupRequests() {
             <ArrowLeft size={15} /> Dashboard
           </button>
 
-          <EcoPulseLogo />
+          <EcoPulseLogo onClick={() => navigate("/admin")} />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

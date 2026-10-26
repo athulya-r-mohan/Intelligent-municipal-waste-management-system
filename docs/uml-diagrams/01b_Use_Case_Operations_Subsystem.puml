@@ -1,0 +1,95 @@
+@startuml
+title EcoPulse - Use Case Subdiagram\nField Operations, Municipal Administration & Recycling Subsystem
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+  ArrowFontSize 11
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Collection Staff" as staff
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "Operations, Administration & Recycling Subsystem" {
+  
+  ' Staff Operations
+  usecase "Staff Login (JWT)" as US1
+  usecase "View Assigned Tasks & Schedule" as US2
+  usecase "Start Scheduled Collection Route" as US3
+  usecase "View Optimized Route Preview" as US4
+  usecase "Update Status & Record Waste Weight" as US5
+  usecase "Resolve Complaint with Proof Photo" as US6
+  usecase "Log Daily Segregated MCF Waste" as US7
+
+  ' Admin Management
+  usecase "Admin Login (JWT)" as UA1
+  usecase "Assign Pickup to Staff & Set Date" as UA2
+  usecase "Assign Complaint to Staff" as UA3
+  usecase "Manage MCF Totals & Assign Recycler" as UA4
+  usecase "Review & Allocate Reward Points" as UA5
+  usecase "View System Analytics & Reports" as UA6
+
+  ' Recycling Partner Operations
+  usecase "Recycler Login (JWT)" as UR1
+  usecase "View Assigned Recycling Batches" as UR2
+  usecase "Complete Recycling & Upload Proof" as UR3
+}
+
+' Staff
+staff --> US1
+staff --> US2
+staff --> US3
+staff --> US5
+staff --> US6
+staff --> US7
+
+US3 ..> US4 : <<include>>
+
+' Admin
+UA1 <-- admin
+UA2 <-- admin
+UA3 <-- admin
+UA4 <-- admin
+UA5 <-- admin
+UA6 <-- admin
+
+' Recycler
+UR1 <-- recycler
+UR2 <-- recycler
+UR3 <-- recycler
+
+' Shared workflows between actors
+UA2 ..> US2 : triggers assignment
+UA4 ..> UR2 : allocates batch
+
+@enduml

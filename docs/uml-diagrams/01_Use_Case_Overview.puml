@@ -1,0 +1,94 @@
+@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\nUse Case Diagram (System Overview)
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Citizen" as citizen
+actor "Collection Staff" as staff
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "EcoPulse Intelligent Municipal Waste Management System" {
+  
+  ' Citizen Core
+  usecase "Register & Authenticate (JWT)" as UC_AUTH
+  usecase "Submit Waste Pickup Request\n(with YOLO AI & Payment)" as UC_PICKUP
+  usecase "Track & Manage Pickup Requests" as UC_TRACK
+  usecase "Register & Track Waste Grievance" as UC_COMPLAINT
+  usecase "Submit Recyclables for Rewards" as UC_REWARD
+
+  ' Staff Core
+  usecase "View Assigned Tasks & Schedule" as UC_STAFF_TASKS
+  usecase "Execute Route & Record Collection Weight" as UC_STAFF_COLLECT
+  usecase "Resolve Grievance with Proof Photo" as UC_STAFF_RESOLVE
+  usecase "Log Daily Segregated MCF Waste" as UC_STAFF_MCF
+
+  ' Admin Core
+  usecase "Assign Pickup to Staff & Set Date" as UC_ADMIN_ASSIGN
+  usecase "Assign Grievance to Ward Staff" as UC_ADMIN_COMPLAINT
+  usecase "Manage MCF Inventory & Allocate Recycler" as UC_ADMIN_MCF
+  usecase "Review & Allocate Reward Points" as UC_ADMIN_REWARD
+  usecase "Monitor Analytics & Municipal Reports" as UC_ADMIN_ANALYTICS
+
+  ' Recycler Core
+  usecase "View Assigned Recyclable Batches" as UC_REC_VIEW
+  usecase "Complete Recycling & Submit Verification" as UC_REC_COMPLETE
+}
+
+' Positioning: arrange vertically in natural groups
+citizen --> UC_AUTH
+citizen --> UC_PICKUP
+citizen --> UC_TRACK
+citizen --> UC_COMPLAINT
+citizen --> UC_REWARD
+
+staff --> UC_AUTH
+staff --> UC_STAFF_TASKS
+staff --> UC_STAFF_COLLECT
+staff --> UC_STAFF_RESOLVE
+staff --> UC_STAFF_MCF
+
+UC_AUTH <-- admin
+UC_ADMIN_ASSIGN <-- admin
+UC_ADMIN_COMPLAINT <-- admin
+UC_ADMIN_MCF <-- admin
+UC_ADMIN_REWARD <-- admin
+UC_ADMIN_ANALYTICS <-- admin
+
+UC_AUTH <-- recycler
+UC_REC_VIEW <-- recycler
+UC_REC_COMPLETE <-- recycler
+
+@enduml

@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 from django.db import models, transaction
 from django.http import JsonResponse
 from django.utils import timezone
+from django.conf import settings
 
 
 from rest_framework.decorators import (
@@ -1706,13 +1707,14 @@ class StaffBatchStartCollectionView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Validate date: Only today's scheduled collections may be started
-        today_dates = {timezone.now().date(), timezone.localdate()}
-        if parsed_date not in today_dates:
+        # Validate date: Allow present date and previous dates; disallow future dates
+        today_dates = {datetime.now().date(), timezone.now().date(), timezone.localdate()}
+        current_date = max(today_dates)
+        if parsed_date > current_date:
             return Response(
                 {
                     "success": False,
-                    "error": f"Collection can only be started for today's scheduled date ({timezone.localdate().strftime('%Y-%m-%d')})."
+                    "error": "Collection can only be started for today or previous scheduled dates (cannot start for future dates)."
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -1751,7 +1753,7 @@ class StaffBatchStartCollectionView(APIView):
                 return Response(
                     {
                         "success": True,
-                        "message": "All eligible pickups for today have already been started.",
+                        "message": "All eligible pickups for this date have already been started.",
                         "updated_count": 0,
                         "all_started": True,
                     },
@@ -3224,16 +3226,45 @@ class PaymentCreateOrderView(APIView):
                 "payment": PaymentSerializer(payment, context={"request": request}).data,
             }, status=status.HTTP_200_OK)
 
-        import uuid
-        order_id = f"order_ecopulse_{uuid.uuid4().hex[:12]}"
+        key_id = getattr(settings, "RAZORPAY_KEY_ID", "")
+        key_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "")
+        amount_in_rupees = float(payment.amount or 50.00)
+        amount_in_paise = int(amount_in_rupees * 100)
+
+        order_id = None
+        if key_id and key_secret:
+            try:
+                import razorpay
+                client = razorpay.Client(auth=(key_id, key_secret))
+                order_data = {
+                    "amount": amount_in_paise,
+                    "currency": "INR",
+                    "receipt": f"rcpt_{pickup.id}_{payment.id}",
+                    "notes": {
+                        "pickup_id": str(pickup.id),
+                        "user_id": str(pickup.user.id),
+                        "payment_id": str(payment.payment_id),
+                    }
+                }
+                razorpay_order = client.order.create(data=order_data)
+                order_id = razorpay_order.get("id")
+            except Exception as e:
+                logger.error(f"Razorpay order creation error: {e}")
+                import uuid
+                order_id = f"order_ecopulse_{uuid.uuid4().hex[:12]}"
+        else:
+            import uuid
+            order_id = f"order_ecopulse_{uuid.uuid4().hex[:12]}"
+
         payment.order_id = order_id
         payment.save(update_fields=["order_id"])
 
         return Response({
             "success": True,
             "order_id": order_id,
-            "amount": 50.00,
+            "amount": amount_in_rupees,
             "currency": "INR",
+            "key_id": key_id,
             "pickup_id": pickup.id,
             "payment_id": payment.payment_id,
             "payment": PaymentSerializer(payment, context={"request": request}).data,
@@ -3245,7 +3276,9 @@ class PaymentVerifyView(APIView):
 
     def post(self, request):
         pickup_id = request.data.get("pickup_id")
-        transaction_id = request.data.get("transaction_id")
+        razorpay_payment_id = request.data.get("razorpay_payment_id") or request.data.get("transaction_id")
+        razorpay_order_id = request.data.get("razorpay_order_id")
+        razorpay_signature = request.data.get("razorpay_signature")
         payment_method = request.data.get("payment_method", "UPI / Online")
 
         if not pickup_id:
@@ -3273,11 +3306,33 @@ class PaymentVerifyView(APIView):
                 "payment": serializer.data,
             }, status=status.HTTP_200_OK)
 
+        key_id = getattr(settings, "RAZORPAY_KEY_ID", "")
+        key_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "")
+
+        # Verify Razorpay signature if provided
+        if key_id and key_secret and razorpay_signature and razorpay_payment_id and razorpay_order_id:
+            try:
+                import razorpay
+                client = razorpay.Client(auth=(key_id, key_secret))
+                client.utility.verify_payment_signature({
+                    'razorpay_order_id': razorpay_order_id,
+                    'razorpay_payment_id': razorpay_payment_id,
+                    'razorpay_signature': razorpay_signature
+                })
+            except Exception as e:
+                logger.error(f"Razorpay signature verification failed: {e}")
+                return Response({
+                    "success": False,
+                    "error": "Payment verification failed. Invalid transaction signature.",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         import uuid
-        tx_id = transaction_id or f"TXN-{uuid.uuid4().hex[:10].upper()}"
+        tx_id = razorpay_payment_id or f"TXN-{uuid.uuid4().hex[:10].upper()}"
         payment.payment_status = "COMPLETED"
         payment.amount = 50.00
         payment.transaction_id = tx_id
+        if razorpay_order_id:
+            payment.order_id = razorpay_order_id
         payment.payment_method = payment_method
         payment.payment_date = timezone.now()
         payment.save()
@@ -3662,7 +3717,17 @@ class RewardSubmissionCreateView(APIView):
         cleaned_bin_location = str(bin_location).strip()
 
         # 4. Validate Waste Type
-        valid_waste_types = ["Paper", "Plastic", "Glass", "Metal", "Organic", "Electronics", "Miscellaneous"]
+        valid_waste_types = [
+            "Paper",
+            "Plastic",
+            "Plastic Bottles",
+            "Plastic Covers",
+            "Glass",
+            "Metal",
+            "Organic",
+            "Electronics",
+            "Miscellaneous",
+        ]
         if not waste_type or not str(waste_type).strip():
             return Response(
                 {
@@ -3681,31 +3746,51 @@ class RewardSubmissionCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 5. Validate Estimated Quantity
+        # 5. Validate Quantity
+        is_bottle_submission = matched_waste_type == "Plastic Bottles"
         if estimated_quantity is None or str(estimated_quantity).strip() == "":
             return Response(
                 {
                     "success": False,
-                    "error": "Please enter the estimated waste quantity.",
+                    "error": "Please enter the number of bottles." if is_bottle_submission else "Please enter the estimated waste quantity.",
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
         try:
             from decimal import Decimal
             qty_val = Decimal(str(estimated_quantity).strip())
-            if qty_val <= 0:
-                return Response(
-                    {
-                        "success": False,
-                        "error": "Estimated quantity must be greater than 0 kg.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            if is_bottle_submission:
+                # Must be a whole number (integer) and at least 2
+                if qty_val != qty_val.to_integral_value():
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "Number of bottles must be a whole number.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                if qty_val < 2:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "Please submit at least 2 plastic bottles to be eligible for rewards.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                if qty_val <= 0:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "Estimated quantity must be greater than 0 kg.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
         except Exception:
             return Response(
                 {
                     "success": False,
-                    "error": "Please enter a valid numeric quantity.",
+                    "error": "Please enter a valid whole number of bottles." if is_bottle_submission else "Please enter a valid numeric quantity.",
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )

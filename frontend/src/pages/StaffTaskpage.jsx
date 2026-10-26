@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL as API_BASE_URL } from "../api/api";
 import { getFullImageUrl } from "../utils/imageUrl";
@@ -1871,8 +1871,28 @@ function ComplaintTaskTable({
 // ---------------------------------------------------------------------------
 export default function MyTaskDashboard() {
   const navigate = useNavigate();
-  // 4 Tabs: "pending_requests" | "completed_requests" | "pending_complaints" | "completed_complaints"
-  const [activeTab, setActiveTab] = useState("pending_requests");
+  const [searchParams] = useSearchParams();
+
+  // Tabs: "pending_requests" | "scheduled_requests" | "completed_requests" | "pending_complaints" | "completed_complaints"
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "scheduled" || tabParam === "scheduled_requests" || tabParam === "scheduled_tasks") {
+      return "scheduled_requests";
+    }
+    if (tabParam === "completed" || tabParam === "completed_requests") {
+      return "completed_requests";
+    }
+    return "pending_requests";
+  });
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "scheduled" || tabParam === "scheduled_requests" || tabParam === "scheduled_tasks") {
+      setActiveTab("scheduled_requests");
+    } else if (tabParam === "completed" || tabParam === "completed_requests") {
+      setActiveTab("completed_requests");
+    }
+  }, [searchParams]);
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1889,12 +1909,14 @@ export default function MyTaskDashboard() {
 
   // Filter States for each section
   const [pendingReqFilter, setPendingReqFilter] = useState({ search: "", wasteType: "", date: "", status: "" });
+  const [scheduledReqFilter, setScheduledReqFilter] = useState({ search: "", wasteType: "", date: "", status: "" });
   const [completedReqFilter, setCompletedReqFilter] = useState({ search: "", wasteType: "", date: "", status: "" });
   const [pendingCompFilter, setPendingCompFilter] = useState({ search: "", priority: "", date: "", status: "" });
   const [completedCompFilter, setCompletedCompFilter] = useState({ search: "", priority: "", date: "", status: "" });
 
   // Sorting States for each section
   const [pendingReqSort, setPendingReqSort] = useState({ key: null, dir: null });
+  const [scheduledReqSort, setScheduledReqSort] = useState({ key: null, dir: null });
   const [completedReqSort, setCompletedReqSort] = useState({ key: null, dir: null });
   const [pendingCompSort, setPendingCompSort] = useState({ key: null, dir: null });
   const [completedCompSort, setCompletedCompSort] = useState({ key: null, dir: null });
@@ -1924,6 +1946,13 @@ export default function MyTaskDashboard() {
     return tasks.filter((t) => String(t.status || "").trim().toUpperCase() === "COMPLETED");
   }, [tasks]);
   const completedTasksRaw = completedTasks;
+
+  const scheduledTasksRaw = useMemo(() => {
+    return tasks.filter((t) => {
+      const s = String(t.status || "").trim().toUpperCase();
+      return Boolean(t.scheduledPickupDate) && s !== "COMPLETED" && s !== "CANCELLED";
+    });
+  }, [tasks]);
 
   const pendingComplaintsRaw = useMemo(() => {
     return complaints.filter((c) => !["RESOLVED", "COMPLETED", "CLOSED"].includes(String(c.status || "").toUpperCase()));
@@ -2067,6 +2096,33 @@ export default function MyTaskDashboard() {
     });
   }, [completedTasksRaw, completedReqFilter, completedReqSort]);
 
+  const filteredScheduledTasks = useMemo(() => {
+    const list = scheduledTasksRaw.filter((t) => {
+      if (scheduledReqFilter.search) {
+        const q = scheduledReqFilter.search.toLowerCase().trim();
+        const idMatch = String(t.id || "").toLowerCase().includes(q);
+        const nameMatch = String(t.userName || "").toLowerCase().includes(q);
+        const locMatch = String(t.pickup || t.location_name || "").toLowerCase().includes(q);
+        const wardMatch = String(t.ward || "").toLowerCase().includes(q);
+        if (!idMatch && !nameMatch && !locMatch && !wardMatch) return false;
+      }
+      if (scheduledReqFilter.wasteType) {
+        if (String(t.wasteType || "").toLowerCase() !== scheduledReqFilter.wasteType.toLowerCase()) return false;
+      }
+      if (scheduledReqFilter.date) {
+        const d = String(t.scheduledPickupDate || "").split("T")[0];
+        if (d !== scheduledReqFilter.date) return false;
+      }
+      if (scheduledReqFilter.status) {
+        if (String(t.status || "").toUpperCase() !== scheduledReqFilter.status.toUpperCase()) return false;
+      }
+      return true;
+    });
+    return sortTableData(list, scheduledReqSort.key, scheduledReqSort.dir, {
+      scheduledPickupDate: (t) => t.scheduledPickupDate || "",
+    });
+  }, [scheduledTasksRaw, scheduledReqFilter, scheduledReqSort]);
+
   const filteredPendingComplaints = useMemo(() => {
     const list = pendingComplaintsRaw.filter((c) => {
       if (pendingCompFilter.search) {
@@ -2126,6 +2182,13 @@ export default function MyTaskDashboard() {
   // Generic Sort Handlers
   const handleSortPendingReq = (key) => {
     setPendingReqSort((prev) => ({
+      key,
+      dir: getNextSortDirection(prev.key, key, prev.dir),
+    }));
+  };
+
+  const handleSortScheduledReq = (key) => {
+    setScheduledReqSort((prev) => ({
       key,
       dir: getNextSortDirection(prev.key, key, prev.dir),
     }));
@@ -2403,6 +2466,30 @@ export default function MyTaskDashboard() {
               Pending Requests ({pendingTasksRaw.length})
             </button>
 
+            {/* Scheduled Tasks Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("scheduled_requests")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                borderRadius: 20,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                border: "1px solid",
+                borderColor: activeTab === "scheduled_requests" ? "#4c7a2e" : "#cfe7bb",
+                background: activeTab === "scheduled_requests" ? "#4c7a2e" : "#ffffff",
+                color: activeTab === "scheduled_requests" ? "#ffffff" : "#2f4a1c",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <CalendarIcon size={14} />
+              Scheduled Tasks ({scheduledTasksRaw.length})
+            </button>
+
             {/* Completed Requests Tab */}
             <button
               type="button"
@@ -2618,6 +2705,42 @@ export default function MyTaskDashboard() {
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* SECTION: SCHEDULED REQUESTS */}
+      {activeTab === "scheduled_requests" && (
+        <div>
+          <StaffFilterBar
+            search={scheduledReqFilter.search}
+            onSearchChange={(search) => setScheduledReqFilter((p) => ({ ...p, search }))}
+            wasteType={scheduledReqFilter.wasteType}
+            onWasteTypeChange={(wasteType) => setScheduledReqFilter((p) => ({ ...p, wasteType }))}
+            date={scheduledReqFilter.date}
+            onDateChange={(date) => setScheduledReqFilter((p) => ({ ...p, date }))}
+            status={scheduledReqFilter.status}
+            onStatusChange={(status) => setScheduledReqFilter((p) => ({ ...p, status }))}
+            statusOptions={[
+              { value: "ASSIGNED", label: "Assigned" },
+              { value: "IN_PROGRESS", label: "In Progress" },
+              { value: "PENDING", label: "Pending" },
+            ]}
+            onClear={() => setScheduledReqFilter({ search: "", wasteType: "", date: "", status: "" })}
+            placeholder="Search by User, ID, Location, Ward..."
+            totalCount={scheduledTasksRaw.length}
+            filteredCount={filteredScheduledTasks.length}
+          />
+          <TaskTable
+            tasks={filteredScheduledTasks}
+            loading={loading}
+            error={error}
+            onStatusClick={handleStatusClick}
+            onStartPickup={handleStartPickup}
+            onOpenRoute={(task) => setActiveRoutePickup(task)}
+            sortKey={scheduledReqSort.key}
+            sortDir={scheduledReqSort.dir}
+            onSort={handleSortScheduledReq}
+          />
         </div>
       )}
 

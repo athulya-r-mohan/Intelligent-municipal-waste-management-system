@@ -27,6 +27,7 @@ import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminPayments.css";
 import { BASE_URL as API_BASE_URL } from "../api/api";
+import { safeNavigateBack } from "../utils/navigation";
 
 function getAccessToken() {
   return (
@@ -158,11 +159,16 @@ export default function AdminPayments() {
       {/* TOPBAR */}
       <header className="ep-admin-pay-topbar">
         <div className="ep-admin-pay-topbar-left">
-          <button className="ep-admin-pay-back-btn" onClick={() => navigate("/admin")}>
+          <button className="ep-admin-pay-back-btn" onClick={() => safeNavigateBack(navigate, "/admin")}>
             <ArrowLeft size={16} />
             Admin Dashboard
           </button>
-          <div className="ep-admin-pay-brand">
+          <div
+            className="ep-admin-pay-brand"
+            onClick={() => navigate("/admin")}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Admin Dashboard"
+          >
             Eco<span>Pulse</span> Admin
           </div>
         </div>

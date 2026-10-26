@@ -4,6 +4,8 @@ import axios from "axios";
 import { API_BASE_URL } from "../api/api";
 import LOGO_IMG from "../assets/logo.png";
 import BIN_IMG from "../assets/bin.png";
+import { isAuthenticated } from "../utils/auth";
+import { getRoleDashboard } from "../utils/navigation";
 
 
 
@@ -387,7 +389,18 @@ export default function EcoPulseLogin() {
 
           <div className="panel-left">
 
-            <div className="logo-row">
+            <div
+              className="logo-row"
+              onClick={() => {
+                if (isAuthenticated()) {
+                  navigate(getRoleDashboard());
+                } else {
+                  navigate("/");
+                }
+              }}
+              style={{ cursor: "pointer" }}
+              title="EcoPulse"
+            >
               <img src={LOGO_IMG} alt="Eco Pulse logo" />
             </div>
 

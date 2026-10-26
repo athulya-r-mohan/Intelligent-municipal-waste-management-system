@@ -1,0 +1,111 @@
+@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\nSystem Use Case Diagram (Master Architecture)
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 14
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Citizen" as citizen
+actor "Collection Staff" as staff
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "EcoPulse Intelligent Municipal Waste Management System" {
+  
+  package "Citizen Services" as P1 {
+    usecase "Submit Waste Pickup Request\n(AI Detection & Fee Payment)" as C1
+    usecase "Track Pickup Request Status" as C2
+    usecase "Register & Track Waste Grievance" as C3
+    usecase "Submit Recyclables for Rewards" as C4
+  }
+
+  package "Field Operations" as P2 {
+    usecase "View Assigned Tasks & Schedule" as S1
+    usecase "Execute Route & Record Waste Weight" as S2
+    usecase "Resolve Grievance with Proof Photo" as S3
+    usecase "Log Daily Segregated MCF Waste" as S4
+  }
+
+  package "Municipal Administration" as P3 {
+    usecase "Assign Pickup to Staff & Set Date" as A1
+    usecase "Assign Grievance to Ward Staff" as A2
+    usecase "Review & Allocate Reward Points" as A3
+    usecase "Manage MCF Totals & Assign Recycler" as A4
+    usecase "View Analytics & Operational Reports" as A5
+  }
+
+  package "Recycling Operations" as P4 {
+    usecase "View Assigned Recyclable Batches" as R1
+    usecase "Complete Recycling & Submit Proof" as R2
+  }
+}
+
+' Parallel column placement
+P1 -[hidden]right-> P3
+P2 -[hidden]right-> P4
+P1 -[hidden]down-> P2
+P3 -[hidden]down-> P4
+
+citizen -[hidden]down-> staff
+admin -[hidden]down-> recycler
+
+' Left-side connections
+citizen --> C1
+citizen --> C2
+citizen --> C3
+citizen --> C4
+
+staff --> S1
+staff --> S2
+staff --> S3
+staff --> S4
+
+' Right-side connections (FROM right actor TO use case)
+A1 <-- admin
+A2 <-- admin
+A3 <-- admin
+A4 <-- admin
+A5 <-- admin
+
+R1 <-- recycler
+R2 <-- recycler
+
+@enduml

@@ -23,6 +23,7 @@ import SortableTh from "../components/SortableTh";
 import { sortTableData, getNextSortDirection } from "../utils/tableSort";
 import "../components/AdminMCFDetails.css";
 import { BASE_URL as API_BASE_URL } from "../api/api";
+import { safeNavigateBack } from "../utils/navigation";
 
 const CATEGORY_ICONS = {
   Paper: "📄",
@@ -178,12 +179,17 @@ export default function AdminMCFDetails() {
           <button
             type="button"
             className="mcf-back-btn"
-            onClick={() => navigate("/admin/mcf")}
+            onClick={() => safeNavigateBack(navigate, "/admin/mcf")}
           >
             <ArrowLeft size={16} />
             MCF Daily List
           </button>
-          <div className="mcf-brand-logo">
+          <div
+            className="mcf-brand-logo"
+            onClick={() => navigate("/admin")}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Admin Dashboard"
+          >
             Eco <span>Pulse</span> · MCF Date Details
           </div>
         </div>

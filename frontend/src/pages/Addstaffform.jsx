@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { UserPlus, CheckCircle2, Truck, Activity } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { UserPlus, CheckCircle2, Truck, Activity, ArrowLeft } from "lucide-react";
 import axios from "axios";
 import { BASE_URL } from "../api/api";
+import { safeNavigateBack } from "../utils/navigation";
 
 const WARDS = [
   { id: 1, name: "Ward 1" },
@@ -18,9 +20,14 @@ const WARDS = [
 
 const DESIGNATIONS = ["Staff", "Driver"];
 
-function EcoPulseLogo() {
+function EcoPulseLogo({ onClick }) {
   return (
-    <div className="eco-logo">
+    <div
+      className="eco-logo"
+      onClick={onClick}
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      title={onClick ? "EcoPulse Admin Dashboard" : undefined}
+    >
       <div className="logo-circle">
         <span className="pulse-ring"></span>
 
@@ -72,6 +79,7 @@ function PulseDivider() {
 }
 
 export default function AddStaffForm() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -675,9 +683,31 @@ export default function AddStaffForm() {
 
         <div className="staff-card">
 
+          <button
+            type="button"
+            onClick={() => safeNavigateBack(navigate, "/admin")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              color: "#166534",
+              borderRadius: 8,
+              padding: "6px 12px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              marginBottom: 14,
+            }}
+            aria-label="Back to Admin Dashboard"
+          >
+            <ArrowLeft size={15} /> Dashboard
+          </button>
+
           {/* LOGO */}
 
-          <EcoPulseLogo />
+          <EcoPulseLogo onClick={() => navigate("/admin")} />
 
 
           {/* HEADING */}

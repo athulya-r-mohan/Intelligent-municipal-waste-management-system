@@ -54,7 +54,7 @@ export default function StaffScheduledPickupTasks() {
     return date;
   }, [date]);
 
-  // Check if current scheduled date is today (local or UTC)
+  // Check if current scheduled date is present date or a previous date (future dates disallowed)
   const isDateToday = useMemo(() => {
     if (!date) return false;
     const now = new Date();
@@ -62,9 +62,8 @@ export default function StaffScheduledPickupTasks() {
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
     const localToday = `${year}-${month}-${day}`;
-    const utcToday = now.toISOString().slice(0, 10);
     const target = String(date).slice(0, 10);
-    return target === localToday || target === utcToday;
+    return target <= localToday;
   }, [date]);
 
   const fetchMyTasks = async () => {
@@ -194,7 +193,7 @@ export default function StaffScheduledPickupTasks() {
       setConfirmModalOpen(false);
       setStartSuccessMessage(
         response.data?.message ||
-          "Today's collection started successfully! Citizens can no longer cancel these pickups."
+          "Collection started successfully! Citizens can no longer cancel these pickups."
       );
       setTimeout(() => {
         setStartSuccessMessage("");
@@ -360,7 +359,7 @@ export default function StaffScheduledPickupTasks() {
                   boxShadow: "none",
                   opacity: 0.95,
                 }}
-                title="Today's collection has already started for all scheduled pickups"
+                title="Collection has already started for all scheduled pickups on this date"
               >
                 <CheckCircle2 size={15} color="#15803d" />
                 Collection Started
@@ -404,18 +403,18 @@ export default function StaffScheduledPickupTasks() {
                 }}
                 title={
                   !isDateToday
-                    ? "Collection can only be started for today's scheduled date"
+                    ? "Collection cannot be started for future scheduled dates"
                     : tasks.length === 0
                     ? "No pickup tasks scheduled for this date"
                     : hasInProgressTasks && hasUnstartedTasks
                     ? "Start collection for remaining / newly assigned pickups"
-                    : "Start today's collection for all assigned pickups"
+                    : "Start collection for all assigned pickups"
                 }
               >
                 <Play size={13} fill="currentColor" />
                 {startingCollection
                   ? "Starting Collection..."
-                  : "Start Today's Collection"}
+                  : "Start Collection"}
               </button>
             )}
 
@@ -605,7 +604,7 @@ export default function StaffScheduledPickupTasks() {
                     color: "#1f2e22",
                   }}
                 >
-                  Start Today's Collection
+                  Start Collection
                 </h3>
                 <p
                   style={{
@@ -615,7 +614,7 @@ export default function StaffScheduledPickupTasks() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Are you sure you want to start today's collection? Once
+                  Are you sure you want to start collection for this date? Once
                   started, citizens will no longer be able to cancel these
                   pickup requests.
                 </p>

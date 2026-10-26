@@ -1,0 +1,98 @@
+@startuml
+title EcoPulse - Deployment Diagram (Physical Infrastructure & Cloud Topology)
+
+skinparam dpi 300
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 14
+skinparam roundCorner 8
+skinparam nodesep 50
+skinparam ranksep 60
+
+skinparam node {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 14
+  FontStyle bold
+  ArrowColor #000000
+}
+
+skinparam artifact {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+skinparam storage {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+skinparam cloud {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 14
+  FontStyle bold
+}
+
+node "Client Device\n(PC / Smartphone)" as Node_Client {
+  node "Modern Web Browser" {
+    artifact "React.js SPA Bundle\n(HTML5, CSS3, Minified JS)" as Art_SPA
+    artifact "Service Worker\n(Push Notification Listener)" as Art_SW
+  }
+}
+
+node "Vercel Edge Platform\n(Global CDN & Static Hosting)" as Node_Vercel {
+  artifact "Production Static Assets\n(ecopulse-nine-pi.vercel.app)" as Art_VercelBuild
+}
+
+node "AWS EC2 Cloud Instance\n(Ubuntu 22.04 LTS Host VM)" as Node_AWS {
+  node "Docker Engine Runtime" as Node_Docker {
+    
+    node "Container: ecopulse_backend\n(Port 8000)" as Cont_Backend {
+      artifact "Gunicorn WSGI Server\n(3 Workers, 2 Threads)" as Art_Gunicorn
+      artifact "Django 6.0 REST API\n(Python 3.12 / 3.14)" as Art_Django
+      artifact "Ultralytics YOLOv8 Engine\n(best.pt PyTorch Weights)" as Art_YOLO
+      artifact "WhiteNoise Static Middleware" as Art_WhiteNoise
+    }
+
+    node "Container: ecopulse_postgres\n(Port 5432)" as Cont_DB {
+      artifact "PostgreSQL 16 Alpine\n(Relational Database Engine)" as Art_Postgres
+    }
+
+    node "Docker Persistent Volumes" as Node_Volumes {
+      storage "ecopulse_postgres_data\n(Relational Tables & Indexes)" as Vol_DB
+      storage "ecopulse_media_data\n(Uploaded Photos & Proofs)" as Vol_Media
+      storage "ecopulse_static_data\n(Compiled CSS/JS Files)" as Vol_Static
+    }
+  }
+}
+
+cloud "External Cloud Infrastructure" as Node_Cloud {
+  node "OSRM Routing Servers\n(OpenStreetMap Highway Routing)" as Node_OSRM
+  node "Browser Push Services\n(Google FCM / Mozilla Autopush)" as Node_Push
+  node "Online Payment Gateway\n(Razorpay / UPI Payment API)" as Node_Razorpay
+}
+
+' Protocols & Deployments
+Node_Client -- Node_Vercel : HTTPS (Port 443)\nStatic Resource Fetch
+Node_Client -- Cont_Backend : HTTPS (Port 443 / 8000)\nREST API (JSON & Multipart Data)
+Node_Client -- Node_OSRM : HTTPS (Port 443)\nDriving Route Polyline Query
+
+Cont_Backend -- Cont_DB : TCP (Port 5432)\necopulse_net Docker Bridge
+Cont_DB -- Vol_DB : Mounts (/var/lib/postgresql/data)
+Cont_Backend -- Vol_Media : Mounts (/app/media)
+Cont_Backend -- Vol_Static : Mounts (/app/staticfiles)
+
+Cont_Backend -- Node_Razorpay : HTTPS / REST (Port 443)\nPayment Order & Webhook Verify
+Cont_Backend -- Node_Push : HTTPS / VAPID (Port 443)\nPush Event Trigger
+Node_Push ..> Art_SW : WSS / Push Notification Delivery
+
+@enduml

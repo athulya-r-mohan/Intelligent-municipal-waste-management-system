@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
+import { safeNavigateBack } from "../utils/navigation";
 
 import {
   MapContainer,
@@ -245,9 +247,16 @@ function MapController({
 // MAIN COMPONENT
 // ==================================================
 
-export default function EcoPulseWastePickup({
-  onBack = () => {},
-}) {
+export default function EcoPulseWastePickup({ onBack }) {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (typeof onBack === "function") {
+      onBack();
+    } else {
+      safeNavigateBack(navigate, "/user");
+    }
+  };
   // ==================================================
   // IMAGE STATES
   // ==================================================
@@ -1127,7 +1136,12 @@ export default function EcoPulseWastePickup({
 
       <div className="pickup-header">
 
-        <div className="pickup-logo">
+        <div
+          className="pickup-logo"
+          onClick={() => navigate("/user")}
+          style={{ cursor: "pointer" }}
+          title="EcoPulse Dashboard"
+        >
 
           <div className="pickup-logo-badge">
 
@@ -1147,7 +1161,7 @@ export default function EcoPulseWastePickup({
 
         <button
           className="pickup-back-btn"
-          onClick={onBack}
+          onClick={handleBack}
           aria-label="Go back"
         >
 
@@ -1668,123 +1682,30 @@ export default function EcoPulseWastePickup({
 
               </p>
 
-              {Array.isArray(
-                aiResult.imageResults
-              ) &&
-              aiResult.imageResults.length > 0 ? (
-
+              {Array.isArray(aiResult.detections) && aiResult.detections.length > 0 ? (
                 <div className="pickup-ai-detections">
+                  {aiResult.detections.map((detection, index) => {
+                    const confidence = Number(detection.confidence) * 100;
+                    const safeConfidence = Math.min(
+                      Math.max(Number.isFinite(confidence) ? confidence : 0, 0),
+                      100
+                    );
+                    const category =
+                      detection.class ||
+                      detection.class_name ||
+                      detection.name ||
+                      "Unknown Waste";
 
-                  {aiResult.imageResults.map(
-                    (
-                      imageResult,
-                      imageIndex
-                    ) => (
-
+                    return (
                       <div
-                        className="pickup-ai-image-result"
-                        key={`${imageResult.imageName}-${imageIndex}`}
+                        className="pickup-ai-detection"
+                        key={`${category}-${index}`}
                       >
-
-                        <div className="pickup-ai-image-name">
-
-                          <strong>
-                            Image{" "}
-                            {
-                              imageResult.imageIndex
-                            }
-                          </strong>
-
-                          <span>
-                            {
-                              imageResult.imageName
-                            }
-                          </span>
-
-                        </div>
-
-                        {Array.isArray(
-                          imageResult.detections
-                        ) &&
-                        imageResult.detections.length >
-                          0 ? (
-
-                          <div className="pickup-ai-image-detections">
-
-                            {imageResult.detections.map(
-                              (
-                                detection,
-                                detectionIndex
-                              ) => {
-
-                                const confidence =
-                                  Number(
-                                    detection.confidence
-                                  ) *
-                                  100;
-
-                                const safeConfidence =
-                                  Math.min(
-                                    Math.max(
-                                      Number.isFinite(
-                                        confidence
-                                      )
-                                        ? confidence
-                                        : 0,
-                                      0
-                                    ),
-                                    100
-                                  );
-
-                                return (
-                                  <div
-                                    className="pickup-ai-detection"
-                                    key={
-                                      detectionIndex
-                                    }
-                                  >
-
-                                    <span>
-
-                                      {detection.class ||
-                                        detection.class_name ||
-                                        detection.name ||
-                                        "Unknown"}
-
-                                    </span>
-
-                                    <span>
-
-                                      {safeConfidence.toFixed(
-                                        2
-                                      )}
-
-                                      %
-
-                                    </span>
-
-                                  </div>
-                                );
-                              }
-                            )}
-
-                          </div>
-
-                        ) : (
-
-                          <div className="pickup-ai-no-detection">
-
-                            No waste detected
-
-                          </div>
-
-                        )}
-
+                        <span>{category}</span>
+                        <span>{safeConfidence.toFixed(2)}%</span>
                       </div>
-
-                    )
-                  )}
-
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="pickup-ai-message" style={{ color: "#4c7a2e", fontSize: "13.5px", marginTop: "8px" }}>

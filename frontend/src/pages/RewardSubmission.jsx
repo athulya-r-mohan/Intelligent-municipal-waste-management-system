@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { getAccessToken } from "../utils/auth";
 import NotificationBell from "../components/NotificationBell";
+import { safeNavigateBack } from "../utils/navigation";
 
 export default function RewardSubmission() {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export default function RewardSubmission() {
   const [binLocation, setBinLocation] = useState("");
   const [customBinLocation, setCustomBinLocation] = useState("");
   const [wasteType, setWasteType] = useState("");
-  const [estimatedQuantity, setEstimatedQuantity] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -91,9 +92,20 @@ export default function RewardSubmission() {
       return;
     }
 
-    if (!estimatedQuantity || isNaN(parseFloat(estimatedQuantity)) || parseFloat(estimatedQuantity) <= 0) {
-      setErrorMessage("Please enter a valid estimated quantity greater than 0 kg.");
-      return;
+    const isBottles = wasteType === "Plastic Bottles";
+
+    if (isBottles) {
+      const bottleNum = Number(quantity);
+      if (!quantity || !Number.isInteger(bottleNum) || bottleNum < 2) {
+        setErrorMessage("Please enter a valid whole number of at least 2 bottles to be eligible for rewards.");
+        return;
+      }
+    } else {
+      const qtyNum = parseFloat(quantity);
+      if (!quantity || isNaN(qtyNum) || qtyNum <= 0) {
+        setErrorMessage("Please enter a valid estimated quantity greater than 0 kg.");
+        return;
+      }
     }
 
     if (!selectedFile) {
@@ -114,7 +126,7 @@ export default function RewardSubmission() {
       formData.append("date", date);
       formData.append("bin_location", finalLocation);
       formData.append("waste_type", wasteType);
-      formData.append("estimated_quantity", estimatedQuantity);
+      formData.append("estimated_quantity", String(quantity).trim());
       formData.append("photo", selectedFile);
 
       const headers = {
@@ -131,7 +143,7 @@ export default function RewardSubmission() {
         setBinLocation("");
         setCustomBinLocation("");
         setWasteType("");
-        setEstimatedQuantity("");
+        setQuantity("");
         setSelectedFile(null);
         setPreviewUrl(null);
         if (fileInputRef.current) {
@@ -508,7 +520,7 @@ export default function RewardSubmission() {
         <div className="reward-header-left">
           <button
             className="reward-back-btn"
-            onClick={() => navigate("/user")}
+            onClick={() => safeNavigateBack(navigate, "/user")}
             aria-label="Back to User Page"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -521,7 +533,12 @@ export default function RewardSubmission() {
               />
             </svg>
           </button>
-          <div className="reward-logo-mark">
+          <div
+            className="reward-logo-mark"
+            onClick={() => navigate("/user")}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
                 d="M2 12h5l2-6 4 12 2-6h7"
@@ -532,7 +549,12 @@ export default function RewardSubmission() {
               />
             </svg>
           </div>
-          <div className="reward-brand">
+          <div
+            className="reward-brand"
+            onClick={() => navigate("/user")}
+            style={{ cursor: "pointer" }}
+            title="EcoPulse Dashboard"
+          >
             Eco <span className="accent">Pulse</span>
           </div>
         </div>
@@ -651,55 +673,79 @@ export default function RewardSubmission() {
               </div>
             )}
 
-            {/* Row 2: Type of Waste & Estimated Quantity */}
-            <div className="form-row">
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="field-label" htmlFor="waste-type">
-                  Type of Waste <span className="field-required">*</span>
-                </label>
-                <select
-                  id="waste-type"
-                  className="field-select"
-                  value={wasteType}
-                  onChange={(e) => setWasteType(e.target.value)}
-                  required
-                >
-                  <option value="">Select Waste Type</option>
-                  <option value="Paper">Paper</option>
-                  <option value="Plastic">Plastic</option>
-                  <option value="Glass">Glass</option>
-                  <option value="Metal">Metal</option>
-                  <option value="Organic">Organic</option>
-                  <option value="Electronics">Electronics</option>
-                  <option value="Miscellaneous">Miscellaneous</option>
-                </select>
-              </div>
+            {/* Type of Waste */}
+            <div className="form-group">
+              <label className="field-label" htmlFor="waste-type">
+                Type of Waste <span className="field-required">*</span>
+              </label>
+              <select
+                id="waste-type"
+                className="field-select"
+                value={wasteType}
+                onChange={(e) => {
+                  setWasteType(e.target.value);
+                  setQuantity("");
+                }}
+                required
+              >
+                <option value="">Select Waste Type</option>
+                <option value="Plastic Bottles">Plastic Bottles</option>
+                <option value="Plastic Covers">Plastic Covers</option>
+                <option value="Paper">Paper</option>
+                <option value="Glass">Glass</option>
+                <option value="Metal">Metal</option>
+                <option value="Organic">Organic</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Miscellaneous">Miscellaneous</option>
+              </select>
+            </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="field-label" htmlFor="estimated-quantity">
-                  Estimated Quantity <span className="field-required">*</span>
+            {/* Quantity / Bottle Count input */}
+            {wasteType && (
+              <div className="form-group">
+                <label className="field-label" htmlFor="submission-quantity">
+                  {wasteType === "Plastic Bottles" ? "Number of Bottles" : "Estimated Quantity"}{" "}
+                  <span className="field-required">*</span>
                 </label>
                 <div className="input-unit-wrap">
                   <input
-                    id="estimated-quantity"
+                    id="submission-quantity"
                     type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="e.g. 5"
+                    min={wasteType === "Plastic Bottles" ? "2" : "0.01"}
+                    step={wasteType === "Plastic Bottles" ? "1" : "0.01"}
+                    placeholder={wasteType === "Plastic Bottles" ? "Minimum 2 bottles (e.g. 2, 4, 6...)" : "e.g. 5"}
                     className="field-input with-unit"
-                    value={estimatedQuantity}
+                    value={quantity}
                     onChange={(e) => {
                       const val = e.target.value;
-                      if (val === "" || parseFloat(val) >= 0) {
-                        setEstimatedQuantity(val);
+                      if (val === "") {
+                        setQuantity("");
+                        return;
+                      }
+                      if (wasteType === "Plastic Bottles") {
+                        // Whole numbers only
+                        if (/^\d*$/.test(val)) {
+                          setQuantity(val);
+                        }
+                      } else {
+                        if (parseFloat(val) >= 0 || val === ".") {
+                          setQuantity(val);
+                        }
                       }
                     }}
                     required
                   />
-                  <span className="unit-badge">kg</span>
+                  <span className="unit-badge">
+                    {wasteType === "Plastic Bottles" ? "bottles" : "kg"}
+                  </span>
                 </div>
+                {wasteType === "Plastic Bottles" && (
+                  <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--muted)" }}>
+                    Rule: Return at least 2 bottles to earn reward points (1 bottle = 5 points).
+                  </p>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Photo Upload Section */}
             <div className="upload-section">

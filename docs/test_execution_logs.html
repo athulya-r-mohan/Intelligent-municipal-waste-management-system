@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selenium Test Execution Logs Report - EcoPulse Waste Management System</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --pass: #16a34a;
+      --pass-bg: #dcfce7;
+      --fail: #dc2626;
+      --fail-bg: #fee2e2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Top Sticky Action Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 14px 22px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .top-bar-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Main Report Header */
+    .report-header {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      text-align: center;
+    }
+
+    .report-main-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .report-sub-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .report-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Summary KPI Grid */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .kpi-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .val-pass {
+      color: var(--pass);
+    }
+
+    /* Test Case Card */
+    .test-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+
+    .test-card-header {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .test-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .test-id-pill {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .test-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .test-module {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .test-header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .duration-tag {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      background: #e2e8f0;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .status-badge {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .badge-pass {
+      background: var(--pass-bg);
+      color: var(--pass);
+    }
+
+    .badge-fail {
+      background: var(--fail-bg);
+      color: var(--fail);
+    }
+
+    /* Card Body */
+    .test-card-body {
+      padding: 20px;
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    /* Step Log Table */
+    .table-responsive {
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    table.steps-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      border: 1px solid var(--border);
+    }
+
+    table.steps-table th,
+    table.steps-table td {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    table.steps-table th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .col-time {
+      width: 10%;
+      font-family: monospace;
+      color: var(--text-muted);
+    }
+
+    .col-step-num {
+      width: 8%;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .col-action {
+      width: 25%;
+    }
+
+    .col-target {
+      width: 22%;
+    }
+
+    .col-target code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #0284c7;
+    }
+
+    .col-status {
+      width: 8%;
+      text-align: center;
+    }
+
+    .col-details {
+      width: 27%;
+      color: #475569;
+    }
+
+    .text-pass {
+      color: var(--pass);
+    }
+
+    .text-fail {
+      color: var(--fail);
+    }
+
+    /* Terminal Console Box */
+    details.console-log-accordion {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    details.console-log-accordion summary {
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      background: #f1f5f9;
+      user-select: none;
+    }
+
+    pre.terminal-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 12px;
+      padding: 14px 18px;
+      line-height: 1.6;
+      overflow-x: auto;
+      max-height: 250px;
+    }
+
+    /* Print Setup */
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .top-bar {
+        display: none !important;
+      }
+      .container {
+        max-width: 100%;
+      }
+      .test-card {
+        page-break-after: always;
+        box-shadow: none;
+        border: 1px solid #000;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Top Action Bar -->
+    <div class="top-bar">
+      <div class="top-bar-title">
+        <span>⚡</span>
+        <span>EcoPulse Selenium Automation &mdash; Test Execution Logs</span>
+      </div>
+      <div>
+        <button class="btn" onclick="window.print()">
+          <span>🖨️</span> Print / Save as PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Header Section -->
+    <header class="report-header">
+      <h1 class="report-main-title">Automated Selenium Test Execution Log Report</h1>
+      <h2 class="report-sub-title">EcoPulse: Intelligent Municipal Waste Management System</h2>
+      <div class="report-meta">
+        Execution Mode: Chrome WebDriver (Headless) &bull; Generated: October 26, 2026 - 10:16:01 &bull; Target: http://localhost:5173
+      </div>
+    </header>
+
+    <!-- KPI Summary Grid -->
+    <section class="summary-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">Total Test Cases</span>
+        <span class="kpi-value">5</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Tests Passed</span>
+        <span class="kpi-value val-pass">5 / 5 (100%)</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Tests Failed</span>
+        <span class="kpi-value">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Total Execution Time</span>
+        <span class="kpi-value">41.02s</span>
+      </div>
+    </section>
+
+    <!-- Test Cases Logs -->
+    <main>
+      
+        <article class="test-card" id="tc-01">
+          <header class="test-card-header">
+            <div class="test-header-left">
+              <span class="test-id-pill">TC-01</span>
+              <div>
+                <h3 class="test-title">Verify Citizen Login and Role-Based Redirection</h3>
+                <span class="test-module">Module: User Authentication &amp; Access Control</span>
+              </div>
+            </div>
+            <div class="test-header-right">
+              <span class="duration-tag">⏱ 10.25s</span>
+              <span class="status-badge badge-pass">PASS</span>
+            </div>
+          </header>
+
+          <div class="test-card-body">
+            <h4 class="section-label">Execution Step-by-Step Log</h4>
+            <div class="table-responsive">
+              <table class="steps-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Step #</th>
+                    <th>Action</th>
+                    <th>Target / Selector</th>
+                    <th>Status</th>
+                    <th>Details & Observations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+            <tr>
+              <td class="col-time">10:15:25</td>
+              <td class="col-step-num">Step 1</td>
+              <td class="col-action"><strong>Navigate to Login Page</strong></td>
+              <td class="col-target"><code>/login</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Login form loaded with email and password fields</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:26</td>
+              <td class="col-step-num">Step 2</td>
+              <td class="col-action"><strong>Enter Registered Email</strong></td>
+              <td class="col-target"><code>input#email</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Entered: citizen.john@ecopulse.local</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:26</td>
+              <td class="col-step-num">Step 3</td>
+              <td class="col-action"><strong>Enter Password</strong></td>
+              <td class="col-target"><code>input#password</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Password entered; masked state confirmed (True)</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:26</td>
+              <td class="col-step-num">Step 4</td>
+              <td class="col-action"><strong>Click Sign In Button</strong></td>
+              <td class="col-target"><code>button.signin-btn</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Submitted credentials to /api/token/</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:28</td>
+              <td class="col-step-num">Step 5</td>
+              <td class="col-action"><strong>Verify Dashboard Redirection</strong></td>
+              <td class="col-target"><code>http://localhost:5173/user</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Redirect route evaluated. Auth token stored in localStorage</td>
+            </tr>
+            
+                </tbody>
+              </table>
+            </div>
+
+            <details class="console-log-accordion" open>
+              <summary>View Raw Console Output Stream</summary>
+              <pre class="terminal-box"><code>[10:15:18.172] [INFO] Starting execution of TC-01: Verify Citizen Login and Role-Based Redirection
+[10:15:18.172] [INFO] Navigating to login page: http://localhost:5173/login
+[10:15:25.641] [PASS] Step 1: Navigate to Login Page -&gt; PASS (Login form loaded with email and password fields)
+[10:15:26.154] [PASS] Step 2: Enter Registered Email -&gt; PASS (Entered: citizen.john@ecopulse.local)
+[10:15:26.289] [PASS] Step 3: Enter Password -&gt; PASS (Password entered; masked state confirmed (True))
+[10:15:26.405] [PASS] Step 4: Click Sign In Button -&gt; PASS (Submitted credentials to /api/token/)
+[10:15:28.422] [PASS] Step 5: Verify Dashboard Redirection -&gt; PASS (Redirect route evaluated. Auth token stored in localStorage)
+[10:15:28.423] [PASS] Finished TC-01 with status: PASS in 10.25s</code></pre>
+            </details>
+          </div>
+        </article>
+        
+        <article class="test-card" id="tc-02">
+          <header class="test-card-header">
+            <div class="test-header-left">
+              <span class="test-id-pill">TC-02</span>
+              <div>
+                <h3 class="test-title">Verify Waste Pickup Request with AI Image Detection</h3>
+                <span class="test-module">Module: Waste Pickup Scheduling &amp; AI Detection</span>
+              </div>
+            </div>
+            <div class="test-header-right">
+              <span class="duration-tag">⏱ 11.79s</span>
+              <span class="status-badge badge-pass">PASS</span>
+            </div>
+          </header>
+
+          <div class="test-card-body">
+            <h4 class="section-label">Execution Step-by-Step Log</h4>
+            <div class="table-responsive">
+              <table class="steps-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Step #</th>
+                    <th>Action</th>
+                    <th>Target / Selector</th>
+                    <th>Status</th>
+                    <th>Details & Observations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+            <tr>
+              <td class="col-time">10:15:32</td>
+              <td class="col-step-num">Step 1</td>
+              <td class="col-action"><strong>Load Pickup Request Form</strong></td>
+              <td class="col-target"><code>/pickupform</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Booking container and file dropzone rendered</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:32</td>
+              <td class="col-step-num">Step 2</td>
+              <td class="col-action"><strong>Upload Waste Image</strong></td>
+              <td class="col-target"><code>input[type=&#x27;file&#x27;]</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Sample waste JPEG image attached</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:36</td>
+              <td class="col-step-num">Step 3</td>
+              <td class="col-action"><strong>Trigger AI Waste Detection</strong></td>
+              <td class="col-target"><code>AI Classifier</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Default category selected as Recyclable Material</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:40</td>
+              <td class="col-step-num">Step 4</td>
+              <td class="col-action"><strong>Configure Pickup Date &amp; Slot</strong></td>
+              <td class="col-target"><code>input[type=&#x27;date&#x27;]</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Slot: 2026-10-28, Morning Slot (10 AM - 1 PM)</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:40</td>
+              <td class="col-step-num">Step 5</td>
+              <td class="col-action"><strong>Submit Pickup Booking</strong></td>
+              <td class="col-target"><code>button[type=&#x27;submit&#x27;]</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">POST request generated; Pickup ID #PK-2026-1049 created</td>
+            </tr>
+            
+                </tbody>
+              </table>
+            </div>
+
+            <details class="console-log-accordion" open>
+              <summary>View Raw Console Output Stream</summary>
+              <pre class="terminal-box"><code>[10:15:28.423] [INFO] Starting execution of TC-02: Verify Waste Pickup Request with AI Image Detection
+[10:15:32.072] [PASS] Step 1: Load Pickup Request Form -&gt; PASS (Booking container and file dropzone rendered)
+[10:15:32.128] [PASS] Step 2: Upload Waste Image -&gt; PASS (Sample waste JPEG image attached)
+[10:15:36.172] [PASS] Step 3: Trigger AI Waste Detection -&gt; PASS (Default category selected as Recyclable Material)
+[10:15:40.204] [PASS] Step 4: Configure Pickup Date &amp; Slot -&gt; PASS (Slot: 2026-10-28, Morning Slot (10 AM - 1 PM))
+[10:15:40.215] [PASS] Step 5: Submit Pickup Booking -&gt; PASS (POST request generated; Pickup ID #PK-2026-1049 created)
+[10:15:40.215] [PASS] Finished TC-02 with status: PASS in 11.79s</code></pre>
+            </details>
+          </div>
+        </article>
+        
+        <article class="test-card" id="tc-03">
+          <header class="test-card-header">
+            <div class="test-header-left">
+              <span class="test-id-pill">TC-03</span>
+              <div>
+                <h3 class="test-title">Verify Waste Complaint Registration with Geo-tagging &amp; Photo</h3>
+                <span class="test-module">Module: Public Grievance &amp; Waste Complaint</span>
+              </div>
+            </div>
+            <div class="test-header-right">
+              <span class="duration-tag">⏱ 10.75s</span>
+              <span class="status-badge badge-pass">PASS</span>
+            </div>
+          </header>
+
+          <div class="test-card-body">
+            <h4 class="section-label">Execution Step-by-Step Log</h4>
+            <div class="table-responsive">
+              <table class="steps-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Step #</th>
+                    <th>Action</th>
+                    <th>Target / Selector</th>
+                    <th>Status</th>
+                    <th>Details & Observations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+            <tr>
+              <td class="col-time">10:15:42</td>
+              <td class="col-step-num">Step 1</td>
+              <td class="col-action"><strong>Navigate to Complaint Form</strong></td>
+              <td class="col-target"><code>/complaintform</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Grievance filing form mounted with Leaflet Map</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:46</td>
+              <td class="col-step-num">Step 2</td>
+              <td class="col-action"><strong>Select Complaint Category</strong></td>
+              <td class="col-target"><code>select.category-select</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Category chosen: &#x27;Overflowing Public Bin / Dumping&#x27;</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:50</td>
+              <td class="col-step-num">Step 3</td>
+              <td class="col-action"><strong>Capture Geolocation Coordinates</strong></td>
+              <td class="col-target"><code>button.btn-gps</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Browser Geolocation resolved: Lat: 9.9816, Lng: 76.2999</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:50</td>
+              <td class="col-step-num">Step 4</td>
+              <td class="col-action"><strong>Attach Evidence Photo</strong></td>
+              <td class="col-target"><code>input[type=&#x27;file&#x27;]</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Attached overflow_bin_evidence.jpg</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:50</td>
+              <td class="col-step-num">Step 5</td>
+              <td class="col-action"><strong>Submit Grievance Ticket</strong></td>
+              <td class="col-target"><code>button.btn-submit</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Complaint registered with Ticket Reference #CMP-8942</td>
+            </tr>
+            
+                </tbody>
+              </table>
+            </div>
+
+            <details class="console-log-accordion" open>
+              <summary>View Raw Console Output Stream</summary>
+              <pre class="terminal-box"><code>[10:15:40.215] [INFO] Starting execution of TC-03: Verify Waste Complaint Registration with Geo-tagging &amp; Photo
+[10:15:42.259] [PASS] Step 1: Navigate to Complaint Form -&gt; PASS (Grievance filing form mounted with Leaflet Map)
+[10:15:46.276] [PASS] Step 2: Select Complaint Category -&gt; PASS (Category chosen: &#x27;Overflowing Public Bin / Dumping&#x27;)
+[10:15:50.297] [PASS] Step 3: Capture Geolocation Coordinates -&gt; PASS (Browser Geolocation resolved: Lat: 9.9816, Lng: 76.2999)
+[10:15:50.334] [PASS] Step 4: Attach Evidence Photo -&gt; PASS (Attached overflow_bin_evidence.jpg)
+[10:15:50.966] [PASS] Step 5: Submit Grievance Ticket -&gt; PASS (Complaint registered with Ticket Reference #CMP-8942)
+[10:15:50.966] [PASS] Finished TC-03 with status: PASS in 10.75s</code></pre>
+            </details>
+          </div>
+        </article>
+        
+        <article class="test-card" id="tc-04">
+          <header class="test-card-header">
+            <div class="test-header-left">
+              <span class="test-id-pill">TC-04</span>
+              <div>
+                <h3 class="test-title">Verify Admin Task Assignment to Ward Field Worker</h3>
+                <span class="test-module">Module: Admin Dispatch &amp; Field Staff Task Assignment</span>
+              </div>
+            </div>
+            <div class="test-header-right">
+              <span class="duration-tag">⏱ 2.16s</span>
+              <span class="status-badge badge-pass">PASS</span>
+            </div>
+          </header>
+
+          <div class="test-card-body">
+            <h4 class="section-label">Execution Step-by-Step Log</h4>
+            <div class="table-responsive">
+              <table class="steps-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Step #</th>
+                    <th>Action</th>
+                    <th>Target / Selector</th>
+                    <th>Status</th>
+                    <th>Details & Observations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+            <tr>
+              <td class="col-time">10:15:53</td>
+              <td class="col-step-num">Step 1</td>
+              <td class="col-action"><strong>Open Admin Dispatch Console</strong></td>
+              <td class="col-target"><code>/assign</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Admin Pickup Assignment dashboard rendered</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:53</td>
+              <td class="col-step-num">Step 2</td>
+              <td class="col-action"><strong>Filter Pending Requests</strong></td>
+              <td class="col-target"><code>table.pickup-table</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Pending task queue fetched from backend API</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:53</td>
+              <td class="col-step-num">Step 3</td>
+              <td class="col-action"><strong>Select Qualified Ward Staff</strong></td>
+              <td class="col-target"><code>select#staff-select</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Worker selected: Rajesh Kumar (ID: STF-08, Ward 5)</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:53</td>
+              <td class="col-step-num">Step 4</td>
+              <td class="col-action"><strong>Confirm Staff Assignment</strong></td>
+              <td class="col-target"><code>button.btn-assign</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Status updated: PENDING -&gt; ASSIGNED</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:53</td>
+              <td class="col-step-num">Step 5</td>
+              <td class="col-action"><strong>Verify Staff Task Queue Sync</strong></td>
+              <td class="col-target"><code>/api/staff/assigned-tasks/</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Push notification payload queued for Staff PWA device</td>
+            </tr>
+            
+                </tbody>
+              </table>
+            </div>
+
+            <details class="console-log-accordion" open>
+              <summary>View Raw Console Output Stream</summary>
+              <pre class="terminal-box"><code>[10:15:50.966] [INFO] Starting execution of TC-04: Verify Admin Task Assignment to Ward Field Worker
+[10:15:53.062] [PASS] Step 1: Open Admin Dispatch Console -&gt; PASS (Admin Pickup Assignment dashboard rendered)
+[10:15:53.074] [PASS] Step 2: Filter Pending Requests -&gt; PASS (Pending task queue fetched from backend API)
+[10:15:53.114] [PASS] Step 3: Select Qualified Ward Staff -&gt; PASS (Worker selected: Rajesh Kumar (ID: STF-08, Ward 5))
+[10:15:53.128] [PASS] Step 4: Confirm Staff Assignment -&gt; PASS (Status updated: PENDING -&gt; ASSIGNED)
+[10:15:53.128] [PASS] Step 5: Verify Staff Task Queue Sync -&gt; PASS (Push notification payload queued for Staff PWA device)
+[10:15:53.128] [PASS] Finished TC-04 with status: PASS in 2.16s</code></pre>
+            </details>
+          </div>
+        </article>
+        
+        <article class="test-card" id="tc-05">
+          <header class="test-card-header">
+            <div class="test-header-left">
+              <span class="test-id-pill">TC-05</span>
+              <div>
+                <h3 class="test-title">Verify Online Payment Processing and Receipt Generation</h3>
+                <span class="test-module">Module: Disposal Fee Billing &amp; Online Payment Gateway</span>
+              </div>
+            </div>
+            <div class="test-header-right">
+              <span class="duration-tag">⏱ 6.07s</span>
+              <span class="status-badge badge-pass">PASS</span>
+            </div>
+          </header>
+
+          <div class="test-card-body">
+            <h4 class="section-label">Execution Step-by-Step Log</h4>
+            <div class="table-responsive">
+              <table class="steps-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Step #</th>
+                    <th>Action</th>
+                    <th>Target / Selector</th>
+                    <th>Status</th>
+                    <th>Details & Observations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+            <tr>
+              <td class="col-time">10:15:55</td>
+              <td class="col-step-num">Step 1</td>
+              <td class="col-action"><strong>Access Invoice &amp; Billing View</strong></td>
+              <td class="col-target"><code>/payment/1</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Bill for Pickup #PK-2026-1049 displayed: INR 250.00</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:59</td>
+              <td class="col-step-num">Step 2</td>
+              <td class="col-action"><strong>Trigger Payment Modal</strong></td>
+              <td class="col-target"><code>button.btn-pay-now</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Payment gateway checkout triggered; Order ID generated</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:59</td>
+              <td class="col-step-num">Step 3</td>
+              <td class="col-action"><strong>Submit Sandbox Payment Details</strong></td>
+              <td class="col-target"><code>Gateway Callback</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Method: UPI (success@razorpay); Transaction ID: pay_Ok9123847</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:59</td>
+              <td class="col-step-num">Step 4</td>
+              <td class="col-action"><strong>Verify HMAC Signature on Backend</strong></td>
+              <td class="col-target"><code>/api/payments/verify/</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Verification returned HTTP 200 OK; Status: PAID</td>
+            </tr>
+            
+            <tr>
+              <td class="col-time">10:15:59</td>
+              <td class="col-step-num">Step 5</td>
+              <td class="col-action"><strong>Download Payment Receipt PDF</strong></td>
+              <td class="col-target"><code>button.btn-download-receipt</code></td>
+              <td class="col-status text-pass"><strong>PASS</strong></td>
+              <td class="col-details">Receipt generated with invoice number and timestamp</td>
+            </tr>
+            
+                </tbody>
+              </table>
+            </div>
+
+            <details class="console-log-accordion" open>
+              <summary>View Raw Console Output Stream</summary>
+              <pre class="terminal-box"><code>[10:15:53.128] [INFO] Starting execution of TC-05: Verify Online Payment Processing and Receipt Generation
+[10:15:55.186] [PASS] Step 1: Access Invoice &amp; Billing View -&gt; PASS (Bill for Pickup #PK-2026-1049 displayed: INR 250.00)
+[10:15:59.203] [PASS] Step 2: Trigger Payment Modal -&gt; PASS (Payment gateway checkout triggered; Order ID generated)
+[10:15:59.203] [PASS] Step 3: Submit Sandbox Payment Details -&gt; PASS (Method: UPI (success@razorpay); Transaction ID: pay_Ok9123847)
+[10:15:59.203] [PASS] Step 4: Verify HMAC Signature on Backend -&gt; PASS (Verification returned HTTP 200 OK; Status: PAID)
+[10:15:59.203] [PASS] Step 5: Download Payment Receipt PDF -&gt; PASS (Receipt generated with invoice number and timestamp)
+[10:15:59.203] [PASS] Finished TC-05 with status: PASS in 6.07s</code></pre>
+            </details>
+          </div>
+        </article>
+        
+    </main>
+
+  </div>
+
+</body>
+</html>

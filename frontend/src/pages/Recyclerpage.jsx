@@ -153,12 +153,16 @@ export default function EcoPulseRecyclerDashboard() {
   };
 
   const handleBack = () => {
-    if (window.history.length > 1) window.history.back();
-    else navigate("/");
+    if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate("/recycler");
+    }
   };
 
   const handleHome = () => {
-    window.location.href = "/";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigate("/recycler");
   };
 
   const handleLogout = () => {

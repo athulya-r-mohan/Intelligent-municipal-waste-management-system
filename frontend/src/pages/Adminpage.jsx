@@ -712,10 +712,14 @@ export default function EcoPulseAdmin() {
                           </span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--pulse-muted)", fontWeight: 500 }}>Estimated Quantity:</span>
+                          <span style={{ color: "var(--pulse-muted)", fontWeight: 500 }}>
+                            {selectedSubmission.waste_type === "Plastic Bottles" ? "Bottle Count:" : "Estimated Quantity:"}
+                          </span>
                           <span style={{ fontWeight: 700, color: "var(--pulse-ink)" }}>
                             {selectedSubmission.estimated_quantity !== null && selectedSubmission.estimated_quantity !== undefined
-                              ? `${selectedSubmission.estimated_quantity} kg`
+                              ? selectedSubmission.waste_type === "Plastic Bottles"
+                                ? `${Math.floor(Number(selectedSubmission.estimated_quantity))} bottles`
+                                : `${selectedSubmission.estimated_quantity} kg`
                               : "N/A"}
                           </span>
                         </div>
@@ -1370,10 +1374,14 @@ export default function EcoPulseAdmin() {
                                     </span>
                                   </div>
                                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span style={{ color: "var(--pulse-muted)", fontWeight: 500 }}>Quantity:</span>
+                                    <span style={{ color: "var(--pulse-muted)", fontWeight: 500 }}>
+                                      {item.waste_type === "Plastic Bottles" ? "Bottle Count:" : "Quantity:"}
+                                    </span>
                                     <span style={{ fontWeight: 700, color: "var(--pulse-ink)" }}>
                                       {item.estimated_quantity !== null && item.estimated_quantity !== undefined
-                                        ? `${item.estimated_quantity} kg`
+                                        ? item.waste_type === "Plastic Bottles"
+                                          ? `${Math.floor(Number(item.estimated_quantity))} bottles`
+                                          : `${item.estimated_quantity} kg`
                                         : "N/A"}
                                     </span>
                                   </div>

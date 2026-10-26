@@ -1,0 +1,203 @@
+import os
+import zlib
+import requests
+from PIL import Image
+
+DIAGRAMS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def encode_6bit(b):
+    if b < 10: return chr(48 + b)
+    b -= 10
+    if b < 26: return chr(65 + b)
+    b -= 26
+    if b < 26: return chr(97 + b)
+    b -= 26
+    if b == 0: return '-'
+    if b == 1: return '_'
+    return '?'
+
+def append3bytes(b1, b2, b3):
+    c1 = b1 >> 2
+    c2 = ((b1 & 0x3) << 4) | (b2 >> 4)
+    c3 = ((b2 & 0xF) << 2) | (b3 >> 6)
+    c4 = b3 & 0x3F
+    return encode_6bit(c1 & 0x3F) + encode_6bit(c2 & 0x3F) + encode_6bit(c3 & 0x3F) + encode_6bit(c4 & 0x3F)
+
+def encode_plantuml(text):
+    z = zlib.compressobj(level=9, method=zlib.DEFLATED, wbits=-15)
+    compressed = z.compress(text.encode('utf-8')) + z.flush()
+    res = []
+    for i in range(0, len(compressed), 3):
+        b1 = compressed[i]
+        b2 = compressed[i+1] if i+1 < len(compressed) else 0
+        b3 = compressed[i+2] if i+2 < len(compressed) else 0
+        res.append(append3bytes(b1, b2, b3))
+    return ''.join(res)
+
+PUML = """@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\\nUse Case Diagram
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 13
+skinparam roundCorner 8
+skinparam nodesep 22
+skinparam ranksep 28
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  ArrowColor #000000
+}
+
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 14
+  FontStyle bold
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 16
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Citizen" as citizen
+actor "Collection Staff" as staff
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "EcoPulse Intelligent Municipal Waste Management System" {
+  
+  package "Citizen Services & AI Subsystem" as P_Citizen {
+    usecase "Register & Login (JWT)" as UC_C1
+    usecase "Submit Waste Pickup Request" as UC_C2
+    usecase "Detect Waste via YOLO AI" as UC_C3
+    usecase "Pay Pickup Fee (Rs. 50)" as UC_C4
+    usecase "Track Pickup Request Status" as UC_C5
+    usecase "Cancel Active Pickup Request" as UC_C6
+    usecase "Register Waste Complaint" as UC_C7
+    usecase "Track Waste Complaint Status" as UC_C8
+    usecase "Submit Item for Reward Points" as UC_C9
+    usecase "Claim Reward Coupon" as UC_C10
+  }
+
+  package "Field Collection & Operations Subsystem" as P_Staff {
+    usecase "Staff Login (JWT)" as UC_S1
+    usecase "View Assigned Tasks & Date Schedule" as UC_S2
+    usecase "Start Scheduled Collection Route" as UC_S3
+    usecase "View Optimized Route Preview" as UC_S4
+    usecase "Update Status & Record Waste Weight" as UC_S5
+    usecase "Resolve Complaint with Proof Photo" as UC_S6
+    usecase "Log Daily Segregated MCF Waste" as UC_S7
+  }
+
+  package "Administrative Management Subsystem" as P_Admin {
+    usecase "Admin Login (JWT)" as UC_A1
+    usecase "Assign Pickup to Staff & Set Date" as UC_A2
+    usecase "Assign Complaint to Staff" as UC_A3
+    usecase "Manage MCF Totals & Assign Recycler" as UC_A4
+    usecase "Review & Allocate Reward Points" as UC_A5
+    usecase "View System Analytics & Reports" as UC_A6
+  }
+
+  package "MCF & Recycling Operations Subsystem" as P_Recycler {
+    usecase "Recycler Login (JWT)" as UC_R1
+    usecase "View Assigned Recycling Batches" as UC_R2
+    usecase "Complete Recycling & Upload Proof" as UC_R3
+  }
+}
+
+' ================= Citizen Connections =================
+citizen --> UC_C1
+citizen --> UC_C2
+citizen --> UC_C5
+citizen --> UC_C7
+citizen --> UC_C8
+citizen --> UC_C9
+citizen --> UC_C10
+
+UC_C2 ..> UC_C3 : <<include>>
+UC_C2 ..> UC_C4 : <<include>>
+UC_C6 ..> UC_C5 : <<extend>>
+
+' Layout ordering inside Citizen package
+UC_C2 -[hidden]down-> UC_C3
+UC_C3 -[hidden]down-> UC_C4
+UC_C5 -[hidden]down-> UC_C6
+
+' ================= Staff Connections =================
+staff --> UC_S1
+staff --> UC_S2
+staff --> UC_S3
+staff --> UC_S5
+staff --> UC_S6
+staff --> UC_S7
+
+UC_S3 ..> UC_S4 : <<include>>
+UC_S3 -[hidden]down-> UC_S4
+
+' ================= Admin Connections =================
+admin --> UC_A1
+admin --> UC_A2
+admin --> UC_A3
+admin --> UC_A4
+admin --> UC_A5
+admin --> UC_A6
+
+' ================= Recycler Connections =================
+recycler --> UC_R1
+recycler --> UC_R2
+recycler --> UC_R3
+
+@enduml
+"""
+
+def main():
+    puml_path = os.path.join(DIAGRAMS_DIR, "01_Use_Case_Diagram.puml")
+    svg_path = os.path.join(DIAGRAMS_DIR, "01_Use_Case_Diagram.svg")
+    png_path = os.path.join(DIAGRAMS_DIR, "01_Use_Case_Diagram.png")
+
+    with open(puml_path, "w", encoding="utf-8") as f:
+        f.write(PUML.strip() + "\n")
+    print(f"Written PUML: {puml_path}")
+
+    encoded = encode_plantuml(PUML)
+    
+    # SVG
+    r_svg = requests.get(f"http://www.plantuml.com/plantuml/svg/{encoded}", timeout=40)
+    with open(svg_path, "wb") as f:
+        f.write(r_svg.content)
+    print(f"Written SVG: {svg_path} ({len(r_svg.content)} bytes)")
+
+    # PNG
+    r_png = requests.get(f"http://www.plantuml.com/plantuml/png/{encoded}", timeout=40)
+    with open(png_path, "wb") as f:
+        f.write(r_png.content)
+    print(f"Written PNG: {png_path} ({len(r_png.content)} bytes)")
+
+    im = Image.open(png_path)
+    print(f"PNG Image Dimensions: {im.size} (Width x Height)")
+
+if __name__ == "__main__":
+    main()

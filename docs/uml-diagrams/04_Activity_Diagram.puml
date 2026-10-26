@@ -1,0 +1,115 @@
+@startuml
+title EcoPulse - Activity Diagram (End-to-End Waste Collection Lifecycle)
+
+skinparam dpi 300
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam defaultFontSize 14
+skinparam roundCorner 8
+
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  ArrowColor #000000
+  StartColor #000000
+  EndColor #000000
+  BarColor #000000
+}
+
+skinparam diamond {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+}
+
+skinparam partition {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+|Citizen|
+start
+:Access Citizen Portal;
+:Upload waste images & enter address;
+
+|EcoPulse Platform|
+:Invoke YOLOv8 Waste Detection Model;
+:Extract detected classes & confidence scores;
+:Display detection completion popup;
+
+|Citizen|
+:Review waste classification;
+:Initiate fixed Rs. 50 pickup fee payment;
+
+|EcoPulse Platform|
+if (Payment successful?) then (yes)
+  :Generate unique Payment ID;
+  :Create WastePickupRequest with status 'PENDING';
+  :Store uploaded WastePickupImage records;
+  :Dispatch notification to Municipal Admin;
+else (no)
+  :Display payment failure message;
+  stop
+endif
+
+|Administrator|
+:Review pending pickups on Admin Dashboard;
+:Inspect waste details, coordinates & ward;
+:Select field staff & set scheduled pickup date;
+
+|EcoPulse Platform|
+:Update pickup status to 'ASSIGNED';
+:Send push notifications to Staff & Citizen;
+
+|Collection Staff|
+:View assigned tasks in Staff Dashboard;
+:Open schedule for the assigned date;
+:Request Route Optimization preview;
+
+|EcoPulse Platform|
+:Query OSRM road geometry engine;
+:Calculate optimal stop sequence from Ward MCF;
+:Render interactive navigation route;
+
+|Collection Staff|
+:Click 'Start Collection' button;
+
+|EcoPulse Platform|
+:Batch update eligible tasks to 'IN_PROGRESS';
+:Notify citizens that collection vehicle is en route;
+
+|Collection Staff|
+:Navigate to citizen pickup location;
+if (Waste accessible and available?) then (yes)
+  :Collect waste into vehicle;
+  :Capture completion proof photo;
+  :Input verified waste weight in kg;
+  :Submit task completion;
+  |EcoPulse Platform|
+  :Save WasteCollection record;
+  :Update pickup status to 'COMPLETED';
+  :Push completion notification to Citizen;
+  |Citizen|
+  :Receive completion notice & view history;
+  stop
+else (no)
+  |Collection Staff|
+  :Mark task 'PENDING' with justification reason;
+  |EcoPulse Platform|
+  :Update status to 'PENDING';
+  :Flag staff_marked_pending = True;
+  :Notify Admin & Citizen for rescheduling;
+  |Administrator|
+  :Review pending reason & reschedule staff/date;
+  detach
+endif
+
+@enduml

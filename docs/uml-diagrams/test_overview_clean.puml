@@ -1,0 +1,80 @@
+@startuml
+title EcoPulse - Intelligent Municipal Waste Management System\nSystem Use Case Diagram (High-Level Overview)
+
+skinparam dpi 160
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontColor #000000
+skinparam roundCorner 8
+
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 13
+  FontStyle bold
+  ArrowColor #000000
+}
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #000000
+  FontColor #000000
+  FontSize 15
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Citizen" as citizen
+actor "Collection Staff" as staff
+actor "Municipal Administrator" as admin
+actor "Recycling Partner" as recycler
+
+rectangle "EcoPulse Intelligent Municipal Waste Management System" {
+  
+  ' Citizen primary goals
+  usecase "Request Waste Pickup\n(with YOLO AI & Payment)" as UC1
+  usecase "Lodge & Track Waste Grievance" as UC2
+  usecase "Earn Rewards for Recyclables" as UC3
+
+  ' Staff primary goals
+  usecase "Execute Scheduled Collection Routes" as UC4
+  usecase "Resolve Citizen Grievances" as UC5
+  usecase "Log Segregated MCF Facility Waste" as UC6
+
+  ' Admin primary goals
+  usecase "Assign Pickups & Grievances to Staff" as UC7
+  usecase "Manage MCF Inventory & Recyclers" as UC8
+  usecase "Monitor Municipal Analytics & Reports" as UC9
+
+  ' Recycler primary goals
+  usecase "Process Industrial Recycling Batches" as UC10
+}
+
+citizen --> UC1
+citizen --> UC2
+citizen --> UC3
+
+staff --> UC4
+staff --> UC5
+staff --> UC6
+
+UC7 <-- admin
+UC8 <-- admin
+UC9 <-- admin
+
+UC10 <-- recycler
+
+UC8 ..> UC10 : allocates
+
+@enduml
