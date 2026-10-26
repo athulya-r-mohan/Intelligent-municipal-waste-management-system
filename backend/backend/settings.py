@@ -100,6 +100,15 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DB_SSL_REQUIRE = os.environ.get("DB_SSL_REQUIRE", "False").lower() in ("true", "1")
 
+db_host = os.environ.get("DB_HOST", "localhost")
+if db_host == "db":
+    import socket
+    try:
+        socket.gethostbyname("db")
+    except socket.gaierror:
+        # Running locally outside Docker container -> fallback to localhost
+        db_host = "localhost"
+
 if os.environ.get("DATABASE_URL"):
     DATABASES = {
         "default": dj_database_url.config(
@@ -109,26 +118,17 @@ if os.environ.get("DATABASE_URL"):
             ssl_require=DB_SSL_REQUIRE,
         )
     }
-elif os.environ.get("DB_HOST"):
+else:
+    # If host was fallback to localhost or user set localhost
+    is_local = db_host in ("localhost", "127.0.0.1")
     DATABASES = {
         "default": {
             "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.postgresql"),
-            "NAME": os.environ.get("DB_NAME", "waste-management"),
-            "USER": os.environ.get("DB_USER", "postgres"),
-            "PASSWORD": os.environ.get("DB_PASSWORD", "athulya123"),
-            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "NAME": "waste-management" if is_local and os.environ.get("DB_NAME") in ("waste_management", None) else os.environ.get("DB_NAME", "waste-management"),
+            "USER": "postgres" if is_local and os.environ.get("DB_USER") in ("ecopulse_user", None) else os.environ.get("DB_USER", "postgres"),
+            "PASSWORD": "athulya123" if is_local and os.environ.get("DB_PASSWORD") in ("ecopulse_secure_password_123", None) else os.environ.get("DB_PASSWORD", "athulya123"),
+            "HOST": db_host,
             "PORT": os.environ.get("DB_PORT", "5432"),
-        }
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'waste-management',
-            'USER': 'postgres',
-            'PASSWORD': 'athulya123',
-            'HOST': 'localhost',
-            'PORT': '5432',
         }
     }
 
