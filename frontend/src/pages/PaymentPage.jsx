@@ -124,93 +124,84 @@ export default function PaymentPage() {
       const { order_id, amount, currency, key_id } = orderRes.data;
       const razorpayKey = key_id || import.meta.env.VITE_RAZORPAY_KEY_ID;
 
+      if (!razorpayKey) {
+        throw new Error(
+          "Razorpay Key ID is not configured on the backend server. Please set RAZORPAY_KEY_ID in the environment variables."
+        );
+      }
+
       // Ensure Razorpay SDK is loaded
       const isLoaded = await loadRazorpayScript();
-
-      if (razorpayKey && isLoaded && window.Razorpay) {
-        // 2. Launch Official Razorpay Checkout Modal
-        const options = {
-          key: razorpayKey,
-          amount: Math.round((amount || 50) * 100), // amount in paise
-          currency: currency || "INR",
-          name: "EcoPulse Waste Management",
-          description: `Disposal Fee for Pickup #${pickupId}`,
-          image: "/favicon.svg",
-          order_id: order_id,
-          handler: async function (response) {
-            try {
-              // 3. Verify Razorpay signature on backend
-              const verifyRes = await axios.post(
-                `${API_BASE_URL}/api/waste/payments/verify/`,
-                {
-                  pickup_id: parseInt(pickupId, 10),
-                  transaction_id: response.razorpay_payment_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature,
-                  payment_method: chosenMethod,
-                },
-                config
-              );
-
-              if (verifyRes.data?.success && verifyRes.data?.payment) {
-                setPaymentData(verifyRes.data.payment);
-                setPaymentCompleted(true);
-                setShowReceiptModal(true);
-              } else {
-                setErrorMsg(verifyRes.data?.error || "Payment verification failed. Please contact support.");
-              }
-            } catch (vErr) {
-              console.error("Verification error:", vErr);
-              setErrorMsg(vErr.response?.data?.error || "Error verifying payment signature.");
-            } finally {
-              setProcessing(false);
-            }
-          },
-          prefill: {
-            name: localStorage.getItem("name") || "Citizen",
-            email: localStorage.getItem("email") || "",
-          },
-          notes: {
-            pickup_id: String(pickupId),
-            service: "Doorstep Municipal Waste Collection",
-          },
-          theme: {
-            color: "#10b981",
-          },
-          modal: {
-            ondismiss: function () {
-              setProcessing(false);
-            },
-          },
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.on("payment.failed", function (failResponse) {
-          console.error("Razorpay payment failed:", failResponse.error);
-          setErrorMsg(failResponse.error?.description || "Payment was declined or cancelled.");
-          setProcessing(false);
-        });
-        rzp.open();
-      } else {
-        // Fallback for local development if keys are not yet provided
-        const verifyPayload = {
-          pickup_id: parseInt(pickupId, 10),
-          razorpay_order_id: order_id,
-          payment_method: chosenMethod,
-        };
-
-        const res = await axios.post(`${API_BASE_URL}/api/waste/payments/verify/`, verifyPayload, config);
-
-        if (res.data?.success && res.data?.payment) {
-          setPaymentData(res.data.payment);
-          setPaymentCompleted(true);
-          setShowReceiptModal(true);
-        } else {
-          setErrorMsg(res.data?.error || "Payment verification failed. Please try again.");
-        }
-        setProcessing(false);
+      if (!isLoaded || !window.Razorpay) {
+        throw new Error(
+          "Failed to load the Razorpay checkout script. Please check your network connection or ad-blocker settings."
+        );
       }
+
+      // 2. Launch Official Razorpay Checkout Modal
+      const options = {
+        key: razorpayKey,
+        amount: Math.round((amount || 50) * 100), // amount in paise
+        currency: currency || "INR",
+        name: "EcoPulse Waste Management",
+        description: `Disposal Fee for Pickup #${pickupId}`,
+        image: "/favicon.svg",
+        order_id: order_id,
+        handler: async function (response) {
+          try {
+            // 3. Verify Razorpay signature on backend
+            const verifyRes = await axios.post(
+              `${API_BASE_URL}/api/waste/payments/verify/`,
+              {
+                pickup_id: parseInt(pickupId, 10),
+                transaction_id: response.razorpay_payment_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                payment_method: chosenMethod,
+              },
+              config
+            );
+
+            if (verifyRes.data?.success && verifyRes.data?.payment) {
+              setPaymentData(verifyRes.data.payment);
+              setPaymentCompleted(true);
+              setShowReceiptModal(true);
+            } else {
+              setErrorMsg(verifyRes.data?.error || "Payment verification failed. Please contact support.");
+            }
+          } catch (vErr) {
+            console.error("Verification error:", vErr);
+            setErrorMsg(vErr.response?.data?.error || "Error verifying payment signature.");
+          } finally {
+            setProcessing(false);
+          }
+        },
+        prefill: {
+          name: localStorage.getItem("name") || "Citizen",
+          email: localStorage.getItem("email") || "",
+        },
+        notes: {
+          pickup_id: String(pickupId),
+          service: "Doorstep Municipal Waste Collection",
+        },
+        theme: {
+          color: "#10b981",
+        },
+        modal: {
+          ondismiss: function () {
+            setProcessing(false);
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", function (failResponse) {
+        console.error("Razorpay payment failed:", failResponse.error);
+        setErrorMsg(failResponse.error?.description || "Payment was declined or cancelled.");
+        setProcessing(false);
+      });
+      rzp.open();
     } catch (err) {
       console.error("Payment processing error:", err);
       setErrorMsg(err.response?.data?.error || err.message || "Payment processing failed. Please try again.");

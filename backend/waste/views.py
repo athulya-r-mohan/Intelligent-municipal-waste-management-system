@@ -3231,30 +3231,36 @@ class PaymentCreateOrderView(APIView):
         amount_in_rupees = float(payment.amount or 50.00)
         amount_in_paise = int(amount_in_rupees * 100)
 
-        order_id = None
-        if key_id and key_secret:
-            try:
-                import razorpay
-                client = razorpay.Client(auth=(key_id, key_secret))
-                order_data = {
-                    "amount": amount_in_paise,
-                    "currency": "INR",
-                    "receipt": f"rcpt_{pickup.id}_{payment.id}",
-                    "notes": {
-                        "pickup_id": str(pickup.id),
-                        "user_id": str(pickup.user.id),
-                        "payment_id": str(payment.payment_id),
-                    }
+        if not key_id or not key_secret:
+            logger.error("Razorpay keys missing: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be configured in server environment variables.")
+            return Response({
+                "success": False,
+                "error": "Razorpay payment gateway is not configured on the backend server. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the deployment environment variables.",
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            import razorpay
+            client = razorpay.Client(auth=(key_id, key_secret))
+            order_data = {
+                "amount": amount_in_paise,
+                "currency": "INR",
+                "receipt": f"rcpt_{pickup.id}_{payment.id}",
+                "notes": {
+                    "pickup_id": str(pickup.id),
+                    "user_id": str(pickup.user.id),
+                    "payment_id": str(payment.payment_id),
                 }
-                razorpay_order = client.order.create(data=order_data)
-                order_id = razorpay_order.get("id")
-            except Exception as e:
-                logger.error(f"Razorpay order creation error: {e}")
-                import uuid
-                order_id = f"order_ecopulse_{uuid.uuid4().hex[:12]}"
-        else:
-            import uuid
-            order_id = f"order_ecopulse_{uuid.uuid4().hex[:12]}"
+            }
+            razorpay_order = client.order.create(data=order_data)
+            order_id = razorpay_order.get("id")
+            if not order_id:
+                raise ValueError("No order ID returned by Razorpay API.")
+        except Exception as e:
+            logger.error(f"Razorpay order creation error: {e}")
+            return Response({
+                "success": False,
+                "error": f"Failed to initialize Razorpay payment order: {str(e)}",
+            }, status=status.HTTP_502_BAD_GATEWAY)
 
         payment.order_id = order_id
         payment.save(update_fields=["order_id"])
@@ -3310,7 +3316,12 @@ class PaymentVerifyView(APIView):
         key_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "")
 
         # Verify Razorpay signature if provided
-        if key_id and key_secret and razorpay_signature and razorpay_payment_id and razorpay_order_id:
+        if razorpay_signature:
+            if not (key_id and key_secret):
+                return Response({
+                    "success": False,
+                    "error": "Payment verification failed: Razorpay API keys are not configured on the backend server.",
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             try:
                 import razorpay
                 client = razorpay.Client(auth=(key_id, key_secret))

@@ -151,6 +151,10 @@ CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://ecopuls
 GUNICORN_WORKERS=3
 GUNICORN_THREADS=2
 GUNICORN_TIMEOUT=120
+
+# Razorpay Payment Gateway Configuration
+RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
 EOF
     echo -e "${GREEN}[OK] Created .env with random secure SECRET_KEY and DB_PASSWORD.${NC}"
 else
